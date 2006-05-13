@@ -1,0 +1,239 @@
+#! /usr/bin/perl
+
+#export PATH=$PATH:/usr/sbin:/sbin
+
+# common options
+# --exclude-globbing-filelist /etc/rdiff-backup/exclude-generic
+
+use strict;
+use warnings;
+use Getopt::Long;
+
+our $TEST=1;
+our $STATS=1;
+our $VERBOSITY=5;
+our $TVERBOSITY=3;
+our $LOCALHOST;
+our $COMPARE=0;
+our $RDIFF_BACKUP='rdiff-backup'; # assume it's in the path
+our $BACKUP_ROOT='/mnt/auto/backup/rdiff-backup';
+our $EXCLUDE_PATH='/etc/rdiff-backup';
+our $PATH;
+
+GetOptions('test!'          => \$TEST,
+           'stats!'         => \$STATS,
+           'verb=i'         => \$VERBOSITY,
+           'tverb=i'        => \$TVERBOSITY,
+           'localhost=s'    => \$LOCALHOST,
+           'rdiff-backup=s' => \$RDIFF_BACKUP,
+           'backup-root=s'  => \$BACKUP_ROOT,
+           'compare'        => \$COMPARE,
+           'path=s'         => \$PATH,
+          );
+
+if(not defined $LOCALHOST) {
+  $LOCALHOST=`hostname`;
+  chomp $LOCALHOST;
+  my @a=split(/\./,$LOCALHOST);
+  @a > 1 and $LOCALHOST=$a[0];
+}
+
+our @BACKUPS=({ 'path' => '/' },
+              { 'path' => '/var' },
+              { 'path' => '/usr' },
+              { 'path' => '/home' },
+              { 'path' => '/var/lib/mysql-snap',
+                'prerun' => '/usr/local/sbin/rsnap-lvm',
+                'postrun' => '/usr/local/sbin/rsnap-lvm --remove',
+                'dest' => 'cain-mysql',
+              },
+              { 'path' => '/diskless' },
+              { 'path' => '/var/log' },
+              { 'path' => '/',
+                'host' => 'xbox1', },
+              { 'path' => '/diskless/delight',
+                'dest' => 'delight-root',
+              },
+              { 'path' => '/diskless/xbox1/home',
+                'dest' => 'xbox1-home',
+              },
+              { 'root' => '/home/spin/rdiff-backup',
+                'host' => 'benway',
+                'path' => '/home',
+              },
+              { 'root' => '/home/spin/rdiff-backup',
+                'host' => 'male',
+                'path' => '/home/acox',
+              },
+            );
+
+
+foreach my $bh (@BACKUPS) {
+  my $host=(defined $$bh{host} ? $$bh{host} : $LOCALHOST);
+  my $path=(defined $$bh{path} ? $$bh{path} : '/');
+  my $dest;
+  my $tag;
+  if(defined $$bh{dest}) {
+    $dest=$$bh{dest};
+    $tag=$dest;
+  } else {
+    $dest=$path;
+    $dest =~ s/\//\-/g;
+    $dest eq '-' and $dest='-root';
+    $tag=$host.$dest;
+  }
+ 
+  $dest=(defined $$bh{root} ? $$bh{root} : $BACKUP_ROOT).'/'.$tag;
+  if(defined $PATH and $path !~ /$PATH/) {
+    next;
+  }
+  print "$host $path $tag $dest\n";
+
+  my @com=($RDIFF_BACKUP,
+           '--verbosity',$VERBOSITY,
+           '--terminal-verbosity',$TVERBOSITY,
+           '--exclude-special-files',
+           '--exclude-other-filesystems',
+           );
+  $STATS and push(@com,'--print-statistics');
+
+  if($path =~ /(home|home\/acox)$/) {
+    push(@com,'--exclude-globbing-filelist',
+         $EXCLUDE_PATH.'/exclude-generic-home');
+  }
+  push(@com,'--exclude-globbing-filelist',
+       $EXCLUDE_PATH.'/exclude-'.$tag);
+
+  if($COMPARE) {
+    push(@com,'--compare');
+  }
+
+  push(@com,($host eq $LOCALHOST ? $path : $host.'::'.$path),$dest);
+  print join(" ",@com)."\n";
+
+  unless($TEST) {
+    if($host ne $LOCALHOST) {
+      system("fping $host");
+      unless($? == 0) {
+        warn "fping failed to ping $host";
+        next;
+      }
+    }
+    if(defined $$bh{prerun}) {
+      print $$bh{prerun}."\n";
+      system($$bh{prerun});
+      unless($? == 0) {
+        warn "unable to execute prerun command: skipping backup!";
+        next;
+      }
+    }
+    system(@com);
+    unless($? == 0) {
+      warn "unable to execute rdiff-backup!";
+    }
+    if(defined $$bh{postrun}) {
+      print $$bh{postrun}."\n";
+      system($$bh{postrun});
+      unless($? == 0) {
+        warn "unable to execute postrun command";
+      }
+    }
+  }
+}
+
+# $GENERIC_OPTS="--verbosity 5 --terminal-verbosity 3 
+#       --exclude-special-files --print-statistics --exclude-other-filesystems"
+
+# COM='nice rdiff-backup'
+# COM="$* $COM"
+
+
+# if [[ -d $BACKUP_ROOT ]]; then
+#     echo cain /
+#     $COM $OPTS \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-cain-root \
+#         / \
+#         $BACKUP_ROOT/cain-root
+
+#     echo cain /var
+#     $COM $OPTS \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-cain-var \
+#         /var \
+#         $BACKUP_ROOT/cain-var
+
+#     echo cain /usr
+#     $COM $OPTS \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-cain-usr \
+#         /usr \
+#         $BACKUP_ROOT/cain-usr
+
+#     echo cain /home
+#     $COM $OPTS \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-generic-home \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-cain-home \
+#         /home \
+#         $BACKUP_ROOT/cain-home
+
+#     echo cain /diskless
+#     $COM $OPTS \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-cain-diskless \
+#         /diskless \
+#         $BACKUP_ROOT/cain-diskless
+
+#     echo cain /var/log
+#     $COM $OPTS \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-cain-var-log \
+#         /var/log \
+#         $BACKUP_ROOT/cain-var-log
+
+#     echo cain /var/lib/mysql
+#     /usr/local/sbin/rsnap-lvm &&
+#     $COM --verbosity 5 --terminal-verbosity 3 --exclude-special-files --print-statistics \
+#         /var/lib/mysql-snap \
+#         $BACKUP_ROOT/cain-mysql
+
+#     /usr/local/sbin/rsnap-lvm --remove
+
+#     echo xbox1 /
+#     fping xbox1 &&
+#     $COM $OPTS \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-xbox1 \
+#         xbox1::/ \
+#         $BACKUP_ROOT/xbox1
+
+#     echo delight /
+#     $COM $OPTS \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-delight \
+#         /diskless/delight \
+#         $BACKUP_ROOT/delight
+
+#     echo xbox1 /home
+#     $COM $OPTS \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-generic-home \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-xbox1-home \
+#         /diskless/xbox1/home \
+#         $BACKUP_ROOT/xbox1-home
+
+# fi
+
+# BACKUP_ROOT=/home/spin/rdiff-backup
+
+# if [[ -d $BACKUP_ROOT ]]; then
+
+#     echo benway /home
+#     fping benway &&
+#     $COM $OPTS \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-generic-home \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-benway-home \
+#         benway::/home \
+#         $BACKUP_ROOT/benway-home
+
+#     echo male /home
+#     fping male &&
+#     $COM $OPTS \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-generic-home \
+#         --exclude-globbing-filelist /etc/rdiff-backup/exclude-male-home \
+#         male::/home \
+#         $BACKUP_ROOT/male-home
+
+# fi
