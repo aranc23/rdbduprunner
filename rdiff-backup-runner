@@ -1,9 +1,6 @@
 #! /usr/bin/perl
 
-#export PATH=$PATH:/usr/sbin:/sbin
-
-# common options
-# --exclude-globbing-filelist /etc/rdiff-backup/exclude-generic
+# $Id: rdiff-backup-runner,v 1.3 2006/05/13 21:38:13 spin Exp $
 
 use strict;
 use warnings;
