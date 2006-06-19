@@ -1,27 +1,31 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.4 2006/05/15 03:08:10 spin Exp $
+# $Id: rdiff-backup-runner,v 1.5 2006/06/19 18:15:47 spin Exp $
 
 use strict;
 use warnings;
 use Getopt::Long;
+use logentry;
 
 our $TEST=1;
-our $STATS=1;
 our $VERBOSITY=5;
 our $TVERBOSITY=3;
 our $LOCALHOST;
 our $COMPARE=0;
 our $RDIFF_BACKUP='rdiff-backup'; # assume it's in the path
-our $BACKUP_ROOT='/mnt/auto/backup/rdiff-backup';
+our $BACKUP_ROOT='/mnt/backup/rdiff-backup';
 our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $HOST;
-our $REMOVE;
 our $FORCE=0;
+our $REMOVE;
+our %INCREMENTS;
+our ($VERBOSE,$DEBUG);
+our $COMPRESS=1;
+our $AVERAGE;
+our ($IFILES,$IFILESIZE,$DESTSIZECHANGE);
 
 GetOptions('test!'          => \$TEST,
-           'stats!'         => \$STATS,
            'verbosity=i'    => \$VERBOSITY,
            'terminal-verbosity=i'   => \$TVERBOSITY,
            'localhost=s'    => \$LOCALHOST,
@@ -30,8 +34,12 @@ GetOptions('test!'          => \$TEST,
            'compare'        => \$COMPARE,
            'path=s'         => \$PATH,
            'host=s'         => \$HOST,
-           'remove=s'       => \$REMOVE,
            'force!'         => \$FORCE,
+           'remove-oldest!' => \$REMOVE,
+           'verbose!'       => \$VERBOSE,
+           'debug!'         => \$DEBUG,
+           'compress!'      => \$COMPRESS,
+	   'average'        => \$AVERAGE,
           );
 
 if(not defined $LOCALHOST) {
@@ -45,8 +53,9 @@ our @BACKUPS=({ 'path' => '/' },
               { 'path' => '/var' },
               { 'path' => '/usr' },
               { 'path' => '/home' },
+              { 'path' => '/home/spin/Maildir' },
               { 'path' => '/var/lib/mysql-snap',
-                'prerun' => '/usr/local/sbin/rsnap-lvm',
+                'prerun' => '/usr/local/sbin/rsnap-lvm --pv /dev/md2',
                 'postrun' => '/usr/local/sbin/rsnap-lvm --remove',
                 'dest' => 'cain-mysql',
               },
@@ -56,6 +65,12 @@ our @BACKUPS=({ 'path' => '/' },
                 'host' => 'xbox1', },
               { 'path' => '/diskless/delight',
                 'dest' => 'delight-root',
+              },
+              { 'path' => '/diskless/delight/usr',
+                'dest' => 'delight-usr',
+              },
+              { 'path' => '/diskless/delight/var',
+                'dest' => 'delight-var',
               },
               { 'path' => '/diskless/xbox1/home',
                 'dest' => 'xbox1-home',
@@ -68,8 +83,18 @@ our @BACKUPS=({ 'path' => '/' },
                 'host' => 'male',
                 'path' => '/home/acox',
               },
+              { 'root' => '/home/spin/rdiff-backup',
+                'host' => 'lazarus',
+                'path' => '/',
+              },
+              { 'root' => '/home/spin/rdiff-backup',
+                'host' => 'lazarus',
+                'path' => '/home',
+              },
             );
 
+logentry::OpenLog('local5','rdiff-backup-runner');
+logentry('info','starting');
 
 foreach my $bh (@BACKUPS) {
   my $host=(defined $$bh{host} ? $$bh{host} : $LOCALHOST);
@@ -93,15 +118,50 @@ foreach my $bh (@BACKUPS) {
   if(defined $HOST and $host !~ /$HOST/) {
     next;
   }
-  print "$host $path $tag $dest\n";
 
-  my @com=($RDIFF_BACKUP,
-           '--verbosity',$VERBOSITY,
-           '--terminal-verbosity',$TVERBOSITY,
-           '--exclude-special-files',
-           '--exclude-other-filesystems',
-           );
-  $STATS and push(@com,'--print-statistics');
+  logentry('info',"$host $path $tag $dest");
+
+  my @com;
+
+  if(defined $AVERAGE) {
+    my $c="rdiff-backup --calculate-average $dest/rdiff-backup-data/session_statistics.*.data";
+    logentry('debug',$c);
+    my @res=`$c`;
+    #print @res;
+    foreach my $ln (@res) {
+      chomp $ln;
+      $ln =~ /IncrementFiles\s+(.+?)$/ and $IFILES+=int($1);
+      $ln =~ /IncrementFileSize\s+(.+?)\s+/ and $IFILESIZE+=($1/1024/1024);
+      $ln =~ /TotalDestinationSizeChange\s+(.+?)\s+/ and $DESTSIZECHANGE+=($1/1024/1024);
+    }
+    next;
+  }
+
+  if(defined $REMOVE) {
+    my $c="rdiff-backup -l --parsable-output ";
+    $c.=$dest;
+    logentry('debug',$c);
+    my @res=`$c`;
+    @res == 1 and next; # if there is only one increment, don't consider it for removal
+    foreach my $ln (@res) {
+      chomp $ln;
+      $ln =~ /^(\d+)\sdirectory$/ or next;
+      if(exists $INCREMENTS{$1}) {
+        warn "conflict: $1 $tag $dest";
+      }
+      $INCREMENTS{$1}=[$dest,$tag];
+    }
+    next;
+  }
+
+  @com=($RDIFF_BACKUP,
+	'--verbosity',$VERBOSITY,
+	'--terminal-verbosity',$TVERBOSITY,
+	'--exclude-special-files',
+	'--exclude-other-filesystems',
+       );
+  $COMPRESS or push(@com,'--ssh-no-compression');
+  $VERBOSE and push(@com,'--print-statistics');
 
   if($path =~ /(home|home\/acox)$/) {
     push(@com,'--exclude-globbing-filelist',
@@ -115,13 +175,13 @@ foreach my $bh (@BACKUPS) {
   }
 
   push(@com,($host eq $LOCALHOST ? $path : $host.'::'.$path),$dest);
-  print join(" ",@com)."\n";
+  logentry('info',join(" ",@com));
 
   unless($TEST) {
     if($host ne $LOCALHOST) {
-      system("fping $host");
+      system("/usr/sbin/fping -q $host");
       unless($? == 0) {
-        warn "fping failed to ping $host";
+        logentry('warning',"fping failed to ping $host");
         next;
       }
     }
@@ -129,36 +189,46 @@ foreach my $bh (@BACKUPS) {
       print $$bh{prerun}."\n";
       system($$bh{prerun});
       unless($? == 0) {
-        warn "unable to execute prerun command: skipping backup!";
+        logentry('err',"unable to execute prerun command: skipping backup!");
         next;
       }
     }
     system(@com);
     my $mainret=$?;
     unless($mainret == 0) {
-      warn "unable to execute rdiff-backup!";
+      logentry('err',"unable to execute rdiff-backup!");
     }
     if(defined $$bh{postrun}) {
       print $$bh{postrun}."\n";
       system($$bh{postrun});
       unless($? == 0) {
-        warn "unable to execute postrun command";
-      }
-    }
-  }
-  if(defined $REMOVE) {
-    @com=($RDIFF_BACKUP,'--remove-older-than',$REMOVE);
-    if($FORCE) {
-      push(@com,'--force');
-    }
-    push(@com,$dest);
-    print join(" ",@com)."\n";
-    unless($TEST) {
-      system(@com);
-      unless($? == 0) {
-        warn "unable to execute rdiff-backup!";
+        logentry('err',"unable to execute postrun command");
       }
     }
   }
 }
 
+if(defined $AVERAGE) {
+  printf("IncrementFiles: %d\nIncrementFileSize: %.2f MiB\nTotalDestinationSizeChange: %.2f MiB\n",
+	 $IFILES,$IFILESIZE,
+	 $DESTSIZECHANGE);
+}
+
+if(defined $REMOVE) {
+  foreach my $t (sort { $a <=> $b } (keys(%INCREMENTS))) {
+    logentry('debug',"$t $INCREMENTS{$t}[0] $INCREMENTS{$t}[1]");
+    my @com=($RDIFF_BACKUP,
+	     '--verbosity',$VERBOSITY,
+	     '--terminal-verbosity',$TVERBOSITY,
+	     '--remove-older-than',($t+1),
+	     $INCREMENTS{$t}[0]);
+    logentry('info',join(" ",@com));
+    unless($TEST) {
+      system(@com);
+      unless($? == 0) {
+	logentry('err',"unable to execute rdiff-backup!");
+      }
+    }
+    last;
+  }
+}
