@@ -1,11 +1,12 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.5 2006/06/19 18:15:47 spin Exp $
+# $Id: rdiff-backup-runner,v 1.6 2006/10/05 15:13:53 spin Exp $
 
 use strict;
 use warnings;
 use Getopt::Long;
 use logentry;
+use File::Temp qw( mkdtemp mkstemp );
 
 our $TEST=1;
 our $VERBOSITY=5;
@@ -24,6 +25,9 @@ our ($VERBOSE,$DEBUG);
 our $COMPRESS=1;
 our $AVERAGE;
 our ($IFILES,$IFILESIZE,$DESTSIZECHANGE);
+our $SNAPPV='/dev/md2';
+our $SNAPSIZE='1G';
+our $LISTOLDEST=0;
 
 GetOptions('test!'          => \$TEST,
            'verbosity=i'    => \$VERBOSITY,
@@ -39,7 +43,9 @@ GetOptions('test!'          => \$TEST,
            'verbose!'       => \$VERBOSE,
            'debug!'         => \$DEBUG,
            'compress!'      => \$COMPRESS,
-	   'average'        => \$AVERAGE,
+           'average'        => \$AVERAGE,
+           'snappv=s'       => \$SNAPPV,
+           'list-oldest' => \$LISTOLDEST,
           );
 
 if(not defined $LOCALHOST) {
@@ -49,18 +55,29 @@ if(not defined $LOCALHOST) {
   @a > 1 and $LOCALHOST=$a[0];
 }
 
-our @BACKUPS=({ 'path' => '/' },
-              { 'path' => '/var' },
-              { 'path' => '/usr' },
-              { 'path' => '/home' },
-              { 'path' => '/home/spin/Maildir' },
+our @BACKUPS=({ 'path' => '/', },
+              { 'path'  => '/var',
+#	        'lvdev' => '/dev/main2/var'
+		},
+              { 'path' => '/usr',
+#	        'lvdev'=> '/dev/main2/usr2'
+		},
+              { 'path' => '/home',
+#	        'lvdev'=> '/dev/main2/home'
+		},
+              { 'path' => '/home/spin/Maildir',
+	        #'lvdev' => '/dev/main2/home'
+		},
               { 'path' => '/var/lib/mysql-snap',
                 'prerun' => '/usr/local/sbin/rsnap-lvm --pv /dev/md2',
                 'postrun' => '/usr/local/sbin/rsnap-lvm --remove',
                 'dest' => 'cain-mysql',
               },
               { 'path' => '/diskless' },
-              { 'path' => '/var/log' },
+#              { 'path' => '/var/log',
+		#'lvdev' => '/dev/main2/log',
+		# never activate lvdev for this path
+#	      },
               { 'path' => '/',
                 'host' => 'xbox1', },
               { 'path' => '/diskless/delight',
@@ -71,6 +88,9 @@ our @BACKUPS=({ 'path' => '/' },
               },
               { 'path' => '/diskless/delight/var',
                 'dest' => 'delight-var',
+              },
+              { 'path' => '/diskless/delight/home',
+                'dest' => 'delight-home',
               },
               { 'path' => '/diskless/xbox1/home',
                 'dest' => 'xbox1-home',
@@ -91,12 +111,49 @@ our @BACKUPS=({ 'path' => '/' },
                 'host' => 'lazarus',
                 'path' => '/home',
               },
+	      { 'root' => '/mnt/backup2/rdiff-backup',
+		'host' => 'spidermonk',
+		'path' => '/',
+	      },
+	      { 'root' => '/mnt/backup2/rdiff-backup',
+		'host' => 'spidermonk',
+		'path' => '/var',
+	      },
+	      { 'root' => '/mnt/backup2/rdiff-backup',
+		'host' => 'spidermonk',
+		'path' => '/home',
+	      },
+	      { 'root' => '/mnt/backup2/rdiff-backup',
+		'host' => 'spidermonk',
+		'path' => '/boot',
+	      },
+              { 'root' => '/mnt/backup2/rdiff-backup',
+                'host' => 'spidermonk',
+                'path' => '/media/sda1',
+              },
+	      { 'root' => '/home/spin/rdiff-backup',
+		'host' => 'oldben',
+		'path' => '/',
+	      },
+	      { 'root' => '/home/spin/rdiff-backup',
+		'host' => 'oldben',
+		'path' => '/var',
+	      },
+	      { 'root' => '/home/spin/rdiff-backup',
+		'host' => 'oldben',
+		'path' => '/boot',
+	      },
+	      { 'root' => '/home/spin/rdiff-backup',
+		'host' => 'oldben',
+		'path' => '/etc',
+	      },
             );
 
 logentry::OpenLog('local5','rdiff-backup-runner');
 logentry('info','starting');
 
 foreach my $bh (@BACKUPS) {
+  my @EXCLUDES;
   my $host=(defined $$bh{host} ? $$bh{host} : $LOCALHOST);
   my $path=(defined $$bh{path} ? $$bh{path} : '/');
   my $dest;
@@ -137,7 +194,7 @@ foreach my $bh (@BACKUPS) {
     next;
   }
 
-  if(defined $REMOVE) {
+  if(defined $REMOVE or $LISTOLDEST) {
     my $c="rdiff-backup -l --parsable-output ";
     $c.=$dest;
     logentry('debug',$c);
@@ -163,18 +220,78 @@ foreach my $bh (@BACKUPS) {
   $COMPRESS or push(@com,'--ssh-no-compression');
   $VERBOSE and push(@com,'--print-statistics');
 
+
   if($path =~ /(home|home\/acox)$/) {
-    push(@com,'--exclude-globbing-filelist',
-         $EXCLUDE_PATH.'/exclude-generic-home');
+    #push(@com,'--exclude-globbing-filelist',
+    #     $EXCLUDE_PATH.'/exclude-generic-home');
+    push(@EXCLUDES,$EXCLUDE_PATH.'/exclude-generic-home');
   }
-  push(@com,'--exclude-globbing-filelist',
+  push(@EXCLUDES,
        $EXCLUDE_PATH.'/exclude-'.$tag);
+  #push(@com,'--exclude-globbing-filelist',
+  #     $EXCLUDE_PATH.'/exclude-'.$tag);
 
   if($COMPARE) {
     push(@com,'--compare');
   }
 
-  push(@com,($host eq $LOCALHOST ? $path : $host.'::'.$path),$dest);
+  my $TMPDIR;
+  my ($EXH, $EXF);
+  my $VGDEV;
+  if($host eq $LOCALHOST and defined $$bh{lvdev}) {
+    my $scom='';
+    $TMPDIR = mkdtemp( '/mnt/rdrXXXXXX' );
+    print $TMPDIR."\n";
+    $VGDEV=$$bh{lvdev};
+    $VGDEV =~ s/\/[a-zA-Z0-9_\-]+$//;
+    unless($TEST) {
+      $scom="lvcreate -s -L $SNAPSIZE -n rdr $$bh{lvdev} $SNAPPV";
+      logentry('info',$scom);
+      system($scom);
+      unless($? == 0) {
+	logentry('crit',
+		 "unable to create snapshot for $$bh{lvdev} with size $SNAPSIZE".
+		 (defined $SNAPPV and length $SNAPPV > 0 ? " on $SNAPPV" : ''));
+	next;
+      }
+      $scom="mount -o ro $VGDEV/rdr $TMPDIR";
+      logentry('info',$scom);
+      system($scom);
+      unless($? == 0) {
+	logentry('crit',
+		 "unable to mount -o ro $VGDEV/rdr $TMPDIR");
+	$scom="lvremove -f $VGDEV/rdr";
+	logentry('info',$scom);
+	unless($? == 0) {
+	  logentry('crit',
+		   "unable to remove lv snapshot $VGDEV/rdr");
+	}
+	next;
+      }
+    }
+    ($EXH,$EXF) = mkstemp( "/tmp/tmpfilerdrXXXXX" );
+    foreach my $f (@EXCLUDES) {
+      unless(open(IF,$f)) {
+	logentry('warn',"unabled to open $f");
+	next;
+      }
+      while(<IF>) {
+	s/$path/$TMPDIR/;
+	print $EXH $_;
+      }
+    }
+    close $EXH;
+    push(@com,'--exclude-globbing-filelist',
+	 $EXF);
+
+    push(@com,$TMPDIR,$dest);
+  } else {
+    foreach my $f (@EXCLUDES) {
+      push(@com,'--exclude-globbing-filelist',
+	   $f);
+    }
+    push(@com,($host eq $LOCALHOST ? $path : $host.'::'.$path),$dest);
+  }
   logentry('info',join(" ",@com));
 
   unless($TEST) {
@@ -205,6 +322,27 @@ foreach my $bh (@BACKUPS) {
         logentry('err',"unable to execute postrun command");
       }
     }
+    if($host eq $LOCALHOST and defined $$bh{lvdev}) {
+      my $scom="umount $TMPDIR";
+      logentry('info',$scom);
+      system($scom);
+      unless($? == 0) {
+	logentry('err',"unable to umount $TMPDIR");
+      } else {
+	$scom="lvremove -f $VGDEV/rdr";
+	logentry('info',$scom);
+	system($scom);
+	unless($? == 0) {
+	  logentry('err',"unable to lvremove $VGDEV/rdr");
+	}
+      }
+      if( defined $TMPDIR and -d $TMPDIR ) {
+	rmdir($TMPDIR);
+      }
+    }
+    if( defined $EXF and -f $EXF ) {
+      unlink($EXF);
+    }
   }
 }
 
@@ -230,5 +368,11 @@ if(defined $REMOVE) {
       }
     }
     last;
+  }
+}
+
+if($LISTOLDEST) {
+  foreach my $t (sort { $a <=> $b } (keys(%INCREMENTS))) {
+    logentry('info',localtime($t).' '.$INCREMENTS{$t}[0].' '.$INCREMENTS{$t}[1]);
   }
 }
