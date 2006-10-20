@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.6 2006/10/05 15:13:53 spin Exp $
+# $Id: rdiff-backup-runner,v 1.7 2006/10/20 14:01:07 spin Exp $
 
 use strict;
 use warnings;
@@ -67,7 +67,9 @@ our @BACKUPS=({ 'path' => '/', },
 		},
               { 'path' => '/home/spin/Maildir',
 	        #'lvdev' => '/dev/main2/home'
-		},
+	      },
+              { 'path' => '/home/spin/enlil',
+	      },
               { 'path' => '/var/lib/mysql-snap',
                 'prerun' => '/usr/local/sbin/rsnap-lvm --pv /dev/md2',
                 'postrun' => '/usr/local/sbin/rsnap-lvm --remove',
@@ -127,10 +129,10 @@ our @BACKUPS=({ 'path' => '/', },
 		'host' => 'spidermonk',
 		'path' => '/boot',
 	      },
-              { 'root' => '/mnt/backup2/rdiff-backup',
-                'host' => 'spidermonk',
-                'path' => '/media/sda1',
-              },
+              #{ 'root' => '/mnt/backup2/rdiff-backup',
+              #  'host' => 'spidermonk',
+              #  'path' => '/media/sda1',
+              #},
 	      { 'root' => '/home/spin/rdiff-backup',
 		'host' => 'oldben',
 		'path' => '/',
@@ -146,6 +148,10 @@ our @BACKUPS=({ 'path' => '/', },
 	      { 'root' => '/home/spin/rdiff-backup',
 		'host' => 'oldben',
 		'path' => '/etc',
+	      },
+	      { 'root' => '/home/spin/rdiff-backup',
+		'host' => 'oldben',
+		'path' => '/home',
 	      },
             );
 
