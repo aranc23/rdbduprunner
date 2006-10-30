@@ -1,12 +1,13 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.8 2006/10/30 15:43:13 spin Exp $
+# $Id: rdiff-backup-runner,v 1.9 2006/10/30 16:01:41 spin Exp $
 
 use strict;
 use warnings;
 use Getopt::Long;
 use logentry;
 use File::Temp qw( mkdtemp mkstemp );
+use Data::Dumper;
 
 our $TEST=1;
 our $VERBOSITY=5;
@@ -163,7 +164,7 @@ our @BACKUPS=({ 'path' => '/', },
 logentry::OpenLog('local5','rdiff-backup-runner');
 logentry('info','starting');
 
-foreach my $bh (@BACKUPS) {
+foreach my $bh (sort backup_sort (@BACKUPS)) {
   my @EXCLUDES;
   my $host=(defined $$bh{host} ? $$bh{host} : $LOCALHOST);
   my $path=(defined $$bh{path} ? $$bh{path} : '/');
@@ -386,5 +387,15 @@ if(defined $REMOVE) {
 if($LISTOLDEST) {
   foreach my $t (sort { $a <=> $b } (keys(%INCREMENTS))) {
     logentry('info',localtime($t).' '.$INCREMENTS{$t}[0].' '.$INCREMENTS{$t}[1]);
+  }
+}
+
+sub backup_sort {
+  if((defined $$a{host} ? $$a{host} : $LOCALHOST) eq
+     (defined $$b{host} ? $$b{host} : $LOCALHOST)) {
+    return $$a{path} cmp $$b{path};
+  } else {
+    return (defined $$a{host} ? $$a{host} : $LOCALHOST) cmp
+      (defined $$b{host} ? $$b{host} : $LOCALHOST);
   }
 }
