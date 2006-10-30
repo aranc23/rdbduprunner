@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.7 2006/10/20 14:01:07 spin Exp $
+# $Id: rdiff-backup-runner,v 1.8 2006/10/30 15:43:13 spin Exp $
 
 use strict;
 use warnings;
@@ -22,7 +22,6 @@ our $FORCE=0;
 our $REMOVE;
 our %INCREMENTS;
 our ($VERBOSE,$DEBUG);
-our $COMPRESS=1;
 our $AVERAGE;
 our ($IFILES,$IFILESIZE,$DESTSIZECHANGE);
 our $SNAPPV='/dev/md2';
@@ -42,10 +41,9 @@ GetOptions('test!'          => \$TEST,
            'remove-oldest!' => \$REMOVE,
            'verbose!'       => \$VERBOSE,
            'debug!'         => \$DEBUG,
-           'compress!'      => \$COMPRESS,
            'average'        => \$AVERAGE,
            'snappv=s'       => \$SNAPPV,
-           'list-oldest' => \$LISTOLDEST,
+           'list-oldest'    => \$LISTOLDEST,
           );
 
 if(not defined $LOCALHOST) {
@@ -100,10 +98,12 @@ our @BACKUPS=({ 'path' => '/', },
               { 'root' => '/home/spin/rdiff-backup',
                 'host' => 'benway',
                 'path' => '/home',
+		'compress' => 1,
               },
               { 'root' => '/home/spin/rdiff-backup',
                 'host' => 'male',
                 'path' => '/home/acox',
+		'compress' => 1,
               },
               { 'root' => '/home/spin/rdiff-backup',
                 'host' => 'lazarus',
@@ -129,29 +129,34 @@ our @BACKUPS=({ 'path' => '/', },
 		'host' => 'spidermonk',
 		'path' => '/boot',
 	      },
-              #{ 'root' => '/mnt/backup2/rdiff-backup',
-              #  'host' => 'spidermonk',
-              #  'path' => '/media/sda1',
-              #},
+              { 'root' => '/mnt/backup2/rdiff-backup',
+                'host' => 'spidermonk',
+                'path' => '/media/winxp',
+              },
 	      { 'root' => '/home/spin/rdiff-backup',
 		'host' => 'oldben',
 		'path' => '/',
+		'compress' => 1,
 	      },
 	      { 'root' => '/home/spin/rdiff-backup',
 		'host' => 'oldben',
 		'path' => '/var',
+		'compress' => 1,
 	      },
 	      { 'root' => '/home/spin/rdiff-backup',
 		'host' => 'oldben',
 		'path' => '/boot',
+		'compress' => 1,
 	      },
 	      { 'root' => '/home/spin/rdiff-backup',
 		'host' => 'oldben',
 		'path' => '/etc',
+		'compress' => 1,
 	      },
 	      { 'root' => '/home/spin/rdiff-backup',
 		'host' => 'oldben',
 		'path' => '/home',
+		'compress' => 1,
 	      },
             );
 
@@ -162,6 +167,7 @@ foreach my $bh (@BACKUPS) {
   my @EXCLUDES;
   my $host=(defined $$bh{host} ? $$bh{host} : $LOCALHOST);
   my $path=(defined $$bh{path} ? $$bh{path} : '/');
+  my $sshcompress=(defined $$bh{compress} ? $$bh{compress} : 0);
   my $dest;
   my $tag;
   if(defined $$bh{dest}) {
@@ -223,7 +229,7 @@ foreach my $bh (@BACKUPS) {
 	'--exclude-special-files',
 	'--exclude-other-filesystems',
        );
-  $COMPRESS or push(@com,'--ssh-no-compression');
+  $sshcompress or push(@com,'--ssh-no-compression');
   $VERBOSE and push(@com,'--print-statistics');
 
 
