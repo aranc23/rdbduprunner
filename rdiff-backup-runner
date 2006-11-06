@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.9 2006/10/30 16:01:41 spin Exp $
+# $Id: rdiff-backup-runner,v 1.10 2006/11/06 17:02:20 spin Exp $
 
 use strict;
 use warnings;
@@ -31,7 +31,7 @@ our $LISTOLDEST=0;
 
 GetOptions('test!'          => \$TEST,
            'verbosity=i'    => \$VERBOSITY,
-           'terminal-verbosity=i'   => \$TVERBOSITY,
+           'terminal-verbosity=i' => \$TVERBOSITY,
            'localhost=s'    => \$LOCALHOST,
            'rdiff-backup=s' => \$RDIFF_BACKUP,
            'backup-root=s'  => \$BACKUP_ROOT,
