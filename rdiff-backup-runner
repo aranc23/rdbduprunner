@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.10 2006/11/06 17:02:20 spin Exp $
+# $Id: rdiff-backup-runner,v 1.11 2007/01/09 21:48:09 spin Exp $
 
 use strict;
 use warnings;
@@ -8,6 +8,7 @@ use Getopt::Long;
 use logentry;
 use File::Temp qw( mkdtemp mkstemp );
 use Data::Dumper;
+use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 
 our $TEST=1;
 our $VERBOSITY=5;
@@ -28,6 +29,9 @@ our ($IFILES,$IFILESIZE,$DESTSIZECHANGE);
 our $SNAPPV='/dev/md2';
 our $SNAPSIZE='1G';
 our $LISTOLDEST=0;
+our $CLEANUP;
+our $FREE;
+our $CHECK=0;
 
 GetOptions('test!'          => \$TEST,
            'verbosity=i'    => \$VERBOSITY,
@@ -45,6 +49,9 @@ GetOptions('test!'          => \$TEST,
            'average'        => \$AVERAGE,
            'snappv=s'       => \$SNAPPV,
            'list-oldest'    => \$LISTOLDEST,
+	   'cleanup=s'      => \$CLEANUP,
+	   'free=s'         => \$FREE,
+	   'check'          => \$CHECK, # perform a check-destination-dir on target
           );
 
 if(not defined $LOCALHOST) {
@@ -56,42 +63,40 @@ if(not defined $LOCALHOST) {
 
 our @BACKUPS=({ 'path' => '/', },
               { 'path'  => '/var',
-#	        'lvdev' => '/dev/main2/var'
-		},
+              },
               { 'path' => '/usr',
-#	        'lvdev'=> '/dev/main2/usr2'
-		},
+              },
               { 'path' => '/home',
-#	        'lvdev'=> '/dev/main2/home'
-		},
+              },
               { 'path' => '/home/spin/Maildir',
-	        #'lvdev' => '/dev/main2/home'
-	      },
+              },
               { 'path' => '/home/spin/enlil',
-	      },
-              { 'path' => '/var/lib/mysql-snap',
-                'prerun' => '/usr/local/sbin/rsnap-lvm --pv /dev/md2',
+              },
+              { 'path'    => '/var/lib/mysql-snap',
+                'prerun'  => '/usr/local/sbin/rsnap-lvm --pv /dev/md2',
                 'postrun' => '/usr/local/sbin/rsnap-lvm --remove',
-                'dest' => 'cain-mysql',
+                'dest'    => 'cain-mysql',
               },
-              { 'path' => '/diskless' },
-#              { 'path' => '/var/log',
-		#'lvdev' => '/dev/main2/log',
-		# never activate lvdev for this path
-#	      },
+              { 'path' => '/diskless'
+              },
+              #{ 'path' => '/var/log',
+              #  'lvdev' => '/dev/main2/log',
+              # never activate lvdev for this path
+              #},
               { 'path' => '/',
-                'host' => 'xbox1', },
-              { 'path' => '/diskless/delight',
-                'dest' => 'delight-root',
+                'host' => 'xbox1',
               },
-              { 'path' => '/diskless/delight/usr',
-                'dest' => 'delight-usr',
+              { 'host' => 'delight',
+                'path' => '/',
               },
-              { 'path' => '/diskless/delight/var',
-                'dest' => 'delight-var',
+              { 'path' => '/usr',
+                'host' => 'delight',
               },
-              { 'path' => '/diskless/delight/home',
-                'dest' => 'delight-home',
+              { 'path' => '/var',
+                'host' => 'delight',
+              },
+              { 'path' => '/home',
+                'host' => 'delight',
               },
               { 'path' => '/diskless/xbox1/home',
                 'dest' => 'xbox1-home',
@@ -99,12 +104,12 @@ our @BACKUPS=({ 'path' => '/', },
               { 'root' => '/home/spin/rdiff-backup',
                 'host' => 'benway',
                 'path' => '/home',
-		'compress' => 1,
+                'compress' => 1,
               },
               { 'root' => '/home/spin/rdiff-backup',
                 'host' => 'male',
                 'path' => '/home/acox',
-		'compress' => 1,
+                'compress' => 1,
               },
               { 'root' => '/home/spin/rdiff-backup',
                 'host' => 'lazarus',
@@ -114,52 +119,52 @@ our @BACKUPS=({ 'path' => '/', },
                 'host' => 'lazarus',
                 'path' => '/home',
               },
-	      { 'root' => '/mnt/backup2/rdiff-backup',
-		'host' => 'spidermonk',
-		'path' => '/',
-	      },
-	      { 'root' => '/mnt/backup2/rdiff-backup',
-		'host' => 'spidermonk',
-		'path' => '/var',
-	      },
-	      { 'root' => '/mnt/backup2/rdiff-backup',
-		'host' => 'spidermonk',
-		'path' => '/home',
-	      },
-	      { 'root' => '/mnt/backup2/rdiff-backup',
-		'host' => 'spidermonk',
-		'path' => '/boot',
-	      },
+              { 'root' => '/mnt/backup2/rdiff-backup',
+                'host' => 'spidermonk',
+                'path' => '/',
+              },
+              { 'root' => '/mnt/backup2/rdiff-backup',
+                'host' => 'spidermonk',
+                'path' => '/var',
+              },
+              { 'root' => '/mnt/backup2/rdiff-backup',
+                'host' => 'spidermonk',
+                'path' => '/home',
+              },
+              { 'root' => '/mnt/backup2/rdiff-backup',
+                'host' => 'spidermonk',
+                'path' => '/boot',
+              },
               { 'root' => '/mnt/backup2/rdiff-backup',
                 'host' => 'spidermonk',
                 'path' => '/media/winxp',
               },
-	      { 'root' => '/home/spin/rdiff-backup',
-		'host' => 'oldben',
-		'path' => '/',
-		'compress' => 1,
-	      },
-	      { 'root' => '/home/spin/rdiff-backup',
-		'host' => 'oldben',
-		'path' => '/var',
-		'compress' => 1,
-	      },
-	      { 'root' => '/home/spin/rdiff-backup',
-		'host' => 'oldben',
-		'path' => '/boot',
-		'compress' => 1,
-	      },
-	      { 'root' => '/home/spin/rdiff-backup',
-		'host' => 'oldben',
-		'path' => '/etc',
-		'compress' => 1,
-	      },
-	      { 'root' => '/home/spin/rdiff-backup',
-		'host' => 'oldben',
-		'path' => '/home',
-		'compress' => 1,
-	      },
-            );
+              { 'root' => '/home/spin/rdiff-backup',
+                'host' => 'oldben',
+                'path' => '/',
+                'compress' => 1,
+              },
+              { 'root' => '/home/spin/rdiff-backup',
+                'host' => 'oldben',
+                'path' => '/var',
+                'compress' => 1,
+              },
+              { 'root' => '/home/spin/rdiff-backup',
+                'host' => 'oldben',
+                'path' => '/boot',
+                'compress' => 1,
+              },
+              { 'root' => '/home/spin/rdiff-backup',
+                'host' => 'oldben',
+                'path' => '/etc',
+                'compress' => 1,
+              },
+              { 'root' => '/home/spin/rdiff-backup',
+                'host' => 'oldben',
+                'path' => '/home',
+                'compress' => 1,
+              },
+             );
 
 logentry::OpenLog('local5','rdiff-backup-runner');
 logentry('info','starting');
@@ -181,7 +186,11 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
     $tag=$host.$dest;
   }
 
-  $dest=(defined $$bh{root} ? $$bh{root} : $BACKUP_ROOT).'/'.$tag;
+  unless(defined $$bh{root}) {
+    $$bh{root}=$BACKUP_ROOT;
+  }
+  $dest=$$bh{root}.'/'.$tag;
+
   if(defined $PATH and $path !~ /$PATH/) {
     next;
   }
@@ -234,7 +243,7 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
   $VERBOSE and push(@com,'--print-statistics');
 
 
-  if($path =~ /(home|home\/acox)$/) {
+  if($path =~ /(home|home\/acox|home\/spin\/Maildir)$/) {
     #push(@com,'--exclude-globbing-filelist',
     #     $EXCLUDE_PATH.'/exclude-generic-home');
     push(@EXCLUDES,$EXCLUDE_PATH.'/exclude-generic-home');
@@ -308,19 +317,39 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
   logentry('info',join(" ",@com));
 
   unless($TEST) {
-    if($host ne $LOCALHOST) {
-      system("/usr/sbin/fping -q $host");
-      unless($? == 0) {
-        logentry('warning',"fping failed to ping $host");
-        next;
-      }
+    my $LOCK_FILE="$dest/rdiff-backup-data/rdiff-backup-runner.pid";
+    unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
+      logentry('err',"unable to open pid file: $LOCK_FILE for writing");
+      next;
     }
-    if(defined $$bh{prerun}) {
-      print $$bh{prerun}."\n";
-      system($$bh{prerun});
-      unless($? == 0) {
-        logentry('err',"unable to execute prerun command: skipping backup!");
-        next;
+    unless(flock(LOCK,LOCK_EX|LOCK_NB)) {
+      logentry('err',"unable to flock the pid file: $LOCK_FILE");
+      next;
+    }
+    truncate(LOCK,0); # this shouldn't fail if we have the file opened and locked!
+    print LOCK $$."\n"; # who really cares if this fails?
+
+    if($CHECK) {
+      @com=($RDIFF_BACKUP,
+	    '--verbosity',$VERBOSITY,
+	    '--terminal-verbosity',$TVERBOSITY,
+	    '--check-destination-dir',$dest);
+      logentry('info',join(" ",@com));
+    } else {
+      if ($host ne $LOCALHOST) {
+	system("/usr/sbin/fping -q $host");
+	unless($? == 0) {
+	  logentry('warning',"fping failed to ping $host");
+	  next;
+	}
+      }
+      if (defined $$bh{prerun}) {
+	print $$bh{prerun}."\n";
+	system($$bh{prerun});
+	unless($? == 0) {
+	  logentry('err',"unable to execute prerun command: skipping backup!");
+	  next;
+	}
       }
     }
     system(@com);
@@ -328,11 +357,13 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
     unless($mainret == 0) {
       logentry('err',"unable to execute rdiff-backup!");
     }
-    if(defined $$bh{postrun}) {
-      print $$bh{postrun}."\n";
-      system($$bh{postrun});
-      unless($? == 0) {
-        logentry('err',"unable to execute postrun command");
+    unless($CHECK) {
+      if(defined $$bh{postrun}) {
+	print $$bh{postrun}."\n";
+	system($$bh{postrun});
+	unless($? == 0) {
+	  logentry('err',"unable to execute postrun command");
+	}
       }
     }
     if($host eq $LOCALHOST and defined $$bh{lvdev}) {
@@ -356,6 +387,9 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
     if( defined $EXF and -f $EXF ) {
       unlink($EXF);
     }
+    unlink $LOCK_FILE;
+    flock(LOCK,LOCK_UN);
+    close LOCK;
   }
 }
 
