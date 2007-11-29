@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.11 2007/01/09 21:48:09 spin Exp $
+# $Id: rdiff-backup-runner,v 1.12 2007/11/29 16:07:59 spin Exp $
 
 use strict;
 use warnings;
@@ -9,6 +9,7 @@ use logentry;
 use File::Temp qw( mkdtemp mkstemp );
 use Data::Dumper;
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
+use Env qw( HOME );
 
 our $TEST=1;
 our $VERBOSITY=5;
@@ -16,7 +17,7 @@ our $TVERBOSITY=3;
 our $LOCALHOST;
 our $COMPARE=0;
 our $RDIFF_BACKUP='rdiff-backup'; # assume it's in the path
-our $BACKUP_ROOT='/mnt/backup/rdiff-backup';
+our $BACKUP_ROOT='spidermonk::/mnt/backup/rdiff-backup';
 our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $HOST;
@@ -26,7 +27,7 @@ our %INCREMENTS;
 our ($VERBOSE,$DEBUG);
 our $AVERAGE;
 our ($IFILES,$IFILESIZE,$DESTSIZECHANGE);
-our $SNAPPV='/dev/md2';
+our $SNAPPV='/dev/md0';
 our $SNAPSIZE='1G';
 our $LISTOLDEST=0;
 our $CLEANUP;
@@ -70,52 +71,59 @@ our @BACKUPS=({ 'path' => '/', },
               },
               { 'path' => '/home/spin/Maildir',
               },
-              { 'path' => '/home/spin/enlil',
+              { 'path'    => '/var/lib/mysql-snap',
+		'root'    => '/mnt/backup2/rdiff-backup',
+                'prerun'  => 'ssh -n root@spidermonk /usr/local/sbin/rsnap-lvm --odev /dev/main/mysql --pv /dev/mapper/sda4 --size 512m',
+                'postrun' => 'ssh -n root@spidermonk /usr/local/sbin/rsnap-lvm --odev /dev/main/mysql --remove',
+                'dest'    => 'spidermonk-mysql',
+		'host'    => 'spidermonk',
+		'disabled'=> 1,
               },
               { 'path'    => '/var/lib/mysql-snap',
-                'prerun'  => '/usr/local/sbin/rsnap-lvm --pv /dev/md2',
+                'prerun'  => '/usr/local/sbin/rsnap-lvm --pv /dev/md0 --size 128m',
                 'postrun' => '/usr/local/sbin/rsnap-lvm --remove',
                 'dest'    => 'cain-mysql',
               },
-              { 'path' => '/diskless'
-              },
-              #{ 'path' => '/var/log',
-              #  'lvdev' => '/dev/main2/log',
-              # never activate lvdev for this path
-              #},
               { 'path' => '/',
                 'host' => 'xbox1',
+                'disabled' => 1,
               },
               { 'host' => 'delight',
                 'path' => '/',
+                'disabled' => 1,
               },
               { 'path' => '/usr',
                 'host' => 'delight',
+                'disabled' => 1,
               },
               { 'path' => '/var',
                 'host' => 'delight',
+                'disabled' => 1,
               },
               { 'path' => '/home',
                 'host' => 'delight',
+                'disabled' => 1,
               },
-              { 'path' => '/diskless/xbox1/home',
-                'dest' => 'xbox1-home',
-              },
-              { 'root' => '/home/spin/rdiff-backup',
+              { 'root' => '/mnt/backup2/rdiff-backup',
                 'host' => 'benway',
                 'path' => '/home',
                 'compress' => 1,
               },
-              { 'root' => '/home/spin/rdiff-backup',
+              { 'root' => '/mnt/backup2/rdiff-backup',
                 'host' => 'male',
                 'path' => '/home/acox',
                 'compress' => 1,
               },
-              { 'root' => '/home/spin/rdiff-backup',
+              { 'root' => '/mnt/backup2/rdiff-backup',
+                'host' => 'male',
+                'path' => '/home/spin',
+                'compress' => 1,
+              },
+              { 'root' => '/mnt/backup2/rdiff-backup',
                 'host' => 'lazarus',
                 'path' => '/',
               },
-              { 'root' => '/home/spin/rdiff-backup',
+              { 'root' => '/mnt/backup2/rdiff-backup',
                 'host' => 'lazarus',
                 'path' => '/home',
               },
@@ -131,39 +139,23 @@ our @BACKUPS=({ 'path' => '/', },
                 'host' => 'spidermonk',
                 'path' => '/home',
               },
+              { 'root' => '/home/spin/rdiff-backup',
+                'host' => 'spidermonk',
+                'path' => '/home/spin/wine-wow',
+              },
+              { 'root' => '/home/spin/rdiff-backup',
+                'host' => 'spidermonk',
+                'path' => '/home/spin/wine-dvd-stuff',
+              },
               { 'root' => '/mnt/backup2/rdiff-backup',
                 'host' => 'spidermonk',
                 'path' => '/boot',
               },
-              { 'root' => '/mnt/backup2/rdiff-backup',
-                'host' => 'spidermonk',
-                'path' => '/media/winxp',
-              },
-              { 'root' => '/home/spin/rdiff-backup',
-                'host' => 'oldben',
-                'path' => '/',
-                'compress' => 1,
-              },
-              { 'root' => '/home/spin/rdiff-backup',
-                'host' => 'oldben',
-                'path' => '/var',
-                'compress' => 1,
-              },
-              { 'root' => '/home/spin/rdiff-backup',
-                'host' => 'oldben',
-                'path' => '/boot',
-                'compress' => 1,
-              },
-              { 'root' => '/home/spin/rdiff-backup',
-                'host' => 'oldben',
-                'path' => '/etc',
-                'compress' => 1,
-              },
-              { 'root' => '/home/spin/rdiff-backup',
-                'host' => 'oldben',
-                'path' => '/home',
-                'compress' => 1,
-              },
+              #{ 'root' => '/mnt/backup2/rdiff-backup',
+              #  'host' => 'spidermonk',
+              #  'path' => '/media/winxp',
+              #  'disabled' => 1,
+              #},
              );
 
 logentry::OpenLog('local5','rdiff-backup-runner');
@@ -233,6 +225,9 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
     next;
   }
 
+  if($$bh{disabled}) {
+    next;
+  }
   @com=($RDIFF_BACKUP,
 	'--verbosity',$VERBOSITY,
 	'--terminal-verbosity',$TVERBOSITY,
@@ -317,7 +312,7 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
   logentry('info',join(" ",@com));
 
   unless($TEST) {
-    my $LOCK_FILE="$dest/rdiff-backup-data/rdiff-backup-runner.pid";
+    my $LOCK_FILE="$HOME/rdiff-backup-runner.pid";
     unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
       logentry('err',"unable to open pid file: $LOCK_FILE for writing");
       next;
