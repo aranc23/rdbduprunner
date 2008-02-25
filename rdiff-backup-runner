@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.15 2008/02/25 16:43:58 acox Exp $
+# $Id: rdiff-backup-runner,v 1.16 2008/02/25 17:19:34 acox Exp $
 
 use strict;
 use warnings;
@@ -75,8 +75,7 @@ require $CONFIG or die "unable to parse the rdiff-backup-runner config file: $CO
 logentry::OpenLog('local5','rdiff-backup-runner');
 logentry('info','starting');
 
-foreach my $bh (sort backup_sort (@BACKUPS)) {
-  my @EXCLUDES;
+foreach my $bh (@BACKUPS) {
   my $host=(defined $$bh{host} ? $$bh{host} : $LOCALHOST);
   my $path=(defined $$bh{path} ? $$bh{path} : '/');
   my $sshcompress=(defined $$bh{compress} ? $$bh{compress} : 0);
@@ -110,13 +109,29 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
   $BACKUPS{$tag}{dest}=$dest;
   $BACKUPS{$tag}{path}=$path;
   $BACKUPS{$tag}{path}=$tag;
+  $BACKUPS{$tag}{host}=$host;
   
-  print Dumper $BACKUPS{$tag};
+  $BACKUPS{$tag}{sshcompress}=$sshcompress;
 
-  my @com;
+  if($BACKUPS{$tag}{path} =~ /(home|home\/acox|home\/spin\/Maildir)$/) {
+      #push(@com,'--exclude-globbing-filelist',
+      #     $EXCLUDE_PATH.'/exclude-generic-home');
+      push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-generic-home');
+  }
+  push(@{$BACKUPS{$tag}{excludes}},
+       $EXCLUDE_PATH.'/exclude-'.$tag);
+  #push(@com,'--exclude-globbing-filelist',
+  #     $EXCLUDE_PATH.'/exclude-'.$tag);
+  
+
+}
+
+foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
+    my $bh=$BACKUPS{$tag}; # for convenience of typing
+
 
   if(defined $AVERAGE) {
-    my $c="rdiff-backup --calculate-average $dest/rdiff-backup-data/session_statistics.*.data";
+    my $c="rdiff-backup --calculate-average $BACKUPS{$tag}{dest}/rdiff-backup-data/session_statistics.*.data";
     logentry('debug',$c);
     my @res=`$c`;
     #print @res;
@@ -126,188 +141,179 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
       $ln =~ /IncrementFileSize\s+(.+?)\s+/ and $IFILESIZE+=($1/1024/1024);
       $ln =~ /TotalDestinationSizeChange\s+(.+?)\s+/ and $DESTSIZECHANGE+=($1/1024/1024);
     }
-    next;
-  }
-
-  if(defined $REMOVE or $LISTOLDEST or $CLEANUP) {
-    my $c="rdiff-backup -l --parsable-output ";
-    $c.=$dest;
-    logentry('debug',$c);
-    my @res=`$c`;
-    @res == 1 and next; # if there is only one increment, don't consider it for removal
-    foreach my $ln (@res) {
-      chomp $ln;
-      $ln =~ /^(\d+)\sdirectory$/ or next;
-      if(exists $INCREMENTS{$1}) {
-        warn "conflict: $1 $tag $dest";
+  } elsif(defined $REMOVE or $LISTOLDEST or $CLEANUP) {
+      my $c="rdiff-backup -l --parsable-output ".$BACKUPS{$tag}{dest};
+      logentry('debug',$c);
+      my @res=`$c`;
+      #@res == 1 and next; # if there is only one increment, don't consider it for removal
+      foreach my $ln (@res) {
+	  chomp $ln;
+	  $ln =~ /^(\d+)\sdirectory$/ or next;
+	  if(exists $INCREMENTS{$1}) {
+	      warn "conflict: $1 $tag $BACKUPS{$tag}{dest}";
+	  }
+	  $INCREMENTS{$1}={'dest' => $BACKUPS{$tag}{dest},
+			   'tag' => $tag};
+	  push(@{$BACKUPS{$tag}{increments}},
+	       {'dest' => $BACKUPS{$tag}{dest},
+		'tag'  => $tag});
       }
-      $INCREMENTS{$1}=[$dest,$tag];
-      $INCSBYTAG{$tag}={dest => $dest,
-			time => $1};
-    }
-    next;
-  }
-
-  if($$bh{disabled}) {
-    next;
-  }
-  @com=($RDIFF_BACKUP,
-	'--verbosity',$VERBOSITY,
-	'--terminal-verbosity',$TVERBOSITY,
-	'--exclude-special-files',
-	'--exclude-other-filesystems',
-       );
-  $sshcompress or push(@com,'--ssh-no-compression');
-  $VERBOSE and push(@com,'--print-statistics');
-
-
-  if($path =~ /(home|home\/acox|home\/spin\/Maildir)$/) {
-    #push(@com,'--exclude-globbing-filelist',
-    #     $EXCLUDE_PATH.'/exclude-generic-home');
-    push(@EXCLUDES,$EXCLUDE_PATH.'/exclude-generic-home');
-  }
-  push(@EXCLUDES,
-       $EXCLUDE_PATH.'/exclude-'.$tag);
-  #push(@com,'--exclude-globbing-filelist',
-  #     $EXCLUDE_PATH.'/exclude-'.$tag);
-
-  if($COMPARE) {
-    push(@com,'--compare');
-  }
-
-  my $TMPDIR;
-  my ($EXH, $EXF);
-  my $VGDEV;
-  if($host eq $LOCALHOST and defined $$bh{lvdev}) {
-    my $scom='';
-    $TMPDIR = mkdtemp( '/mnt/rdrXXXXXX' );
-    print $TMPDIR."\n";
-    $VGDEV=$$bh{lvdev};
-    $VGDEV =~ s/\/[a-zA-Z0-9_\-]+$//;
-    unless($TEST) {
-      $scom="lvcreate -s -L $SNAPSIZE -n rdr $$bh{lvdev} $SNAPPV";
-      logentry('info',$scom);
-      system($scom);
-      unless($? == 0) {
-	logentry('crit',
-		 "unable to create snapshot for $$bh{lvdev} with size $SNAPSIZE".
-		 (defined $SNAPPV and length $SNAPPV > 0 ? " on $SNAPPV" : ''));
-	next;
+  } else { # actually do a  backup
+      my @com;
+      if($$bh{disabled}) {
+	  # skip disabled backups
+	  next;
       }
-      $scom="mount -o ro $VGDEV/rdr $TMPDIR";
-      logentry('info',$scom);
-      system($scom);
-      unless($? == 0) {
-	logentry('crit',
-		 "unable to mount -o ro $VGDEV/rdr $TMPDIR");
-	$scom="lvremove -f $VGDEV/rdr";
-	logentry('info',$scom);
-	unless($? == 0) {
-	  logentry('crit',
-		   "unable to remove lv snapshot $VGDEV/rdr");
-	}
-	next;
-      }
-    }
-    ($EXH,$EXF) = mkstemp( "/tmp/tmpfilerdrXXXXX" );
-    foreach my $f (@EXCLUDES) {
-      unless(open(IF,$f)) {
-	logentry('warn',"unabled to open $f");
-	next;
-      }
-      while(<IF>) {
-	s/$path/$TMPDIR/;
-	print $EXH $_;
-      }
-    }
-    close $EXH;
-    push(@com,'--exclude-globbing-filelist',
-	 $EXF);
-
-    push(@com,$TMPDIR,$dest);
-  } else {
-    foreach my $f (@EXCLUDES) {
-      push(@com,'--exclude-globbing-filelist',
-	   $f);
-    }
-    push(@com,($host eq $LOCALHOST ? $path : $host.'::'.$path),$dest);
-  }
-  logentry('info',join(" ",@com));
-
-  unless($TEST) {
-    my $LOCK_FILE="$HOME/rdiff-backup-runner.pid";
-    unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
-      logentry('err',"unable to open pid file: $LOCK_FILE for writing");
-      next;
-    }
-    unless(flock(LOCK,LOCK_EX|LOCK_NB)) {
-      logentry('err',"unable to flock the pid file: $LOCK_FILE");
-      next;
-    }
-    truncate(LOCK,0); # this shouldn't fail if we have the file opened and locked!
-    print LOCK $$."\n"; # who really cares if this fails?
-
-    if($CHECK) {
       @com=($RDIFF_BACKUP,
 	    '--verbosity',$VERBOSITY,
 	    '--terminal-verbosity',$TVERBOSITY,
-	    '--check-destination-dir',$dest);
-      logentry('info',join(" ",@com));
-    } else {
-      if ($host ne $LOCALHOST) {
-	system("/usr/sbin/fping -q $host");
-	unless($? == 0) {
-	  logentry('warning',"fping failed to ping $host");
-	  next;
-	}
+	    '--exclude-special-files',
+	    '--exclude-other-filesystems',
+	  );
+      $BACKUPS{$tag}{sshcompress} or push(@com,'--ssh-no-compression');
+      $VERBOSE and push(@com,'--print-statistics');
+
+
+      
+      if($COMPARE) {
+	  push(@com,'--compare');
       }
-      if (defined $$bh{prerun}) {
-	print $$bh{prerun}."\n";
-	system($$bh{prerun});
-	unless($? == 0) {
-	  logentry('err',"unable to execute prerun command: skipping backup!");
-	  next;
-	}
-      }
-    }
-    system(@com);
-    my $mainret=$?;
-    unless($mainret == 0) {
-      logentry('err',"unable to execute rdiff-backup!");
-    }
-    unless($CHECK) {
-      if(defined $$bh{postrun}) {
-	print $$bh{postrun}."\n";
-	system($$bh{postrun});
-	unless($? == 0) {
-	  logentry('err',"unable to execute postrun command");
-	}
-      }
-    }
-    if($host eq $LOCALHOST and defined $$bh{lvdev}) {
-      my $scom="umount $TMPDIR";
-      logentry('info',$scom);
-      system($scom);
-      unless($? == 0) {
-	logentry('err',"unable to umount $TMPDIR");
+
+      my $TMPDIR;
+      my ($EXH, $EXF);
+      my $VGDEV;
+      if($BACKUPS{$tag}{host} eq $LOCALHOST and defined $$bh{lvdev}) {
+	  my $scom='';
+	  $TMPDIR = mkdtemp( '/mnt/rdrXXXXXX' );
+	  print $TMPDIR."\n";
+	  $VGDEV=$$bh{lvdev};
+	  $VGDEV =~ s/\/[a-zA-Z0-9_\-]+$//;
+	  unless($TEST) {
+	      $scom="lvcreate -s -L $SNAPSIZE -n rdr $$bh{lvdev} $SNAPPV";
+	      logentry('info',$scom);
+	      system($scom);
+	      unless($? == 0) {
+		  logentry('crit',
+			   "unable to create snapshot for $$bh{lvdev} with size $SNAPSIZE".
+			   (defined $SNAPPV and length $SNAPPV > 0 ? " on $SNAPPV" : ''));
+		  next;
+	      }
+	      $scom="mount -o ro $VGDEV/rdr $TMPDIR";
+	      logentry('info',$scom);
+	      system($scom);
+	      unless($? == 0) {
+		  logentry('crit',
+			   "unable to mount -o ro $VGDEV/rdr $TMPDIR");
+		  $scom="lvremove -f $VGDEV/rdr";
+		  logentry('info',$scom);
+		  unless($? == 0) {
+		      logentry('crit',
+			       "unable to remove lv snapshot $VGDEV/rdr");
+		  }
+		  next;
+	      }
+	  }
+	  ($EXH,$EXF) = mkstemp( "/tmp/tmpfilerdrXXXXX" );
+	  foreach my $f (@{$BACKUPS{$tag}{excludes}}) {
+	      unless(open(IF,$f)) {
+		  logentry('warn',"unabled to open $f");
+		  next;
+	      }
+	      while(<IF>) {
+		  s/$BACKUPS{$tag}{path}/$TMPDIR/;
+		  print $EXH $_;
+	      }
+	  }
+	  close $EXH;
+	  push(@com,'--exclude-globbing-filelist',
+	       $EXF);
+	  
+	  push(@com,$TMPDIR,$BACKUPS{$tag}{dest});
       } else {
-	$scom="lvremove -f $VGDEV/rdr";
-	logentry('info',$scom);
-	system($scom);
-	unless($? == 0) {
-	  logentry('err',"unable to lvremove $VGDEV/rdr");
-	}
+	  foreach my $f (@{$BACKUPS{$tag}{excludes}}) {
+	      push(@com,'--exclude-globbing-filelist',
+		   $f);
+	  }
+	  # this is fugly:
+	  push(@com,($BACKUPS{$tag}{host} eq $LOCALHOST ? $BACKUPS{$tag}{path} : $BACKUPS{$tag}{host}.'::'.$BACKUPS{$tag}{path}),$BACKUPS{$tag}{dest});
       }
-      if( defined $TMPDIR and -d $TMPDIR ) {
-	rmdir($TMPDIR);
+      logentry('info',join(" ",@com));
+
+      unless($TEST) {
+	  my $LOCK_FILE="$HOME/rdiff-backup-runner.pid";
+	  unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
+	      logentry('err',"unable to open pid file: $LOCK_FILE for writing");
+	      next;
+	  }
+	  unless(flock(LOCK,LOCK_EX|LOCK_NB)) {
+	      logentry('err',"unable to flock the pid file: $LOCK_FILE");
+	      next;
+	  }
+	  truncate(LOCK,0); # this shouldn't fail if we have the file opened and locked!
+	  print LOCK $$."\n"; # who really cares if this fails?
+
+	  if($CHECK) {
+	      @com=($RDIFF_BACKUP,
+		    '--verbosity',$VERBOSITY,
+		    '--terminal-verbosity',$TVERBOSITY,
+		    '--check-destination-dir',$BACKUPS{$tag}{dest});
+	      logentry('info',join(" ",@com));
+	  } else {
+	      if ($BACKUPS{$tag}{host} ne $LOCALHOST) {
+		  system("/usr/sbin/fping -q $BACKUPS{$tag}{host}");
+		  unless($? == 0) {
+		      logentry('warning',"fping failed to ping $BACKUPS{$tag}{host}");
+		      next;
+		  }
+	      }
+	      if (defined $$bh{prerun}) {
+		  print $$bh{prerun}."\n";
+		  system($$bh{prerun});
+		  unless($? == 0) {
+		      logentry('err',"unable to execute prerun command: skipping backup!");
+		      next;
+		  }
+	      }
+	  }
+	  system(@com);
+	  my $mainret=$?;
+	  unless($mainret == 0) {
+	      logentry('err',"unable to execute rdiff-backup!");
+	  }
+	  unless($CHECK) {
+	      if(defined $$bh{postrun}) {
+		  print $$bh{postrun}."\n";
+		  system($$bh{postrun});
+		  unless($? == 0) {
+		      logentry('err',"unable to execute postrun command");
+		  }
+	      }
+	  }
+	  if($BACKUPS{$tag}{host} eq $LOCALHOST and defined $$bh{lvdev}) {
+	      my $scom="umount $TMPDIR";
+	      logentry('info',$scom);
+	      system($scom);
+	      unless($? == 0) {
+		  logentry('err',"unable to umount $TMPDIR");
+	      } else {
+		  $scom="lvremove -f $VGDEV/rdr";
+		  logentry('info',$scom);
+		  system($scom);
+		  unless($? == 0) {
+		      logentry('err',"unable to lvremove $VGDEV/rdr");
+		  }
+	      }
+	      if( defined $TMPDIR and -d $TMPDIR ) {
+		  rmdir($TMPDIR);
+	      }
+	  }
+	  if( defined $EXF and -f $EXF ) {
+	      unlink($EXF);
+	  }
+	  unlink $LOCK_FILE;
+	  flock(LOCK,LOCK_UN);
+	  close LOCK;
       }
-    }
-    if( defined $EXF and -f $EXF ) {
-      unlink($EXF);
-    }
-    unlink $LOCK_FILE;
-    flock(LOCK,LOCK_UN);
-    close LOCK;
   }
 }
 
@@ -351,13 +357,13 @@ if($CLEANUP) {
 
 
 sub backup_sort {
-    my $aprio=(defined $$a{priority} ? $$a{priority} : 0);
-    my $bprio=(defined $$b{priority} ? $$b{priority} : 0);
-    my $ahost=(defined $$a{host} ? $$a{host} : $LOCALHOST);
-    my $bhost=(defined $$b{host} ? $$b{host} : $LOCALHOST);
+    my $aprio=(defined $BACKUPS{$a}{priority} ? $BACKUPS{$a}{priority} : 0);
+    my $bprio=(defined $BACKUPS{$b}{priority} ? $BACKUPS{$b}{priority} : 0);
+    my $ahost=(defined $BACKUPS{$a}{host} ? $BACKUPS{$a}{host} : $LOCALHOST);
+    my $bhost=(defined $BACKUPS{$b}{host} ? $BACKUPS{$b}{host} : $LOCALHOST);
 
     if($aprio == $bprio and $ahost eq $bhost) {
-	return $$a{path} cmp $$b{path};
+	return $BACKUPS{$a}{path} cmp $BACKUPS{$b}{path};
     } elsif($aprio == $bprio) {
 	return $ahost cmp $bhost;
     } # else, compare the prio
