@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.19 2008/02/25 19:41:19 acox Exp $
+# $Id: rdiff-backup-runner,v 1.20 2008/02/25 19:55:21 acox Exp $
 
 use strict;
 use warnings;
@@ -21,6 +21,8 @@ our $BACKUP_ROOT='/mnt/backup/rdiff-backup';
 our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $HOST;
+our $DEST;
+our $ROOT;
 our $FORCE=0;
 our $REMOVE;
 our %BACKUPS;
@@ -48,6 +50,8 @@ GetOptions('test!'          => \$TEST,
            'compare'        => \$COMPARE,
            'path=s'         => \$PATH,
            'host=s'         => \$HOST,
+	   'dest=s'         => \$DEST,
+	   'root=s'         => \$ROOT,
            'force!'         => \$FORCE,
            'remove-oldest!' => \$REMOVE,
            'verbose!'       => \$VERBOSE,
@@ -81,6 +85,7 @@ foreach my $bh (@BACKUPS) {
   my $path=(defined $$bh{path} ? $$bh{path} : '/');
   my $sshcompress=(defined $$bh{compress} ? $$bh{compress} : 0);
   my $dest;
+  my $root;
   my $tag;
   if(defined $$bh{dest}) {
     $dest=$$bh{dest};
@@ -92,15 +97,23 @@ foreach my $bh (@BACKUPS) {
     $tag=$host.$dest;
   }
 
-  unless(defined $$bh{root}) {
-    $$bh{root}=$BACKUP_ROOT;
+  if(defined $$bh{root}) {
+    $root=$$bh{root};
+  } else {
+    $root=$BACKUP_ROOT;
   }
-  $dest=$$bh{root}.'/'.$tag;
+  $dest=$root.'/'.$tag;
 
   if(defined $PATH and $path !~ /$PATH/) {
     next;
   }
   if(defined $HOST and $host !~ /$HOST/) {
+    next;
+  }
+  if(defined $DEST and $dest !~ /$DEST/) {
+    next;
+  }
+  if(defined $ROOT and $root !~ /$ROOT/) {
     next;
   }
 
@@ -111,6 +124,7 @@ foreach my $bh (@BACKUPS) {
   $BACKUPS{$tag}{path}=$path;
   $BACKUPS{$tag}{tag}=$tag;
   $BACKUPS{$tag}{host}=$host;
+  $BACKUPS{$tag}{root}=$root;
   
   $BACKUPS{$tag}{sshcompress}=$sshcompress;
 
