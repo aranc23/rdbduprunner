@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.17 2008/02/25 17:35:01 acox Exp $
+# $Id: rdiff-backup-runner,v 1.18 2008/02/25 17:38:42 acox Exp $
 
 use strict;
 use warnings;
@@ -42,7 +42,7 @@ our $CONFIG="$HOME/.rbrrc";
 
 GetOptions('test!'          => \$TEST,
            'verbosity=i'    => \$VERBOSITY,
-           'terminal-verbosity=i' => \$TVERBOSITY,
+           'v|terminal-verbosity=i' => \$TVERBOSITY,
            'localhost=s'    => \$LOCALHOST,
            'rdiff-backup=s' => \$RDIFF_BACKUP,
            'backup-root=s'  => \$BACKUP_ROOT,
@@ -125,7 +125,6 @@ foreach my $bh (@BACKUPS) {
   
 
 }
-print Dumper \%BACKUPS;
 
 foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
     my $bh=$BACKUPS{$tag}; # for convenience of typing
@@ -314,7 +313,6 @@ foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
       }
   }
 }
-print Dumper \%BACKUPS;
 
 if(defined $AVERAGE) {
   printf("IncrementFiles: %d\nIncrementFileSize: %.2f MiB\nTotalDestinationSizeChange: %.2f MiB\n",
