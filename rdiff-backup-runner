@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.14 2008/02/25 16:12:34 spin Exp $
+# $Id: rdiff-backup-runner,v 1.15 2008/02/25 16:43:58 acox Exp $
 
 use strict;
 use warnings;
@@ -23,16 +23,20 @@ our $PATH;
 our $HOST;
 our $FORCE=0;
 our $REMOVE;
+our %BACKUPS;
 our %INCREMENTS;
+our %INCSBYTAG;
 our ($VERBOSE,$DEBUG);
 our $AVERAGE;
 our ($IFILES,$IFILESIZE,$DESTSIZECHANGE);
 our $SNAPPV='/dev/md0';
 our $SNAPSIZE='1G';
 our $LISTOLDEST=0;
-our $CLEANUP;
 our $FREE;
 our $CHECK=0;
+our $CLEANUP=0;
+our $DEFMAXINCS=-1;
+our $DEFMAXDAYS=-1;
 
 our $CONFIG="$HOME/.rbrrc";
 
@@ -52,10 +56,10 @@ GetOptions('test!'          => \$TEST,
            'average'        => \$AVERAGE,
            'snappv=s'       => \$SNAPPV,
            'list-oldest'    => \$LISTOLDEST,
-	   'cleanup=s'      => \$CLEANUP,
 	   'free=s'         => \$FREE,
 	   'check'          => \$CHECK, # perform a check-destination-dir on target
 	   'config=s'       => \$CONFIG, # config file
+	   'cleanup'        => \$CLEANUP,
           );
 
 if(not defined $LOCALHOST) {
@@ -67,7 +71,6 @@ if(not defined $LOCALHOST) {
 
 our @BACKUPS;
 require $CONFIG or die "unable to parse the rdiff-backup-runner config file: $CONFIG";
-
 
 logentry::OpenLog('local5','rdiff-backup-runner');
 logentry('info','starting');
@@ -103,6 +106,13 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
 
   logentry('info',"$host $path $tag $dest");
 
+  $BACKUPS{$tag}=$bh;
+  $BACKUPS{$tag}{dest}=$dest;
+  $BACKUPS{$tag}{path}=$path;
+  $BACKUPS{$tag}{path}=$tag;
+  
+  print Dumper $BACKUPS{$tag};
+
   my @com;
 
   if(defined $AVERAGE) {
@@ -119,7 +129,7 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
     next;
   }
 
-  if(defined $REMOVE or $LISTOLDEST) {
+  if(defined $REMOVE or $LISTOLDEST or $CLEANUP) {
     my $c="rdiff-backup -l --parsable-output ";
     $c.=$dest;
     logentry('debug',$c);
@@ -132,6 +142,8 @@ foreach my $bh (sort backup_sort (@BACKUPS)) {
         warn "conflict: $1 $tag $dest";
       }
       $INCREMENTS{$1}=[$dest,$tag];
+      $INCSBYTAG{$tag}={dest => $dest,
+			time => $1};
     }
     next;
   }
@@ -330,6 +342,14 @@ if($LISTOLDEST) {
   }
 }
 
+
+if($CLEANUP) {
+  foreach my $tag (sort(keys(%INCSBYTAG))) {
+      #logentry('info',localtime($t).' '.$INCREMENTS{$t}[0].' '.$INCREMENTS{$t}[1]);
+  }
+}
+
+
 sub backup_sort {
     my $aprio=(defined $$a{priority} ? $$a{priority} : 0);
     my $bprio=(defined $$b{priority} ? $$b{priority} : 0);
@@ -343,3 +363,7 @@ sub backup_sort {
     } # else, compare the prio
     return $aprio <=> $bprio;
 }
+
+#sub find_backup_by_tag {
+#    foreach my $hr (@BACKUPS) {
+#	if
