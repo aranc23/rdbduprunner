@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.26 2008/02/26 19:33:45 acox Exp $
+# $Id: rdiff-backup-runner,v 1.27 2008/02/26 19:39:19 acox Exp $
 
 use strict;
 use warnings;
@@ -215,70 +215,17 @@ foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
       $BACKUPS{$tag}{sshcompress} or push(@com,'--ssh-no-compression');
       $VERBOSE and push(@com,'--print-statistics');
 
-
-      
       if($COMPARE) {
 	  push(@com,'--compare');
       }
 
-      my $TMPDIR;
-      my ($EXH, $EXF);
-      my $VGDEV;
-      if($BACKUPS{$tag}{host} eq $LOCALHOST and defined $$bh{lvdev}) {
-	  my $scom='';
-	  $TMPDIR = mkdtemp( '/mnt/rdrXXXXXX' );
-	  print $TMPDIR."\n";
-	  $VGDEV=$$bh{lvdev};
-	  $VGDEV =~ s/\/[a-zA-Z0-9_\-]+$//;
-	  unless($TEST) {
-	      $scom="lvcreate -s -L $SNAPSIZE -n rdr $$bh{lvdev} $SNAPPV";
-	      logentry('info',$scom);
-	      system($scom);
-	      unless($? == 0) {
-		  logentry('crit',
-			   "unable to create snapshot for $$bh{lvdev} with size $SNAPSIZE".
-			   (defined $SNAPPV and length $SNAPPV > 0 ? " on $SNAPPV" : ''));
-		  next;
-	      }
-	      $scom="mount -o ro $VGDEV/rdr $TMPDIR";
-	      logentry('info',$scom);
-	      system($scom);
-	      unless($? == 0) {
-		  logentry('crit',
-			   "unable to mount -o ro $VGDEV/rdr $TMPDIR");
-		  $scom="lvremove -f $VGDEV/rdr";
-		  logentry('info',$scom);
-		  unless($? == 0) {
-		      logentry('crit',
-			       "unable to remove lv snapshot $VGDEV/rdr");
-		  }
-		  next;
-	      }
-	  }
-	  ($EXH,$EXF) = mkstemp( "/tmp/tmpfilerdrXXXXX" );
-	  foreach my $f (@{$BACKUPS{$tag}{excludes}}) {
-	      unless(open(IF,$f)) {
-		  logentry('warn',"unabled to open $f");
-		  next;
-	      }
-	      while(<IF>) {
-		  s/$BACKUPS{$tag}{path}/$TMPDIR/;
-		  print $EXH $_;
-	      }
-	  }
-	  close $EXH;
+      foreach my $f (@{$BACKUPS{$tag}{excludes}}) {
 	  push(@com,'--exclude-globbing-filelist',
-	       $EXF);
-	  
-	  push(@com,$TMPDIR,$BACKUPS{$tag}{dest});
-      } else {
-	  foreach my $f (@{$BACKUPS{$tag}{excludes}}) {
-	      push(@com,'--exclude-globbing-filelist',
-		   $f);
-	  }
-	  # this is fugly:
-	  push(@com,($BACKUPS{$tag}{host} eq $LOCALHOST ? $BACKUPS{$tag}{path} : $BACKUPS{$tag}{host}.'::'.$BACKUPS{$tag}{path}),$BACKUPS{$tag}{dest});
+	       $f);
       }
+      # this is fugly:
+      push(@com,($BACKUPS{$tag}{host} eq $LOCALHOST ? $BACKUPS{$tag}{path} : $BACKUPS{$tag}{host}.'::'.$BACKUPS{$tag}{path}),$BACKUPS{$tag}{dest});
+
       logentry('info',join(" ",@com));
 
       unless($TEST) {
