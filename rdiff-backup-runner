@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.27 2008/02/26 19:39:19 acox Exp $
+# $Id: rdiff-backup-runner,v 1.28 2008/02/26 19:51:02 acox Exp $
 
 use strict;
 use warnings;
@@ -29,13 +29,12 @@ our %INCREMENTS;
 our ($VERBOSE,$DEBUG);
 our $AVERAGE;
 #our ($IFILES,$IFILESIZE,$DESTSIZECHANGE);
-our $SNAPPV='/dev/md0';
-our $SNAPSIZE='1G';
 our $LISTOLDEST=0;
 our $CHECK=0;
 our $CLEANUP=0;
 our $DEFMAXINC;
 our $DEFMAXAGE;
+our $LOCK_FILE="$HOME/rdiff-backup-runner.pid";
 
 our $CONFIG_FILE="$HOME/rdbrc";
 our %CONFIG;
@@ -56,13 +55,13 @@ GetOptions('test!'          => \$TEST,
            'verbose!'       => \$VERBOSE,
            'debug!'         => \$DEBUG,
            'calculate-average' => \$AVERAGE,
-           'snappv=s'       => \$SNAPPV,
 	   'list-oldest'    => \$LISTOLDEST,
 	   'check'          => \$CHECK, # perform a check-destination-dir on target
 	   'config=s'       => \$CONFIG_FILE, # config file
 	   'cleanup'        => \$CLEANUP,
 	   'maxinc=i'       => \$DEFMAXINC,
 	   'maxage=s'       => \$DEFMAXAGE,
+	   'lockfile=s'     => \$LOCK_FILE,
           );
 
 if(not defined $LOCALHOST) {
@@ -229,17 +228,7 @@ foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
       logentry('info',join(" ",@com));
 
       unless($TEST) {
-	  my $LOCK_FILE="$HOME/rdiff-backup-runner.pid";
-	  unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
-	      logentry('err',"unable to open pid file: $LOCK_FILE for writing");
-	      next;
-	  }
-	  unless(flock(LOCK,LOCK_EX|LOCK_NB)) {
-	      logentry('err',"unable to flock the pid file: $LOCK_FILE");
-	      next;
-	  }
-	  truncate(LOCK,0); # this shouldn't fail if we have the file opened and locked!
-	  print LOCK $$."\n"; # who really cares if this fails?
+	  lock_pid_file();
 
 	  if($CHECK) {
 	      @com=($RDIFF_BACKUP,
@@ -277,27 +266,6 @@ foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
 		      logentry('err',"unable to execute postrun command");
 		  }
 	      }
-	  }
-	  if($BACKUPS{$tag}{host} eq $LOCALHOST and defined $$bh{lvdev}) {
-	      my $scom="umount $TMPDIR";
-	      logentry('info',$scom);
-	      system($scom);
-	      unless($? == 0) {
-		  logentry('err',"unable to umount $TMPDIR");
-	      } else {
-		  $scom="lvremove -f $VGDEV/rdr";
-		  logentry('info',$scom);
-		  system($scom);
-		  unless($? == 0) {
-		      logentry('err',"unable to lvremove $VGDEV/rdr");
-		  }
-	      }
-	      if( defined $TMPDIR and -d $TMPDIR ) {
-		  rmdir($TMPDIR);
-	      }
-	  }
-	  if( defined $EXF and -f $EXF ) {
-	      unlink($EXF);
 	  }
 	  unlink $LOCK_FILE;
 	  flock(LOCK,LOCK_UN);
@@ -412,3 +380,23 @@ sub backup_sort {
 #sub find_backup_by_tag {
 #    foreach my $hr (@BACKUPS) {
 #	if
+
+sub lock_pid_file {
+    if(defined $LOCK_FILE) {
+	# leave it alone
+    } elsif(defined $CONFIG{LockFile}) {
+	$LOCK_FILE=$CONFIG{LockFile};
+    } else {
+	$LOCK_FILE="$HOME/rdiff-backup-runner.pid";
+    }
+    unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
+	logentry('err',"unable to open pid file: $LOCK_FILE for writing");
+	next;
+    }
+    unless(flock(LOCK,LOCK_EX|LOCK_NB)) {
+	logentry('err',"unable to flock the pid file: $LOCK_FILE");
+	next;
+    }
+    truncate(LOCK,0); # this shouldn't fail if we have the file opened and locked!
+    print LOCK $$."\n"; # who really cares if this fails?
+}
