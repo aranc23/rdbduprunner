@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.24 2008/02/26 17:29:32 acox Exp $
+# $Id: rdiff-backup-runner,v 1.25 2008/02/26 19:27:35 acox Exp $
 
 use strict;
 use warnings;
@@ -23,7 +23,6 @@ our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $HOST;
 our $DEST;
-our $ROOT;
 our $FORCE=0;
 our $REMOVE;
 our %INCREMENTS;
@@ -51,14 +50,14 @@ GetOptions('test!'          => \$TEST,
            'path=s'         => \$PATH,
            'host=s'         => \$HOST,
 	   'dest=s'         => \$DEST,
-	   'root=s'         => \$ROOT,
+#	   'root=s'         => \$ROOT,
            'force!'         => \$FORCE,
            'remove-oldest!' => \$REMOVE,
            'verbose!'       => \$VERBOSE,
            'debug!'         => \$DEBUG,
            'calculate-average' => \$AVERAGE,
            'snappv=s'       => \$SNAPPV,
-           'list-oldest'    => \$LISTOLDEST,
+	   'list-oldest'    => \$LISTOLDEST,
 	   'check'          => \$CHECK, # perform a check-destination-dir on target
 	   'config=s'       => \$CONFIG_FILE, # config file
 	   'cleanup'        => \$CLEANUP,
@@ -93,35 +92,39 @@ if(not defined $RDIFF_BACKUP) {
 unless(-x $RDIFF_BACKUP) {
     logndie("unable to execute $RDIFF_BACKUP");
 }
-    
+
+foreach my $bdtag (keys(%{$CONFIG{backupdestination}})) {
+    my $bd=$CONFIG{backupdestination}{$bdtag};
+}
+   
 foreach my $bs (values(%{$CONFIG{backupset}})) {
     unless(defined $$bs{host}) {
 	logndie "you must specify a Host directive in each backupset, even if the backup is local";
     }
-  my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
-###  my $path=(defined $$bh{path} ? $$bh{path} : '/');
-  my $sshcompress=(defined $$bs{compress} ? $$bs{compress} : 0);
-  my $root;
+    my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
+    if(defined $HOST and $host !~ /$HOST/) {
+	next;
+    }
+    my $sshcompress=(defined $$bs{compress} ? $$bs{compress} : 0);
 
-  if(defined $$bs{root}) {
-      $root=$$bs{root};
-  } elsif(defined $CONFIG{root}) {
-      $root=$CONFIG{root};
-  }
-  unless(defined $root and -d $root) {
-      logndie("no backup root defined or does not exist: $root");
-  }
-  if(defined $ROOT and $root !~ /$ROOT/) {
-      next;
-  }
-
-  my @paths;
-  if(ref($$bs{path}) eq "ARRAY") {
-      @paths=@{$$bs{path}};
-  } else {
-      @paths=($$bs{path});
-  }
-  foreach my $path (@paths) {
+    my $backupdest;
+    if(defined $$bs{backupdestination}) {
+	$backupdest=$$bs{backupdestination};
+    } elsif(defined $CONFIG{defaultbackupdestination}) {
+	$backupdest=$CONFIG{defaultbackupdestination};
+    }
+    unless(defined $backupdest and defined $CONFIG{backupdestination}{$backupdest} and -d $CONFIG{backupdestination}{$backupdest}{path}) {
+	logndie("no backup root defined or does not exist: $backupdest".(defined $CONFIG{backupdestination}{$backupdest}{path} ? " ($CONFIG{backupdestination}{$backupdest}{path})" : ''));
+    }
+    if(defined $DEST and $backupdest !~ /$DEST/) {
+	next;
+    }
+    my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
+    
+    foreach my $path (ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path})) {
+      if(defined $PATH and $path !~ /$PATH/) {
+	  next;
+      }
       my $dest;
       my $tag='';
       if(defined $$bs{tag}) {
@@ -133,27 +136,17 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
 	  $dest eq '-' and $dest='-root';
 	  $tag=$host.$dest;
       }
-      $dest=$root.'/'.$tag;
+      $dest=$backupdestpath.'/'.$tag;
 
-      if(defined $PATH and $path !~ /$PATH/) {
-	  next;
-      }
-      if(defined $HOST and $host !~ /$HOST/) {
-	  next;
-      }
-      if(defined $DEST and $dest !~ /$DEST/) {
-	  next;
-      }
-      logentry('debug',"Host: $host Path: $path Tag: $tag Dest: $dest Root: $root");
+      logentry('debug',"Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
 
       $BACKUPS{$tag}={%{$bs}}; # very important to make a copy here
       $BACKUPS{$tag}{dest}=$dest;
       $BACKUPS{$tag}{path}=$path;
       $BACKUPS{$tag}{tag}=$tag;
       $BACKUPS{$tag}{host}=$host;
-      $BACKUPS{$tag}{root}=$root;
       $BACKUPS{$tag}{sshcompress}=$sshcompress;
-
+      
       if($BACKUPS{$tag}{path} =~ /(home|home\/acox|home\/spin\/Maildir)$/) {
 	  #push(@com,'--exclude-globbing-filelist',
 	  #     $EXCLUDE_PATH.'/exclude-generic-home');
