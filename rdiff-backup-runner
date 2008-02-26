@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.25 2008/02/26 19:27:35 acox Exp $
+# $Id: rdiff-backup-runner,v 1.26 2008/02/26 19:33:45 acox Exp $
 
 use strict;
 use warnings;
@@ -146,7 +146,7 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       $BACKUPS{$tag}{tag}=$tag;
       $BACKUPS{$tag}{host}=$host;
       $BACKUPS{$tag}{sshcompress}=$sshcompress;
-      
+
       if($BACKUPS{$tag}{path} =~ /(home|home\/acox|home\/spin\/Maildir)$/) {
 	  #push(@com,'--exclude-globbing-filelist',
 	  #     $EXCLUDE_PATH.'/exclude-generic-home');
@@ -154,23 +154,21 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       }
       push(@{$BACKUPS{$tag}{excludes}},
 	   $EXCLUDE_PATH.'/exclude-'.$tag);
-      #push(@com,'--exclude-globbing-filelist',
-      #     $EXCLUDE_PATH.'/exclude-'.$tag);
       
-#       if(defined $DEFMAXAGE) {
-# 	  # override!
-# 	  $BACKUPS{$tag}{maxage}=$DEFMAXAGE;
-#       } elsif(not defined $BACKUPS{$tag}{maxage} and
-# 	      defined $CONFIG{maxage}) {
-# 	  $BACKUPS{$tag}{maxage}=$CONFIG{maxage};
-#       }
-#       if(defined $DEFMAXINC) {
-# 	  # override!
-# 	  $BACKUPS{$tag}{maxinc}=$DEFMAXINC;
-#       } elsif(not defined $BACKUPS{$tag}{maxinc} and
-# 	      defined $CONFIG{maxinc}) {
-# 	  $BACKUPS{$tag}{maxinc}=$CONFIG{maxinc};
-#       }
+       if(defined $DEFMAXAGE) {
+ 	  # override!
+ 	  $BACKUPS{$tag}{maxage}=$DEFMAXAGE;
+       } elsif(not defined $BACKUPS{$tag}{maxage} and
+ 	      defined $CONFIG{maxage}) {
+ 	  $BACKUPS{$tag}{maxage}=$CONFIG{maxage};
+       }
+       if(defined $DEFMAXINC) {
+ 	  # override!
+ 	  $BACKUPS{$tag}{maxinc}=$DEFMAXINC;
+       } elsif(not defined $BACKUPS{$tag}{maxinc} and
+ 	      defined $CONFIG{maxinc}) {
+ 	  $BACKUPS{$tag}{maxinc}=$CONFIG{maxinc};
+       }
   }
 }
 print Dumper \%BACKUPS;
