@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.32 2008/02/26 20:34:11 acox Exp $
+# $Id: rdiff-backup-runner,v 1.33 2008/02/26 20:45:13 acox Exp $
 
 use strict;
 use warnings;
@@ -359,7 +359,7 @@ sub list_increments {
 	warning("non-existant dest dir: $BACKUPS{$tag}{dest}");
 	return;
     }
-    my $c="rdiff-backup -l --parsable-output ".$BACKUPS{$tag}{dest};
+    my $c="$RDIFF_BACKUP -l --parsable-output ".$BACKUPS{$tag}{dest};
     logentry('debug',$c);
     my @res=`$c`;
     #@res == 1 and next; # if there is only one increment, don't consider it for removal
@@ -384,6 +384,9 @@ sub cleanup {
 	     '--terminal-verbosity',$TVERBOSITY,
 	     '--remove-older-than',
 	);
+    unless(defined $BACKUPS{$tag}{increments}) {
+	list_increments($tag);
+    }
     if(defined $BACKUPS{$tag}{maxinc} and
        $BACKUPS{$tag}{maxinc} =~ /^\d+$/ and
        @{$BACKUPS{$tag}{increments}} > $BACKUPS{$tag}{maxinc} ) {
@@ -418,11 +421,9 @@ sub cleanup {
 		logentry('err',"unable to execute rdiff-backup!");
 	    }
 	}
-	
     }
 }
 
-sub age_decipher {
-    # try and parse a time spec?
-
-}
+# TODO:
+# --check is broken
+# --clean --maxage X should probably be --remove-older-than  and --clean --maxinc X should maybe be --remove-more-than?
