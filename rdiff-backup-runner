@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.37 2008/02/26 22:25:30 acox Exp $
+# $Id: rdiff-backup-runner,v 1.38 2008/02/26 22:51:08 acox Exp $
 
 use strict;
 use warnings;
@@ -99,10 +99,6 @@ unless(-x $RDIFF_BACKUP) {
     logndie("unable to execute $RDIFF_BACKUP");
 }
 
-foreach my $bdtag (keys(%{$CONFIG{backupdestination}})) {
-    my $bd=$CONFIG{backupdestination}{$bdtag};
-}
-   
 foreach my $bs (values(%{$CONFIG{backupset}})) {
     unless(defined $$bs{host}) {
 	logndie "you must specify a Host directive in each backupset, even if the backup is local";
@@ -204,13 +200,12 @@ foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
 	  my $minfree=$CONFIG{backupdestination}{$BACKUPS{$tag}{backupdestination}}{minfree};
 	  my @a=`df -vP $CONFIG{backupdestination}{$BACKUPS{$tag}{backupdestination}}{path}`;
 	  $a[1] =~ /(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\%/;
-	  print "$minfree $3\n";
 	  if($3 < $minfree) {
 	      if(@INCREMENTS == 0) {
 		  # build out increments list
 		  build_increment_list();
 	      }
-	      die "unable to continue!";
+	      remove_oldest($$bh{backupdestination});
 	  }
       }
 
@@ -286,26 +281,7 @@ if(defined $AVERAGE) {
 }
 
 if(defined $REMOVE) {
-   foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
-     if(scalar @{$BACKUPS{$$ih{tag}}{increments}} == 1) {
- 	# cannot remove the only increment!
- 	next;
-     }
-     my $t=$$ih{inctime};
-     my @com=($RDIFF_BACKUP,
- 	     '--verbosity',$VERBOSITY,
- 	     '--terminal-verbosity',$TVERBOSITY,
- 	     '--remove-older-than',($t+1),
- 	     $BACKUPS{$$ih{tag}}{dest});
-     logentry('info',join(" ",@com));
-     unless($TEST) {
-       system(@com);
-       unless($? == 0) {
- 	logentry('err',"unable to execute rdiff-backup!");
-       }
-     }
-     last;
-   }
+    remove_oldest('any');
 }
 
 if($LISTOLDEST) {
@@ -457,6 +433,41 @@ sub build_increment_list {
 		 }
 		);
 	}
+    }
+}
+
+sub remove_oldest {
+    my $backupdest=$_[0];
+    foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
+	if(defined $$ih{removed} and $$ih{removed}) {
+	    logentry('warn',"cannot remove previously removed increment for $$ih{tag}");
+	    next;
+	}
+	if(scalar @{$BACKUPS{$$ih{tag}}{increments}} == 1) {
+	    # cannot remove the only increment!
+	    logentry('warn',"cannot remove only increment for $$ih{tag}");
+	    next;
+	}
+	unless($backupdest eq 'any' or
+	       $backupdest eq $BACKUPS{$$ih{tag}}{backupdestination}) {
+	    logentry('info',"skipping because it isn't in the backupdestination we are looking for: $backupdest $BACKUPS{$$ih{tag}}{backupdestination}");
+	    next;
+	}
+	my $t=$$ih{inctime};
+	my @com=($RDIFF_BACKUP,
+		 '--verbosity',$VERBOSITY,
+		 '--terminal-verbosity',$TVERBOSITY,
+		 '--remove-older-than',($t+1),
+		 $BACKUPS{$$ih{tag}}{dest});
+	logentry('info',join(" ",@com));
+	unless($TEST) {
+	    system(@com);
+	    unless($? == 0) {
+		logentry('err',"unable to execute rdiff-backup!");
+	    }
+	}
+	$$ih{removed}=1;
+	return;
     }
 }
 
