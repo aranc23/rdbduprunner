@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.22 2008/02/25 20:35:47 acox Exp $
+# $Id: rdiff-backup-runner,v 1.23 2008/02/26 17:10:32 acox Exp $
 
 use strict;
 use warnings;
@@ -11,14 +11,14 @@ use Data::Dumper;
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Env qw( HOME );
 use List::Util qw( shuffle );
+use Config::General;
 
 our $TEST=1;
 our $VERBOSITY=5;
 our $TVERBOSITY=3;
 our $LOCALHOST;
 our $COMPARE=0;
-our $RDIFF_BACKUP='rdiff-backup'; # assume it's in the path
-our $BACKUP_ROOT='/mnt/backup/rdiff-backup';
+our $RDIFF_BACKUP;
 our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $HOST;
@@ -26,7 +26,6 @@ our $DEST;
 our $ROOT;
 our $FORCE=0;
 our $REMOVE;
-our %BACKUPS;
 our %INCREMENTS;
 our ($VERBOSE,$DEBUG);
 our $AVERAGE;
@@ -34,20 +33,20 @@ our ($IFILES,$IFILESIZE,$DESTSIZECHANGE);
 our $SNAPPV='/dev/md0';
 our $SNAPSIZE='1G';
 our $LISTOLDEST=0;
-our $FREE;
 our $CHECK=0;
 our $CLEANUP=0;
 our $DEFMAXINC;
 our $DEFMAXAGE;
 
-our $CONFIG="$HOME/.rbrrc";
+our $CONFIG_FILE="$HOME/rdbrc";
+our %CONFIG;
+our %BACKUPS;
 
 GetOptions('test!'          => \$TEST,
            'verbosity=i'    => \$VERBOSITY,
            'v|terminal-verbosity=i' => \$TVERBOSITY,
            'localhost=s'    => \$LOCALHOST,
            'rdiff-backup=s' => \$RDIFF_BACKUP,
-           'backup-root=s'  => \$BACKUP_ROOT,
            'compare'        => \$COMPARE,
            'path=s'         => \$PATH,
            'host=s'         => \$HOST,
@@ -60,9 +59,8 @@ GetOptions('test!'          => \$TEST,
            'average'        => \$AVERAGE,
            'snappv=s'       => \$SNAPPV,
            'list-oldest'    => \$LISTOLDEST,
-	   'free=s'         => \$FREE,
 	   'check'          => \$CHECK, # perform a check-destination-dir on target
-	   'config=s'       => \$CONFIG, # config file
+	   'config=s'       => \$CONFIG_FILE, # config file
 	   'cleanup'        => \$CLEANUP,
 	   'maxinc=i'       => \$DEFMAXINC,
 	   'maxage=s'       => \$DEFMAXAGE,
@@ -75,80 +73,111 @@ if(not defined $LOCALHOST) {
   @a > 1 and $LOCALHOST=$a[0];
 }
 
-our @BACKUPS;
-require $CONFIG or die "unable to parse the rdiff-backup-runner config file: $CONFIG";
-
 logentry::OpenLog('local5','rdiff-backup-runner');
 logentry('info','starting');
 
-foreach my $bh (@BACKUPS) {
-  my $host=(defined $$bh{host} ? $$bh{host} : $LOCALHOST);
-  my $path=(defined $$bh{path} ? $$bh{path} : '/');
-  my $sshcompress=(defined $$bh{compress} ? $$bh{compress} : 0);
-  my $dest;
+%CONFIG=new Config::General(-ConfigFile => $CONFIG_FILE,
+			    -UseApacheInclude => 1,
+			    -AutoTrue => 1,
+			    -LowerCaseNames => 1)->getall() or die "unable to parse $CONFIG_FILE";
+
+print Dumper \%CONFIG;
+
+if(not defined $RDIFF_BACKUP) {
+    if(defined $CONFIG{rdiffbackuppath}) {
+	$RDIFF_BACKUP=$CONFIG{rdiffbackuppath};
+    } else {
+	$RDIFF_BACKUP='rdiff-backup'; # in our path we hope
+    }
+}
+unless(-x $RDIFF_BACKUP) {
+    logndie("unable to execute $RDIFF_BACKUP");
+}
+    
+foreach my $bs (values(%{$CONFIG{backupset}})) {
+    unless(defined $$bs{host}) {
+	logndie "you must specify a Host directive in each backupset, even if the backup is local";
+    }
+  my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
+###  my $path=(defined $$bh{path} ? $$bh{path} : '/');
+  my $sshcompress=(defined $$bs{compress} ? $$bs{compress} : 0);
   my $root;
-  my $tag;
-  if(defined $$bh{dest}) {
-    $dest=$$bh{dest};
-    $tag=$dest;
-  } else {
-    $dest=$path;
-    $dest =~ s/\//\-/g;
-    $dest eq '-' and $dest='-root';
-    $tag=$host.$dest;
-  }
 
-  if(defined $$bh{root}) {
-    $root=$$bh{root};
-  } else {
-    $root=$BACKUP_ROOT;
+  if(defined $$bs{root}) {
+      $root=$$bs{root};
+  } elsif(defined $CONFIG{root}) {
+      $root=$CONFIG{root};
   }
-  $dest=$root.'/'.$tag;
-
-  if(defined $PATH and $path !~ /$PATH/) {
-    next;
-  }
-  if(defined $HOST and $host !~ /$HOST/) {
-    next;
-  }
-  if(defined $DEST and $dest !~ /$DEST/) {
-    next;
+  unless(defined $root and -d $root) {
+      logndie("no backup root defined or does not exist: $root");
   }
   if(defined $ROOT and $root !~ /$ROOT/) {
-    next;
+      next;
   }
 
-  logentry('info',"$host $path $tag $dest");
+  my @paths;
+  if(ref($$bs{path}) eq "ARRAY") {
+      @paths=@{$$bs{path}};
+  } else {
+      @paths=($$bs{path});
+  }
+  foreach my $path (@paths) {
+      my $dest;
+      my $tag='';
+      if(defined $$bs{tag}) {
+	  $dest=$$bs{tag};
+	  $tag=$dest;
+      } else {
+	  $dest=$path;
+	  $dest =~ s/\//\-/g;
+	  $dest eq '-' and $dest='-root';
+	  $tag=$host.$dest;
+      }
+      $dest=$root.'/'.$tag;
 
-  $BACKUPS{$tag}=$bh;
-  $BACKUPS{$tag}{dest}=$dest;
-  $BACKUPS{$tag}{path}=$path;
-  $BACKUPS{$tag}{tag}=$tag;
-  $BACKUPS{$tag}{host}=$host;
-  $BACKUPS{$tag}{root}=$root;
-  
-  $BACKUPS{$tag}{sshcompress}=$sshcompress;
+      if(defined $PATH and $path !~ /$PATH/) {
+	  next;
+      }
+      if(defined $HOST and $host !~ /$HOST/) {
+	  next;
+      }
+      if(defined $DEST and $dest !~ /$DEST/) {
+	  next;
+      }
+      logentry('debug',"Host: $host Path: $path Tag: $tag Dest: $dest Root: $root");
 
-  if($BACKUPS{$tag}{path} =~ /(home|home\/acox|home\/spin\/Maildir)$/) {
+      $BACKUPS{$tag}={%{$bs}}; # very important to make a copy here
+      $BACKUPS{$tag}{dest}=$dest;
+      $BACKUPS{$tag}{path}=$path;
+      $BACKUPS{$tag}{tag}=$tag;
+      $BACKUPS{$tag}{host}=$host;
+      $BACKUPS{$tag}{root}=$root;
+      $BACKUPS{$tag}{sshcompress}=$sshcompress;
+
+      if($BACKUPS{$tag}{path} =~ /(home|home\/acox|home\/spin\/Maildir)$/) {
+	  #push(@com,'--exclude-globbing-filelist',
+	  #     $EXCLUDE_PATH.'/exclude-generic-home');
+	  push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-generic-home');
+      }
+      push(@{$BACKUPS{$tag}{excludes}},
+	   $EXCLUDE_PATH.'/exclude-'.$tag);
       #push(@com,'--exclude-globbing-filelist',
-      #     $EXCLUDE_PATH.'/exclude-generic-home');
-      push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-generic-home');
+      #     $EXCLUDE_PATH.'/exclude-'.$tag);
+      
+      if(not defined $BACKUPS{$tag}{maxage} and
+	 defined $DEFMAXAGE) {
+	  $BACKUPS{$tag}{maxage}=$DEFMAXAGE;
+      }
+      if(not defined $BACKUPS{$tag}{maxinc} and
+	 defined $DEFMAXINC) {
+	  $BACKUPS{$tag}{maxinc}=$DEFMAXINC;
+      }
   }
-  push(@{$BACKUPS{$tag}{excludes}},
-       $EXCLUDE_PATH.'/exclude-'.$tag);
-  #push(@com,'--exclude-globbing-filelist',
-  #     $EXCLUDE_PATH.'/exclude-'.$tag);
-  
-  if(not defined $BACKUPS{$tag}{maxage} and
-     defined $DEFMAXAGE) {
-      $BACKUPS{$tag}{maxage}=$DEFMAXAGE;
-  }
-
+ 
 }
 
 foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
     my $bh=$BACKUPS{$tag}; # for convenience of typing
-
 
   if(defined $AVERAGE) {
     my $c="rdiff-backup --calculate-average $BACKUPS{$tag}{dest}/rdiff-backup-data/session_statistics.*.data";
