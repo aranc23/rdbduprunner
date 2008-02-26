@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.30 2008/02/26 20:26:18 acox Exp $
+# $Id: rdiff-backup-runner,v 1.31 2008/02/26 20:31:02 acox Exp $
 
 use strict;
 use warnings;
@@ -195,7 +195,7 @@ foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
 	  next;
       }
 
-      # apply the hard cleanup rules (maxinc, maxage) before running the backup
+      # apply <the hard cleanup rules (maxinc, maxage) before running the backup
       cleanup($tag);
       # apply constraints before attempting the backup
 
@@ -301,56 +301,8 @@ if($LISTOLDEST) {
 
 
 if($CLEANUP) {
-    my $now=time();
     foreach my $tag (shuffle(keys(%BACKUPS))) {
-	if(defined $BACKUPS{$tag}{maxinc} and
-	   $BACKUPS{$tag}{maxinc} =~ /^\d+$/ and
-	   @{$BACKUPS{$tag}{increments}} > $BACKUPS{$tag}{maxinc} ) {
-	    # too many!
-	    logentry('info',"$tag\t Incs: ".
-		     scalar @{$BACKUPS{$tag}{increments}}.
-		     "\t Max: ".$BACKUPS{$tag}{maxinc});
-	    my $lastinc=(sort {$a <=> $b} (@{$BACKUPS{$tag}{increments}}))[$BACKUPS{$tag}{maxinc}-1];
-	    logentry('debug',"last time to keep for $tag: ".localtime($lastinc));
-	    my @com=($RDIFF_BACKUP,
-		     '--verbosity',$VERBOSITY,
-		     '--terminal-verbosity',$TVERBOSITY,
-		     '--remove-older-than',$lastinc,
-		);
-	    if($FORCE) {
-		push(@com,'--force');
-	    }
-	    push(@com,$BACKUPS{$tag}{dest});
-	    logentry('info',join(" ",@com));
-	    unless($TEST) {
-		system(@com);
-		unless($? == 0) {
-		    logentry('err',"unable to execute rdiff-backup!");
-		}
-	    }
-	}
-	if(defined $BACKUPS{$tag}{maxage} and
-	   $BACKUPS{$tag}{maxage} =~ /^\d/) {
-	    my @com=($RDIFF_BACKUP,
-		     '--verbosity',$VERBOSITY,
-		     '--terminal-verbosity',$TVERBOSITY,
-		     '--remove-older-than',$BACKUPS{$tag}{maxage},
-		);
-	    if($FORCE) {
-		push(@com,'--force');
-	    }
-	    push(@com,$BACKUPS{$tag}{dest});
-
-
-	    logentry('info',join(" ",@com));
-	    unless($TEST) {
-		system(@com);
-		unless($? == 0) {
-		    logentry('err',"unable to execute rdiff-backup!");
-		}
-	    }
-	    
-	}
+	cleanup($tag);
     }
 }
 
