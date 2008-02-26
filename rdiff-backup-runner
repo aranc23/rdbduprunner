@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.28 2008/02/26 19:51:02 acox Exp $
+# $Id: rdiff-backup-runner,v 1.29 2008/02/26 19:54:06 acox Exp $
 
 use strict;
 use warnings;
@@ -267,9 +267,7 @@ foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
 		  }
 	      }
 	  }
-	  unlink $LOCK_FILE;
-	  flock(LOCK,LOCK_UN);
-	  close LOCK;
+	  unlock_pid_file();
       }
   }
 }
@@ -399,4 +397,10 @@ sub lock_pid_file {
     }
     truncate(LOCK,0); # this shouldn't fail if we have the file opened and locked!
     print LOCK $$."\n"; # who really cares if this fails?
+}
+
+sub unlock_pid_file {
+    unlink $LOCK_FILE;
+    flock(LOCK,LOCK_UN);
+    close LOCK;
 }
