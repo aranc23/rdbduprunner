@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.39 2008/02/27 16:13:54 acox Exp $
+# $Id: rdiff-backup-runner,v 1.40 2008/02/27 16:49:10 acox Exp $
 
 use strict;
 use warnings;
@@ -175,150 +175,147 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
   }
 }
 
-if(defined $REMOVE or $LISTOLDEST or $CLEANUP) {
-    build_increment_list();
-}
-
-my $avcom="$RDIFF_BACKUP --calculate-average";
-BACKUP:
-foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
-    my $bh=$BACKUPS{$tag}; # for convenience of typing
-
-  if(defined $AVERAGE) {
-    $avcom.=" $BACKUPS{$tag}{dest}/rdiff-backup-data/session_statistics.*.data";
-  } elsif(defined $REMOVE or $LISTOLDEST or $CLEANUP) {
-      # do nothing?
-  } else { # actually do a  backup
-      if($$bh{disabled}) {
-	  # skip disabled backups
-	  next;
-      }
-      if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
-	  next BACKUP;
-      }
-      unless(-d $CONFIG{backupdestination}{$$bh{backupdestination}}{path}) {
-	  $CONFIG{backupdestination}{$$bh{backupdestination}}{busted}=1;
-	  logentry('warn',"the backupdestination directory ($BACKUPS{backupdestiantion}{$$bh{backupdestination}}{path}) for $$bh{host}/$$bh{tag} does not exist");
-	  logentry('warn',"this warning will only be printed once for each destination");
-	  next BACKUP;
-      }
-
-      # apply <the hard cleanup rules (maxinc, maxage) before running the backup
-      cleanup($tag);
-      # apply constraints before attempting the backup
-      while(1) {
-	  my $ans=check_space($$bh{backupdestination});
-	  if($ans == -1) {
-	      logentry('err',"unable to determine if this backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path}) has enough free space");
-	      logentry('err',"no backups to this backupdestination will be attempted and this message will be repeated only once");
-	      $CONFIG{$$bh{backupdestination}}{busted}=1;
-	      next BACKUP;
-	  } elsif($ans == 0) {
-	      unless(remove_oldest($$bh{backupdestination})) {
-		  # we failed to remove an increment from the backupdestination
-		  # we cannot do backups on this bd for this run!
-		  logentry('warn',"unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
-		  logentry('warn',"no further attempts will be made to do backups to this destination");
-		  $CONFIG{$$bh{backupdestination}}{busted}=1;
-		  next BACKUP;
-	      }
-	      # we can just fall out now and let check_space() run again to see if it helped
-	  } elsif($ans == 1) {
-	      # we have enough space to proceed
-	      last;
-	  } else {
-	      # wtf!
-	      logndie("check space did not return a valid code (-1,0,1) so we have to die for lack of anything more sensible to do");
-	  }
-      }
-	      
-	      
-      my @com=($RDIFF_BACKUP,
-	       '--verbosity',$VERBOSITY,
-	       '--terminal-verbosity',$TVERBOSITY,
-	       '--exclude-special-files',
-	       '--exclude-other-filesystems',
-	  );
-      $BACKUPS{$tag}{sshcompress} or push(@com,'--ssh-no-compression');
-      $VERBOSE and push(@com,'--print-statistics');
-
-      if($COMPARE) {
-	  push(@com,'--compare');
-      }
-
-      foreach my $f (@{$BACKUPS{$tag}{excludes}}) {
-	  push(@com,'--exclude-globbing-filelist',
-	       $f);
-      }
-      # this is fugly:
-      push(@com,($BACKUPS{$tag}{host} eq $LOCALHOST ? $BACKUPS{$tag}{path} : $BACKUPS{$tag}{host}.'::'.$BACKUPS{$tag}{path}),$BACKUPS{$tag}{dest});
-
-      logentry('info',join(" ",@com));
-
-      unless($TEST) {
-	  lock_pid_file();
-
-	  if($CHECK) {
-	      @com=($RDIFF_BACKUP,
-		    '--verbosity',$VERBOSITY,
-		    '--terminal-verbosity',$TVERBOSITY,
-		    '--check-destination-dir',$BACKUPS{$tag}{dest});
-	      logentry('info',join(" ",@com));
-	  } else {
-	      if ($BACKUPS{$tag}{host} ne $LOCALHOST) {
-		  system("/usr/sbin/fping -q $BACKUPS{$tag}{host}");
-		  unless($? == 0) {
-		      logentry('warning',"fping failed to ping $BACKUPS{$tag}{host}");
-		      next;
-		  }
-	      }
-	      if (defined $$bh{prerun}) {
-		  print $$bh{prerun}."\n";
-		  system($$bh{prerun});
-		  unless($? == 0) {
-		      logentry('err',"unable to execute prerun command: skipping backup!");
-		      next;
-		  }
-	      }
-	  }
-	  system(@com);
-	  my $mainret=$?;
-	  unless($mainret == 0) {
-	      logentry('err',"unable to execute rdiff-backup!");
-	  }
-	  unless($CHECK) {
-	      if(defined $$bh{postrun}) {
-		  print $$bh{postrun}."\n";
-		  system($$bh{postrun});
-		  unless($? == 0) {
-		      logentry('err',"unable to execute postrun command");
-		  }
-	      }
-	  }
-	  unlock_pid_file();
-      }
-  }
-}
-
-if(defined $AVERAGE) {
-    exec($avcom);
-}
-
-if(defined $REMOVE) {
-    remove_oldest('any');
-}
-
 if($LISTOLDEST) {
+    build_increment_list();
     foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
-	logentry('info',localtime($$ih{inctime}).' '.$BACKUPS{$$ih{tag}}{dest}.' '.$$ih{tag});
+	print localtime($$ih{inctime}).' '.$BACKUPS{$$ih{tag}}{dest}.' '.$$ih{tag}."\n";
     }
-}
-
-if($CLEANUP) {
+} elsif($CLEANUP) {
     foreach my $tag (shuffle(keys(%BACKUPS))) {
 	cleanup($tag);
     }
+} elsif(defined $REMOVE) {
+    build_increment_list();
+    remove_oldest('any');
+} elsif($CHECK) {
+    foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
+	my @com=($RDIFF_BACKUP,
+		 '--verbosity',$VERBOSITY,
+		 '--terminal-verbosity',$TVERBOSITY,
+		 '--check-destination-dir',$BACKUPS{$tag}{dest});
+	logentry('info',join(" ",@com));
+	unless($TEST) {
+	    lock_pid_file();
+	    system(@com);
+	    unless($? == 0) {
+		logentry('err',"unable to execute rdiff-backup!");
+	    }
+	    unlock_pid_file();
+	}
+    }
+} elsif($AVERAGE) {
+    my $avcom="$RDIFF_BACKUP --calculate-average";
+    foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
+	my $bh=$BACKUPS{$tag}; # for convenience of typing
+	$avcom.=" $BACKUPS{$tag}{dest}/rdiff-backup-data/session_statistics.*.data";
+    }
+    exec($avcom);
+} else { # actually do a backup, please
+  BACKUP:
+    foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
+	my $bh=$BACKUPS{$tag}; # for convenience of typing
+
+	if($$bh{disabled}) {
+	    # skip disabled backups
+	    next;
+	}
+	if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
+	    next BACKUP;
+	}
+	unless(-d $CONFIG{backupdestination}{$$bh{backupdestination}}{path}) {
+	    $CONFIG{backupdestination}{$$bh{backupdestination}}{busted}=1;
+	    logentry('warn',"the backupdestination directory ($BACKUPS{backupdestiantion}{$$bh{backupdestination}}{path}) for $$bh{host}/$$bh{tag} does not exist");
+	    logentry('warn',"this warning will only be printed once for each destination");
+	    next BACKUP;
+	}
+
+	# apply <the hard cleanup rules (maxinc, maxage) before running the backup
+	cleanup($tag);
+	# apply constraints before attempting the backup
+	while(1) {
+	    my $ans=check_space($$bh{backupdestination});
+	    if($ans == -1) {
+		logentry('err',"unable to determine if this backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path}) has enough free space");
+		logentry('err',"no backups to this backupdestination will be attempted and this message will be repeated only once");
+		$CONFIG{$$bh{backupdestination}}{busted}=1;
+		next BACKUP;
+	    } elsif($ans == 0) {
+		unless(remove_oldest($$bh{backupdestination})) {
+		    # we failed to remove an increment from the backupdestination
+		    # we cannot do backups on this bd for this run!
+		    logentry('warn',"unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
+		    logentry('warn',"no further attempts will be made to do backups to this destination");
+		    $CONFIG{$$bh{backupdestination}}{busted}=1;
+		    next BACKUP;
+		}
+		# we can just fall out now and let check_space() run again to see if it helped
+	    } elsif($ans == 1) {
+		# we have enough space to proceed
+		last;
+	    } else {
+		# wtf!
+		logndie("check space did not return a valid code (-1,0,1) so we have to die for lack of anything more sensible to do");
+	    }
+	}
+	      
+	      
+	my @com=($RDIFF_BACKUP,
+		 '--verbosity',$VERBOSITY,
+		 '--terminal-verbosity',$TVERBOSITY,
+		 '--exclude-special-files',
+		 '--exclude-other-filesystems',
+	    );
+	$BACKUPS{$tag}{sshcompress} or push(@com,'--ssh-no-compression');
+	$VERBOSE and push(@com,'--print-statistics');
+	
+	if($COMPARE) {
+	    push(@com,'--compare');
+	}
+
+	foreach my $f (@{$BACKUPS{$tag}{excludes}}) {
+	    push(@com,'--exclude-globbing-filelist',
+		 $f);
+	}
+	# this is fugly:
+	push(@com,($BACKUPS{$tag}{host} eq $LOCALHOST ? $BACKUPS{$tag}{path} : $BACKUPS{$tag}{host}.'::'.$BACKUPS{$tag}{path}),$BACKUPS{$tag}{dest});
+
+	logentry('info',join(" ",@com));
+
+	unless($TEST) {
+	    lock_pid_file();
+
+	    if ($BACKUPS{$tag}{host} ne $LOCALHOST) {
+		system("/usr/sbin/fping -q $BACKUPS{$tag}{host}");
+		unless($? == 0) {
+		    logentry('warning',"fping failed to ping $BACKUPS{$tag}{host}");
+		    next;
+		}
+	    }
+	    if (defined $$bh{prerun}) {
+		print $$bh{prerun}."\n";
+		system($$bh{prerun});
+		unless($? == 0) {
+		    logentry('err',"unable to execute prerun command: skipping backup!");
+		    next;
+		}
+	    }
+	}
+	system(@com);
+	my $mainret=$?;
+	unless($mainret == 0) {
+	    logentry('err',"unable to execute rdiff-backup!");
+	}
+	if(defined $$bh{postrun}) {
+	    print $$bh{postrun}."\n";
+	    system($$bh{postrun});
+	    unless($? == 0) {
+		logentry('err',"unable to execute postrun command");
+	    }
+	    unlock_pid_file();
+	}
+    }
 }
+
 
 
 sub backup_sort {
@@ -370,7 +367,7 @@ sub list_increments {
 
     unless(-d $BACKUPS{$tag}{dest}) {
 	# skip non-existant destination directories
-	warning("non-existant dest dir: $BACKUPS{$tag}{dest}");
+	logentry('warn',"non-existant dest dir: $BACKUPS{$tag}{dest}");
 	return;
     }
     my $c="$RDIFF_BACKUP -l --parsable-output ".$BACKUPS{$tag}{dest};
@@ -433,7 +430,6 @@ sub cleanup {
 
 sub build_increment_list {
     while(my ($tag,$bp)=each(%BACKUPS)) {
-	print $tag."\n";
 	unless(defined $$bp{increments}) {
 	    list_increments($tag);
 	}
@@ -497,6 +493,9 @@ sub remove_oldest {
 	    }
 	}
 	$$ih{removed}=1;
+#	print Dumper $BACKUPS{$$ih{tag}}{increments};
+	shift(@{$BACKUPS{$$ih{tag}}{increments}});
+#	print Dumper $BACKUPS{$$ih{tag}}{increments};
 	return 1;
     }
 }
