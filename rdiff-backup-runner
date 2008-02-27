@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.41 2008/02/27 16:51:01 acox Exp $
+# $Id: rdiff-backup-runner,v 1.42 2008/02/27 16:57:37 acox Exp $
 
 use strict;
 use warnings;
@@ -470,7 +470,7 @@ sub remove_oldest {
 	}
 	if(scalar @{$BACKUPS{$$ih{tag}}{increments}} == 1) {
 	    # cannot remove the only increment!
-	    logentry('warn',"cannot remove only increment for $$ih{tag}");
+	    logentry('debug',"cannot remove only increment for $$ih{tag}");
 	    next;
 	}
 	unless($backupdest eq 'any' or
