@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.38 2008/02/26 22:51:08 acox Exp $
+# $Id: rdiff-backup-runner,v 1.39 2008/02/27 16:13:54 acox Exp $
 
 use strict;
 use warnings;
@@ -180,6 +180,7 @@ if(defined $REMOVE or $LISTOLDEST or $CLEANUP) {
 }
 
 my $avcom="$RDIFF_BACKUP --calculate-average";
+BACKUP:
 foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
     my $bh=$BACKUPS{$tag}; # for convenience of typing
 
@@ -192,23 +193,46 @@ foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
 	  # skip disabled backups
 	  next;
       }
+      if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
+	  next BACKUP;
+      }
+      unless(-d $CONFIG{backupdestination}{$$bh{backupdestination}}{path}) {
+	  $CONFIG{backupdestination}{$$bh{backupdestination}}{busted}=1;
+	  logentry('warn',"the backupdestination directory ($BACKUPS{backupdestiantion}{$$bh{backupdestination}}{path}) for $$bh{host}/$$bh{tag} does not exist");
+	  logentry('warn',"this warning will only be printed once for each destination");
+	  next BACKUP;
+      }
 
       # apply <the hard cleanup rules (maxinc, maxage) before running the backup
       cleanup($tag);
       # apply constraints before attempting the backup
-      if(defined $CONFIG{backupdestination}{$BACKUPS{$tag}{backupdestination}}{minfree}) {
-	  my $minfree=$CONFIG{backupdestination}{$BACKUPS{$tag}{backupdestination}}{minfree};
-	  my @a=`df -vP $CONFIG{backupdestination}{$BACKUPS{$tag}{backupdestination}}{path}`;
-	  $a[1] =~ /(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\%/;
-	  if($3 < $minfree) {
-	      if(@INCREMENTS == 0) {
-		  # build out increments list
-		  build_increment_list();
+      while(1) {
+	  my $ans=check_space($$bh{backupdestination});
+	  if($ans == -1) {
+	      logentry('err',"unable to determine if this backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path}) has enough free space");
+	      logentry('err',"no backups to this backupdestination will be attempted and this message will be repeated only once");
+	      $CONFIG{$$bh{backupdestination}}{busted}=1;
+	      next BACKUP;
+	  } elsif($ans == 0) {
+	      unless(remove_oldest($$bh{backupdestination})) {
+		  # we failed to remove an increment from the backupdestination
+		  # we cannot do backups on this bd for this run!
+		  logentry('warn',"unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
+		  logentry('warn',"no further attempts will be made to do backups to this destination");
+		  $CONFIG{$$bh{backupdestination}}{busted}=1;
+		  next BACKUP;
 	      }
-	      remove_oldest($$bh{backupdestination});
+	      # we can just fall out now and let check_space() run again to see if it helped
+	  } elsif($ans == 1) {
+	      # we have enough space to proceed
+	      last;
+	  } else {
+	      # wtf!
+	      logndie("check space did not return a valid code (-1,0,1) so we have to die for lack of anything more sensible to do");
 	  }
       }
-
+	      
+	      
       my @com=($RDIFF_BACKUP,
 	       '--verbosity',$VERBOSITY,
 	       '--terminal-verbosity',$TVERBOSITY,
@@ -438,9 +462,14 @@ sub build_increment_list {
 
 sub remove_oldest {
     my $backupdest=$_[0];
+
+    unless(@INCREMENTS > 0) {
+	build_increment_list();
+    }
     foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
+	logentry('debug',"remove_oldest: $$ih{inctime}");
 	if(defined $$ih{removed} and $$ih{removed}) {
-	    logentry('warn',"cannot remove previously removed increment for $$ih{tag}");
+	    logentry('debug',"cannot remove previously removed increment for $$ih{tag}");
 	    next;
 	}
 	if(scalar @{$BACKUPS{$$ih{tag}}{increments}} == 1) {
@@ -450,25 +479,58 @@ sub remove_oldest {
 	}
 	unless($backupdest eq 'any' or
 	       $backupdest eq $BACKUPS{$$ih{tag}}{backupdestination}) {
-	    logentry('info',"skipping because it isn't in the backupdestination we are looking for: $backupdest $BACKUPS{$$ih{tag}}{backupdestination}");
+	    logentry('debug',"skipping because it isn't in the backupdestination we are looking for: $backupdest $BACKUPS{$$ih{tag}}{backupdestination}");
 	    next;
 	}
 	my $t=$$ih{inctime};
 	my @com=($RDIFF_BACKUP,
 		 '--verbosity',$VERBOSITY,
 		 '--terminal-verbosity',$TVERBOSITY,
-		 '--remove-older-than',($t+1),
+		 '--remove-older-than',($t+1), # do I really need to add 1?
 		 $BACKUPS{$$ih{tag}}{dest});
 	logentry('info',join(" ",@com));
 	unless($TEST) {
 	    system(@com);
 	    unless($? == 0) {
-		logentry('err',"unable to execute rdiff-backup!");
+		logentry('err',"rdiff-backup did not exit cleanly!");
+		return 0;
 	    }
 	}
 	$$ih{removed}=1;
-	return;
+	return 1;
     }
+}
+
+sub check_space {
+    my $bh=$CONFIG{backupdestination}{$_[0]};
+    update_bd_space($bh) or return -1;    
+    if(defined $$bh{minfree} and $$bh{avail} < $$bh{minfree}) {
+	return 0;
+    } elsif(defined $$bh{percentused} and $$bh{percent} > $$bh{percentused}) {
+	return 0;
+    }
+    return 1;
+}
+
+sub update_bd_space {
+    my $bh=$_[0];
+    my $com="df -vP $$bh{path}";
+    my @a=`$com`;
+    unless($? == 0) {
+	logentry('err',"unable to run \"$com\": no further backups will be attempted to this directory");
+	$$bh{busted}=1;
+	return 0;
+    }
+    unless($a[1] =~ /(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\%/) {
+	logentry('err',"unable to parse output from \"$com\": no further backups will be attempted to this directory");
+	$$bh{busted}=1;
+	return 0;
+    }
+    $$bh{size}=$1;
+    $$bh{used}=$2;
+    $$bh{avail}=$3;
+    $$bh{percent}=$4;
+    return 1;
 }
 
 # TODO:
