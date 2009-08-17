@@ -232,36 +232,36 @@ if($LISTOLDEST) {
 	}
 
 	# apply <the hard cleanup rules (maxinc, maxage) before running the backup
-	if(-d $$bh{dest}) {
-	    # if we haven't run a backup of this dir, don't try to clean it up
-	    cleanup($tag);
-	}
+	# if(-d $$bh{dest}) {
+	#     # if we haven't run a backup of this dir, don't try to clean it up
+	#     cleanup($tag);
+	# }
 	# apply constraints before attempting the backup
-	while(1) {
-	    my $ans=check_space($$bh{backupdestination});
-	    if($ans == -1) {
-		logentry('err',"unable to determine if this backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path}) has enough free space");
-		logentry('err',"no backups to this backupdestination will be attempted and this message will be repeated only once");
-		$CONFIG{$$bh{backupdestination}}{busted}=1;
-		next BACKUP;
-	    } elsif($ans == 0) {
-		unless(remove_oldest($$bh{backupdestination})) {
-		    # we failed to remove an increment from the backupdestination
-		    # we cannot do backups on this bd for this run!
-		    logentry('warn',"unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
-		    logentry('warn',"no further attempts will be made to do backups to this destination");
-		    $CONFIG{$$bh{backupdestination}}{busted}=1;
-		    next BACKUP;
-		}
-		# we can just fall out now and let check_space() run again to see if it helped
-	    } elsif($ans == 1) {
-		# we have enough space to proceed
-		last;
-	    } else {
-		# wtf!
-		logndie("check space did not return a valid code (-1,0,1) so we have to die for lack of anything more sensible to do");
-	    }
-	}
+	# while(1) {
+	#     my $ans=check_space($$bh{backupdestination});
+	#     if($ans == -1) {
+	# 	logentry('err',"unable to determine if this backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path}) has enough free space");
+	# 	logentry('err',"no backups to this backupdestination will be attempted and this message will be repeated only once");
+	# 	$CONFIG{$$bh{backupdestination}}{busted}=1;
+	# 	next BACKUP;
+	#     } elsif($ans == 0) {
+	# 	unless(remove_oldest($$bh{backupdestination})) {
+	# 	    # we failed to remove an increment from the backupdestination
+	# 	    # we cannot do backups on this bd for this run!
+	# 	    logentry('warn',"unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
+	# 	    logentry('warn',"no further attempts will be made to do backups to this destination");
+	# 	    $CONFIG{$$bh{backupdestination}}{busted}=1;
+	# 	    next BACKUP;
+	# 	}
+	# 	# we can just fall out now and let check_space() run again to see if it helped
+	#     } elsif($ans == 1) {
+	# 	# we have enough space to proceed
+	# 	last;
+	#     } else {
+	# 	# wtf!
+	# 	logndie("check space did not return a valid code (-1,0,1) so we have to die for lack of anything more sensible to do");
+	#     }
+	# }
 
 	my @com=($DUPLICITY_BINARY,
 		 '--verbosity',$VERBOSITY,
@@ -269,9 +269,9 @@ if($LISTOLDEST) {
 	    );
 	not $VERBOSE and push(@com,'--no-print-statistics');
 
-	if($COMPARE) {
-	    push(@com,'--compare');
-	}
+	# if($COMPARE) {
+	#     push(@com,'--compare');
+	# }
 
 	foreach my $f (@{$BACKUPS{$tag}{excludes}}) {
 	    push(@com,'--exclude-globbing-filelist',
