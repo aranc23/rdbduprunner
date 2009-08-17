@@ -69,10 +69,14 @@ GetOptions('test!'          => \$TEST,
           );
 
 if(not defined $LOCALHOST) {
-  $LOCALHOST=`hostname`;
-  chomp $LOCALHOST;
-  my @a=split(/\./,$LOCALHOST);
-  @a > 1 and $LOCALHOST=$a[0];
+  if(defined $CONFIG{localhost}) {
+    $LOCALHOST=$CONFIG{localhost};
+  } else {
+    $LOCALHOST=`hostname`;
+    chomp $LOCALHOST;
+    my @a=split(/\./,$LOCALHOST);
+    @a > 1 and $LOCALHOST=$a[0];
+  }
 }
 
 logentry::OpenLog('local5','duplcity-runner');
@@ -289,7 +293,7 @@ if($LISTOLDEST) {
 		 $f);
 	}
 	# this is fugly:
-	push(@com,($BACKUPS{$tag}{host} eq $LOCALHOST ? $BACKUPS{$tag}{path} : $BACKUPS{$tag}{host}.'::'.$BACKUPS{$tag}{path}),$BACKUPS{$tag}{dest});
+	push(@com,$BACKUPS{$tag}{path},$BACKUPS{$tag}{dest});
 
 	logentry('info',join(" ",@com));
 
