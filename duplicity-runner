@@ -271,15 +271,14 @@ if($LISTOLDEST) {
 		logndie("check space did not return a valid code (-1,0,1) so we have to die for lack of anything more sensible to do");
 	    }
 	}
-	      
-	      
+
 	my @com=($DUPLICITY_BINARY,
 		 '--verbosity',$VERBOSITY,
 		 '--terminal-verbosity',$TVERBOSITY,
 		 '--exclude-other-filesystems',
 	    );
 	$VERBOSE and push(@com,'--print-statistics');
-	
+
 	if($COMPARE) {
 	    push(@com,'--compare');
 	}
