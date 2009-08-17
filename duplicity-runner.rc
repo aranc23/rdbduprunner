@@ -1,0 +1,174 @@
+DefaultBackupDestination backup
+# verbosity 5
+# terminal-verbosity 3
+RdiffBackupPath /usr/bin/rdiff-backup
+#LockFile $HOME/rdiff-backup-runner.pid or something like that
+#excludepath /etc/rdiff-backup
+#maxage 10D
+
+<BackupDestination backup>
+Path /mnt/backup/rdiff-backup
+#MinFree XXX # in kbytes
+PercentUsed 95
+#minfree 100000000
+</BackupDestination>
+
+<BackupDestination backup2>
+Path /mnt/backup2/rdiff-backup
+PercentUsed 95
+</BackupDestination>
+
+<BackupDestination home-spin>
+Path /home/spin/rdiff-backup
+</BackupDestination>
+
+
+<BackupSet cain>
+	   Host cain
+	   Path /
+	   Path /var
+	   Path /usr/local
+	   Path /boot
+</BackupSet>
+
+<BackupSet cain-home>
+	   Host cain
+	   path /home/spin/Maildir
+	   path /home/spin/gmail
+	   path /home/spin/wow-sync
+	   path /home
+	   priority -5
+</BackupSet>
+
+<BackupSet spidermonk-mysql>
+Path /var/lib/mysql-snap
+BackupDestination backup2
+PreRun ssh -n root@spidermonk /usr/local/sbin/rsnap-lvm --odev /dev/main/mysql --pv /dev/mapper/sda4 --size 512m
+PostRun ssh -n root@spidermonk /usr/local/sbin/rsnap-lvm --odev /dev/main/mysql --remove
+tag spidermonk-mysql
+Host spidermonk
+disabled 1
+</BackupSet>
+
+<BackupSet cain-mysql>
+Host cain
+Path /mnt/backup2/cain
+#PreRun /usr/local/sbin/rsnap-lvm --pv /dev/sda3 --odev /dev/cainvg/mysql --size 128m
+#PostRun /usr/local/sbin/rsnap-lvm --odev /dev/cainvg/mysql --remove
+Tag cain-mysql
+
+prerun mysqldump -udumpuser -pViskogil6524 -f --opt --skip-extended-insert --master-data -A > /mnt/backup2/cain/cain.sql
+postrun rm -f /mnt/backup2/cain/cain.sql
+
+</BackupSet>
+
+<BackupSet cain-mythcondumps>
+Host cain
+Path /home/spin/mythcondumps
+PreRun su -c /home/spin/bin/mythcondump spin
+</BackupSet>
+
+<BackupSet xbox1>
+Path /
+Host xbox1
+disabled 1
+</BackupSet>
+
+<BackupSet delight>
+Path /
+Path /var
+Path /home
+Path /usr
+Host delight
+</BackupSet>
+
+<BackupSet delight-root-old>
+# junk!
+disabled 1
+Host delight
+Tag delight-root-old
+Path /
+</BackupSet>
+
+<BackupSet delight-var-old>
+# junk!
+disabled 1
+Host delight
+Tag delight-var-old
+Path /var
+</BackupSet>
+
+<BackupSet delight-home-old>
+# junk!
+disabled 1
+Host delight
+Tag delight-home-old
+Path /var
+</BackupSet>
+
+<BackupSet delight-usr-old>
+# junk!
+disabled 1
+Host delight
+Tag delight-usr-old
+Path /var
+</BackupSet>
+
+#<BackupSet benway>
+#BackupDestination backup2
+#Host benway
+#Path /home
+#compress 1
+#</BackupSet>
+
+<BackupSet male>
+BackupDestination backup2
+Host male
+Path /home/acox
+compress 1
+</BackupSet>
+
+#<BackupSet male-spin>
+#BackupDestination backup2
+#Host male
+#Path /home/spin
+#compress true
+#disabled true
+#maxinc 10
+#maxage 30D
+#</BackupSet>
+             
+<BackupSet lazarus>
+BackupDestination backup2
+Host 172.29.253.0
+path /home
+compress 1
+tag lazarus-home
+</BackupSet>
+
+<BackupSet spidermonk>
+BackupDestination backup
+Host spidermonk
+Path /
+Path /var
+Path /home
+Path /boot
+</BackupSet>
+
+<BackupSet spidermonk-wine>
+Host spidermonk
+BackupDestination home-spin
+# reenable the next one when we have more space!
+#Path /home/spin/wine-wow
+Path /home/spin/wine-dvd-stuff
+priority 5
+maxage 180D
+maxinc 3
+</BackupSet>
+
+<BackupSet spidermonk-winxp>
+Host spidermonk
+Path /mnt/extras/World of Warcraft
+maxage 30D
+disabled 1
+</BackupSet>
