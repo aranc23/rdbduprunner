@@ -96,6 +96,18 @@ unless(-x $DUPLICITY_BINARY) {
     logndie("unable to execute $DUPLICITY_BINARY");
 }
 
+# grab more stuff from the config and put them into ENV for use by duplicity
+if(defined $CONFIG{gpgpassphrase}) {
+  $ENV{PASSPHRASE}=$CONFIG{gpgpassphrase};
+}
+if(defined $CONFIG{awsaccesskeyid}) {
+  $ENV{AWS_ACCESS_KEY_ID}=$CONFIG{awsaccesskeyid};
+}
+if(defined $CONFIG{awssecretaccesskey}) {
+  $ENV{AWS_SECRET_ACCESS_KEY}=$CONFIG{awssecretaccesskey};
+}
+
+
 foreach my $bs (values(%{$CONFIG{backupset}})) {
     unless(defined $$bs{host}) {
 	logndie "you must specify a Host directive in each backupset, even if the backup is local";
@@ -267,6 +279,13 @@ if($LISTOLDEST) {
 		 '--verbosity',$VERBOSITY,
 		 '--exclude-other-filesystems',
 	    );
+	if(defined $CONFIG{signkey}) {
+	  push(@com,'--sign-key',$CONFIG{signkey});
+	}
+	if(defined $CONFIG{encryptkey}) {
+	  push(@com,'--encrypt-key',$CONFIG{encryptkey});
+	}
+
 	not $VERBOSE and push(@com,'--no-print-statistics');
 
 	# if($COMPARE) {
