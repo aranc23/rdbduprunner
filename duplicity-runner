@@ -22,11 +22,9 @@ our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $DEST;
 our $FORCE=0;
-our $REMOVE;
 our ($VERBOSE,$DEBUG);
 our $AVERAGE;
 #our ($IFILES,$IFILESIZE,$DESTSIZECHANGE);
-our $LISTOLDEST=0;
 our $CHECK=0;
 our $CLEANUP=0;
 our $DEFMAXINC;
@@ -55,11 +53,9 @@ GetOptions('test!'          => \$TEST,
            'path=s'         => \$PATH,
 	   'dest=s'         => \$DEST,
            'force!'         => \$FORCE,
-           'remove-oldest!' => \$REMOVE,
            'verbose!'       => \$VERBOSE,
            'debug!'         => \$DEBUG,
            'calculate-average' => \$AVERAGE,
-	   'list-oldest'    => \$LISTOLDEST,
 	   'check'          => \$CHECK, # perform a check-destination-dir on target
 	   'config=s'       => \$CONFIG_FILE, # config file
 	   'cleanup'        => \$CLEANUP,
@@ -192,18 +188,10 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
   }
 }
 
-if($LISTOLDEST) {
-    build_increment_list();
-    foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
-	print localtime($$ih{inctime}).' '.$BACKUPS{$$ih{tag}}{dest}.' '.$$ih{tag}."\n";
-    }
-} elsif($CLEANUP) {
+if($CLEANUP) {
     foreach my $tag (shuffle(keys(%BACKUPS))) {
 	cleanup($tag);
     }
-} elsif(defined $REMOVE) {
-    build_increment_list();
-    remove_oldest('any');
 } elsif($CHECK) {
     foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
 	my @com=($DUPLICITY_BINARY,
@@ -370,25 +358,6 @@ sub unlock_pid_file {
     close LOCK;
 }
 
-sub list_increments {
-    my $tag=$_[0];
-
-    unless(-d $BACKUPS{$tag}{dest}) {
-	# skip non-existant destination directories
-	logentry('warn',"non-existant dest dir: $BACKUPS{$tag}{dest}");
-	return;
-    }
-    my $c="$DUPLICITY_BINARY -l --parsable-output ".$BACKUPS{$tag}{dest};
-    logentry('debug',$c);
-    my @res=`$c`;
-    #@res == 1 and next; # if there is only one increment, don't consider it for removal
-    foreach my $ln (@res) {
-	chomp $ln;
-	$ln =~ /^(\d+)\sdirectory$/ or next;
-	push(@{$BACKUPS{$tag}{increments}},$1);
-    }
-}
-
 sub cleanup {
     my $tag=$_[0];
     my @com=($DUPLICITY_BINARY,
@@ -476,84 +445,3 @@ sub build_increment_list {
     #print Dumper \@INCREMENTS;
 }
 
-sub remove_oldest {
-    my $backupdest=$_[0];
-
-    unless(@INCREMENTS > 0) {
-	build_increment_list();
-    }
-    foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
-	logentry('debug',"remove_oldest: $$ih{inctime}");
-	if(defined $$ih{removed} and $$ih{removed}) {
-	    logentry('debug',"cannot remove previously removed increment for $$ih{tag}");
-	    next;
-	}
-	if(scalar @{$BACKUPS{$$ih{tag}}{increments}} == 1) {
-	    # cannot remove the only increment!
-	    logentry('debug',"cannot remove only increment for $$ih{tag}");
-	    next;
-	}
-	unless($backupdest eq 'any' or
-	       $backupdest eq $BACKUPS{$$ih{tag}}{backupdestination}) {
-	    logentry('debug',"skipping because it isn't in the backupdestination we are looking for: $backupdest $BACKUPS{$$ih{tag}}{backupdestination}");
-	    next;
-	}
-	my $t=$$ih{inctime};
-	my @com=($DUPLICITY_BINARY,
-		 '--verbosity',$VERBOSITY,
-		 '--remove-older-than',($t+1), # do I really need to add 1?
-		 $BACKUPS{$$ih{tag}}{dest});
-	logentry('info',join(" ",@com));
-	unless($TEST) {
-	    system(@com);
-	    unless($? == 0) {
-		logentry('err',"rdiff-backup did not exit cleanly!");
-		return 0;
-	    }
-	}
-	$$ih{removed}=1;
-#	print Dumper $BACKUPS{$$ih{tag}}{increments};
-	shift(@{$BACKUPS{$$ih{tag}}{increments}});
-#	print Dumper $BACKUPS{$$ih{tag}}{increments};
-	return 1;
-    }
-}
-
-sub check_space {
-    my $bh=$CONFIG{backupdestination}{$_[0]};
-    update_bd_space($bh) or return -1;    
-    if(defined $$bh{minfree} and $$bh{avail} < $$bh{minfree}) {
-	return 0;
-    } elsif(defined $$bh{percentused} and $$bh{percent} > $$bh{percentused}) {
-	return 0;
-    }
-    return 1;
-}
-
-sub update_bd_space {
-    my $bh=$_[0];
-    my $com="df -vP $$bh{path}";
-    my @a=`$com`;
-    unless($? == 0) {
-	logentry('err',"unable to run \"$com\": no further backups will be attempted to this directory");
-	$$bh{busted}=1;
-	return 0;
-    }
-    unless($a[1] =~ /(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\%/) {
-	logentry('err',"unable to parse output from \"$com\": no further backups will be attempted to this directory");
-	$$bh{busted}=1;
-	return 0;
-    }
-    $$bh{size}=$1;
-    $$bh{used}=$2;
-    $$bh{avail}=$3;
-    $$bh{percent}=$4;
-    return 1;
-}
-
-# TODO:
-# --check is broken
-# --clean --maxage X should probably be --remove-older-than  and --clean --maxinc X should maybe be --remove-more-than?
-# this TODO list makes no sense and is probably also broken
-# add some pod?
-# --force should do something or be removed...
