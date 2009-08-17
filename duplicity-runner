@@ -20,7 +20,6 @@ our $COMPARE=0;
 our $DUPLICITY_BINARY;
 our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
-our $HOST;
 our $DEST;
 our $FORCE=0;
 our $REMOVE;
@@ -54,7 +53,6 @@ GetOptions('test!'          => \$TEST,
            'duplicity-binary=s' => \$DUPLICITY_BINARY,
            'compare'        => \$COMPARE,
            'path=s'         => \$PATH,
-           'host=s'         => \$HOST,
 	   'dest=s'         => \$DEST,
            'force!'         => \$FORCE,
            'remove-oldest!' => \$REMOVE,
