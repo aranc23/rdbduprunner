@@ -138,6 +138,7 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
 	  $dest eq '-' and $dest='-root';
 	  $tag=$host.$dest;
       }
+      # I should use a perl module here, I guess, not .
       $dest=$backupdestpath.'/'.$tag;
       my @tags=split(/\-/,$tag);
 
@@ -163,12 +164,6 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       } else {
 	#logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$BACKUPS{$tag}{gtag}." for backup $tag");
       }
-
-#      if($BACKUPS{$tag}{path} =~ /^\/home/ and
-#	 -f $EXCLUDE_PATH.'/exclude-generic-home' ) {
-#	  push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-generic-home');
-#	  logentry('warn',"using deprecated exclude file: ".$EXCLUDE_PATH.'/exclude-generic-home'." for backup $tag");
-#      }
 
       if( -f $EXCLUDE_PATH.'/exclude-'.$tag ) {
 	push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-'.$tag);
