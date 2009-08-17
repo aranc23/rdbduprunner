@@ -44,12 +44,15 @@ Path scp://benway/home/spin/rdiff-backup
 </BackupSet>
 
 <BackupSet cain-home>
-	   Host cain
 	   path /home/spin/Maildir
 	   path /home/spin/gmail
 	   path /home/spin/wow-sync
 	   path /home
 	   priority -5
+</BackupSet>
+
+<BackupSet tobenway>
+path /home/spin/Maildir
 </BackupSet>
 
 <BackupSet spidermonk-mysql>
