@@ -30,6 +30,10 @@ Path file:///mnt/backup2/duplicity
 Path file:///home/spin/duplicity
 </BackupDestination>
 
+<BackupDestination benway>
+Path scp://benway/home/spin/rdiff-backup
+</BackupDestination>
+
 
 <BackupSet cain>
 	   Host cain
