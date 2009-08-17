@@ -1,6 +1,6 @@
 #! /usr/bin/perl
 
-# $Id: rdiff-backup-runner,v 1.49 2009/03/30 17:02:18 acox Exp $
+# $Id: rdiff-backup-runner,v 1.50 2009/08/17 17:28:12 acox Exp acox $
 
 use strict;
 use warnings;
@@ -140,6 +140,7 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
 	  $tag=$host.$dest;
       }
       $dest=$backupdestpath.'/'.$tag;
+      my @tags=split(/\-/,$tag);
 
       logentry('debug',"Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
 
@@ -150,15 +151,31 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       $BACKUPS{$tag}{host}=$host;
       $BACKUPS{$tag}{sshcompress}=$sshcompress;
       $BACKUPS{$tag}{backupdestination}=$backupdest;
+      $BACKUPS{$tag}{gtag}='generic-'.$tags[1];
 
-      if($BACKUPS{$tag}{path} =~ /(home|home\/acox|home\/spin\/Maildir)$/) {
-	  #push(@com,'--exclude-globbing-filelist',
-	  #     $EXCLUDE_PATH.'/exclude-generic-home');
-	  push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-generic-home');
+      if( -f $EXCLUDE_PATH.'/exclude-generic' ) {
+	push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-generic');
+      } else {
+	#logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$BACKUPS{$tag}{gtag}." for backup $tag");
       }
-      push(@{$BACKUPS{$tag}{excludes}},
-	   $EXCLUDE_PATH.'/exclude-'.$tag);
-      
+
+      if( -f $EXCLUDE_PATH.'/exclude-'.$BACKUPS{$tag}{gtag} ) {
+	push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-'.$BACKUPS{$tag}{gtag});
+      } else {
+	#logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$BACKUPS{$tag}{gtag}." for backup $tag");
+      }
+
+#      if($BACKUPS{$tag}{path} =~ /^\/home/ and
+#	 -f $EXCLUDE_PATH.'/exclude-generic-home' ) {
+#	  push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-generic-home');
+#	  logentry('warn',"using deprecated exclude file: ".$EXCLUDE_PATH.'/exclude-generic-home'." for backup $tag");
+#      }
+
+      if( -f $EXCLUDE_PATH.'/exclude-'.$tag ) {
+	push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-'.$tag);
+      } else {
+	logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$tag." for backup $tag");
+      }
        if(defined $DEFMAXAGE) {
  	  # override!
  	  $BACKUPS{$tag}{maxage}=$DEFMAXAGE;
