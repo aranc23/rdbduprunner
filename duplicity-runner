@@ -106,7 +106,6 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
     if(defined $HOST and $host !~ /$HOST/) {
 	next;
     }
-    my $sshcompress=(defined $$bs{compress} ? $$bs{compress} : 0);
 
     my $backupdest;
     if(defined $$bs{backupdestination}) {
@@ -114,14 +113,15 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
     } elsif(defined $CONFIG{defaultbackupdestination}) {
 	$backupdest=$CONFIG{defaultbackupdestination};
     }
-    unless(defined $backupdest and defined $CONFIG{backupdestination}{$backupdest} and -d $CONFIG{backupdestination}{$backupdest}{path}) {
-	logndie("no backup root defined or does not exist: $backupdest".(defined $CONFIG{backupdestination}{$backupdest}{path} ? " ($CONFIG{backupdestination}{$backupdest}{path})" : ''));
+    unless(defined $backupdest and defined $CONFIG{backupdestination}{$backupdest}) {
+      # can't easily verify the existance of all backup destinations without using duplicity itself
+	logndie("no backup root defined: $backupdest".(defined $CONFIG{backupdestination}{$backupdest}{path} ? " ($CONFIG{backupdestination}{$backupdest}{path})" : ''));
     }
     if(defined $DEST and $backupdest !~ /$DEST/) {
 	next;
     }
     my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
-    
+
     foreach my $path (ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path})) {
       if(defined $PATH and $path !~ /$PATH/) {
 	  next;
