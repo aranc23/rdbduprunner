@@ -189,10 +189,12 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
 }
 
 if($CLEANUP) {
+    # since duplicity has a cleanup command, so this shall stay for now
     foreach my $tag (shuffle(keys(%BACKUPS))) {
 	cleanup($tag);
     }
 } elsif($CHECK) {
+    # since duplicity has a check command, so this shall stay for now
     foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
 	my @com=($DUPLICITY_BINARY,
 		 '--verbosity',$VERBOSITY,
@@ -207,13 +209,6 @@ if($CLEANUP) {
 	    unlock_pid_file();
 	}
     }
-} elsif($AVERAGE) {
-    my $avcom="$DUPLICITY_BINARY --calculate-average";
-    foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
-	my $bh=$BACKUPS{$tag}; # for convenience of typing
-	$avcom.=" $BACKUPS{$tag}{dest}/rdiff-backup-data/session_statistics.*.data";
-    }
-    exec($avcom);
 } else { # actually do a backup, please
   BACKUP:
     foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
@@ -232,38 +227,6 @@ if($CLEANUP) {
 	if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
 	    next BACKUP;
 	}
-
-	# apply <the hard cleanup rules (maxinc, maxage) before running the backup
-	# if(-d $$bh{dest}) {
-	#     # if we haven't run a backup of this dir, don't try to clean it up
-	#     cleanup($tag);
-	# }
-	# apply constraints before attempting the backup
-	# while(1) {
-	#     my $ans=check_space($$bh{backupdestination});
-	#     if($ans == -1) {
-	# 	logentry('err',"unable to determine if this backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path}) has enough free space");
-	# 	logentry('err',"no backups to this backupdestination will be attempted and this message will be repeated only once");
-	# 	$CONFIG{$$bh{backupdestination}}{busted}=1;
-	# 	next BACKUP;
-	#     } elsif($ans == 0) {
-	# 	unless(remove_oldest($$bh{backupdestination})) {
-	# 	    # we failed to remove an increment from the backupdestination
-	# 	    # we cannot do backups on this bd for this run!
-	# 	    logentry('warn',"unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
-	# 	    logentry('warn',"no further attempts will be made to do backups to this destination");
-	# 	    $CONFIG{$$bh{backupdestination}}{busted}=1;
-	# 	    next BACKUP;
-	# 	}
-	# 	# we can just fall out now and let check_space() run again to see if it helped
-	#     } elsif($ans == 1) {
-	# 	# we have enough space to proceed
-	# 	last;
-	#     } else {
-	# 	# wtf!
-	# 	logndie("check space did not return a valid code (-1,0,1) so we have to die for lack of anything more sensible to do");
-	#     }
-	# }
 
 	my @com=($DUPLICITY_BINARY,
 		 '--verbosity',$VERBOSITY,
@@ -403,45 +366,5 @@ sub cleanup {
 	    }
 	}
     }
-}
-
-sub build_increment_list {
-    while(my ($tag,$bp)=each(%BACKUPS)) {
-	unless(defined $$bp{increments}) {
-	    list_increments($tag);
-	}
-	foreach my $inctime (@{$$bp{increments}}) {
-	    # find various tidbits of info about this increment
-	    # /home/spin/rdiff-backup/spidermonk-home-spin-wine-wow/rdiff-backup-data/session_statistics.2008-02-22T03:05:48-06:00.data
-	    my @d=localtime($inctime);
-	    my $rbdate=strftime("%FT%T",@d);
-	    my $glob="$$bp{dest}/rdiff-backup-data/session_statistics.$rbdate*.data";
-	    my $ssdfile=(glob($glob))[0];
-	    my $data={}; # store info from the session stats file... which we never ever ever use!
-	    
-	    if(defined $ssdfile) {
-		if(open(SSD,$ssdfile)) {
-		    foreach my $ln (<SSD>) {
-			$ln =~ /^(\w+)\s+(\d+\.?\d*)/ and $$data{$1}=$2;
-		    }
-		    close(SSD);
-		} else {
-		    logentry('err',"unable to open increment file: $glob $ssdfile");
-		}
-	    } else {
-		logentry('notice',"unable to find the session statistics file for this increment: $tag $rbdate using glob: $glob");
-	    }
-
-	    push(@INCREMENTS,{ inctime => $inctime,
-			       incdt => [@d],
-			       ssdfile => $ssdfile,
-			       ssddata => $data,
-			       tag     => $tag,
-			       backupdestination => $$bp{backupdestination},
-		 }
-		);
-	}
-    }
-    #print Dumper \@INCREMENTS;
 }
 
