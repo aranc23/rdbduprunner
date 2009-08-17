@@ -149,7 +149,6 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       $BACKUPS{$tag}{path}=$path;
       $BACKUPS{$tag}{tag}=$tag;
       $BACKUPS{$tag}{host}=$host;
-      $BACKUPS{$tag}{sshcompress}=$sshcompress;
       $BACKUPS{$tag}{backupdestination}=$backupdest;
       $BACKUPS{$tag}{gtag}='generic-'.$tags[1];
 
@@ -280,7 +279,6 @@ if($LISTOLDEST) {
 		 '--exclude-special-files',
 		 '--exclude-other-filesystems',
 	    );
-	$BACKUPS{$tag}{sshcompress} or push(@com,'--ssh-no-compression');
 	$VERBOSE and push(@com,'--print-statistics');
 	
 	if($COMPARE) {
