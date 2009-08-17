@@ -1,6 +1,5 @@
 #! /usr/bin/perl
-
-# $Id: rdiff-backup-runner,v 1.50 2009/08/17 17:28:12 acox Exp acox $
+# Copyright Aran Cox <arancox@gmail.com>
 
 use strict;
 use warnings;
@@ -19,7 +18,7 @@ our $VERBOSITY=5;
 our $TVERBOSITY=3;
 our $LOCALHOST;
 our $COMPARE=0;
-our $RDIFF_BACKUP;
+our $DUPLICITY_BINARY;
 our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $HOST;
@@ -34,9 +33,9 @@ our $CHECK=0;
 our $CLEANUP=0;
 our $DEFMAXINC;
 our $DEFMAXAGE;
-our $LOCK_FILE="$HOME/rdiff-backup-runner.pid";
+our $LOCK_FILE="$HOME/duplicity-runner.pid";
 
-our $CONFIG_FILE="$HOME/rdbrrc";
+our $CONFIG_FILE="$HOME/.duplicity-runner.rc";
 our %CONFIG;
 our %BACKUPS;
 our @INCREMENTS;
@@ -54,7 +53,7 @@ GetOptions('test!'          => \$TEST,
            'verbosity=i'    => \$VERBOSITY,
            'v|terminal-verbosity=i' => \$TVERBOSITY,
            'localhost=s'    => \$LOCALHOST,
-           'rdiff-backup=s' => \$RDIFF_BACKUP,
+           'duplicity-binary=s' => \$DUPLICITY_BINARY,
            'compare'        => \$COMPARE,
            'path=s'         => \$PATH,
            'host=s'         => \$HOST,
@@ -80,7 +79,7 @@ if(not defined $LOCALHOST) {
   @a > 1 and $LOCALHOST=$a[0];
 }
 
-logentry::OpenLog('local5','rdiff-backup-runner');
+logentry::OpenLog('local5','duplcity-runner');
 logentry('info','starting');
 
 %CONFIG=new Config::General(-ConfigFile => $CONFIG_FILE,
@@ -88,15 +87,15 @@ logentry('info','starting');
 			    -AutoTrue => 1,
 			    -LowerCaseNames => 1)->getall() or die "unable to parse $CONFIG_FILE";
 
-if(not defined $RDIFF_BACKUP) {
-    if(defined $CONFIG{rdiffbackuppath}) {
-	$RDIFF_BACKUP=$CONFIG{rdiffbackuppath};
+if(not defined $DUPLICITY_BINARY) {
+    if(defined $CONFIG{duplicitybinary}) {
+	$DUPLICITY_BINARY=$CONFIG{duplicitybinary};
     } else {
-	$RDIFF_BACKUP='rdiff-backup'; # in our path we hope
+	$DUPLICITY_BINARY='duplicity'; # in our path we hope
     }
 }
-unless(-x $RDIFF_BACKUP) {
-    logndie("unable to execute $RDIFF_BACKUP");
+unless(-x $DUPLICITY_BINARY) {
+    logndie("unable to execute $DUPLICITY_BINARY");
 }
 
 foreach my $bs (values(%{$CONFIG{backupset}})) {
@@ -207,7 +206,7 @@ if($LISTOLDEST) {
     remove_oldest('any');
 } elsif($CHECK) {
     foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
-	my @com=($RDIFF_BACKUP,
+	my @com=($DUPLICITY_BINARY,
 		 '--verbosity',$VERBOSITY,
 		 '--terminal-verbosity',$TVERBOSITY,
 		 '--check-destination-dir',$BACKUPS{$tag}{dest});
@@ -222,7 +221,7 @@ if($LISTOLDEST) {
 	}
     }
 } elsif($AVERAGE) {
-    my $avcom="$RDIFF_BACKUP --calculate-average";
+    my $avcom="$DUPLICITY_BINARY --calculate-average";
     foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
 	my $bh=$BACKUPS{$tag}; # for convenience of typing
 	$avcom.=" $BACKUPS{$tag}{dest}/rdiff-backup-data/session_statistics.*.data";
@@ -280,7 +279,7 @@ if($LISTOLDEST) {
 	}
 	      
 	      
-	my @com=($RDIFF_BACKUP,
+	my @com=($DUPLICITY_BINARY,
 		 '--verbosity',$VERBOSITY,
 		 '--terminal-verbosity',$TVERBOSITY,
 		 '--exclude-special-files',
@@ -391,7 +390,7 @@ sub list_increments {
 	logentry('warn',"non-existant dest dir: $BACKUPS{$tag}{dest}");
 	return;
     }
-    my $c="$RDIFF_BACKUP -l --parsable-output ".$BACKUPS{$tag}{dest};
+    my $c="$DUPLICITY_BINARY -l --parsable-output ".$BACKUPS{$tag}{dest};
     logentry('debug',$c);
     my @res=`$c`;
     #@res == 1 and next; # if there is only one increment, don't consider it for removal
@@ -404,7 +403,7 @@ sub list_increments {
 
 sub cleanup {
     my $tag=$_[0];
-    my @com=($RDIFF_BACKUP,
+    my @com=($DUPLICITY_BINARY,
 	     '--verbosity',$VERBOSITY,
 	     '--terminal-verbosity',$TVERBOSITY,
              '--force',
@@ -513,7 +512,7 @@ sub remove_oldest {
 	    next;
 	}
 	my $t=$$ih{inctime};
-	my @com=($RDIFF_BACKUP,
+	my @com=($DUPLICITY_BINARY,
 		 '--verbosity',$VERBOSITY,
 		 '--terminal-verbosity',$TVERBOSITY,
 		 '--remove-older-than',($t+1), # do I really need to add 1?
