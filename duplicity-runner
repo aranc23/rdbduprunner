@@ -15,7 +15,6 @@ use POSIX qw( strftime );
 
 our $TEST=1;
 our $VERBOSITY=5;
-our $TVERBOSITY=3;
 our $LOCALHOST;
 our $COMPARE=0;
 our $DUPLICITY_BINARY;
@@ -51,7 +50,6 @@ our %TSMAP=('s' => 1,
 
 GetOptions('test!'          => \$TEST,
            'verbosity=i'    => \$VERBOSITY,
-           'v|terminal-verbosity=i' => \$TVERBOSITY,
            'localhost=s'    => \$LOCALHOST,
            'duplicity-binary=s' => \$DUPLICITY_BINARY,
            'compare'        => \$COMPARE,
@@ -202,7 +200,6 @@ if($LISTOLDEST) {
     foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
 	my @com=($DUPLICITY_BINARY,
 		 '--verbosity',$VERBOSITY,
-		 '--terminal-verbosity',$TVERBOSITY,
 		 '--check-destination-dir',$BACKUPS{$tag}{dest});
 	logentry('info',join(" ",@com));
 	unless($TEST) {
@@ -274,7 +271,6 @@ if($LISTOLDEST) {
 
 	my @com=($DUPLICITY_BINARY,
 		 '--verbosity',$VERBOSITY,
-		 '--terminal-verbosity',$TVERBOSITY,
 		 '--exclude-other-filesystems',
 	    );
 	not $VERBOSE and push(@com,'--no-print-statistics');
@@ -396,7 +392,6 @@ sub cleanup {
     my $tag=$_[0];
     my @com=($DUPLICITY_BINARY,
 	     '--verbosity',$VERBOSITY,
-	     '--terminal-verbosity',$TVERBOSITY,
              '--force',
 	     '--remove-older-than',
 	);
@@ -505,7 +500,6 @@ sub remove_oldest {
 	my $t=$$ih{inctime};
 	my @com=($DUPLICITY_BINARY,
 		 '--verbosity',$VERBOSITY,
-		 '--terminal-verbosity',$TVERBOSITY,
 		 '--remove-older-than',($t+1), # do I really need to add 1?
 		 $BACKUPS{$$ih{tag}}{dest});
 	logentry('info',join(" ",@com));
