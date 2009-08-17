@@ -336,14 +336,7 @@ if($LISTOLDEST) {
 sub backup_sort {
     my $aprio=(defined $BACKUPS{$a}{priority} ? $BACKUPS{$a}{priority} : 0);
     my $bprio=(defined $BACKUPS{$b}{priority} ? $BACKUPS{$b}{priority} : 0);
-    my $ahost=(defined $BACKUPS{$a}{host} ? $BACKUPS{$a}{host} : $LOCALHOST);
-    my $bhost=(defined $BACKUPS{$b}{host} ? $BACKUPS{$b}{host} : $LOCALHOST);
-
-    if($aprio == $bprio and $ahost eq $bhost) {
-	return $BACKUPS{$a}{path} cmp $BACKUPS{$b}{path};
-    } elsif($aprio == $bprio) {
-	return $ahost cmp $bhost;
-    } # else, compare the prio
+    
     return $aprio <=> $bprio;
 }
 
