@@ -277,7 +277,7 @@ if($LISTOLDEST) {
 		 '--terminal-verbosity',$TVERBOSITY,
 		 '--exclude-other-filesystems',
 	    );
-	$VERBOSE and push(@com,'--print-statistics');
+	not $VERBOSE and push(@com,'--no-print-statistics');
 
 	if($COMPARE) {
 	    push(@com,'--compare');
