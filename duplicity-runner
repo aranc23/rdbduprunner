@@ -230,12 +230,6 @@ if($LISTOLDEST) {
 	if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
 	    next BACKUP;
 	}
-	unless(-d $CONFIG{backupdestination}{$$bh{backupdestination}}{path}) {
-	    $CONFIG{backupdestination}{$$bh{backupdestination}}{busted}=1;
-	    logentry('warn',"the backupdestination directory ($BACKUPS{backupdestiantion}{$$bh{backupdestination}}{path}) for $$bh{host}/$$bh{tag} does not exist");
-	    logentry('warn',"this warning will only be printed once for each destination");
-	    next BACKUP;
-	}
 
 	# apply <the hard cleanup rules (maxinc, maxage) before running the backup
 	if(-d $$bh{dest}) {
