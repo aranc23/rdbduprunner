@@ -109,13 +109,7 @@ if(defined $CONFIG{awssecretaccesskey}) {
 
 
 foreach my $bs (values(%{$CONFIG{backupset}})) {
-    unless(defined $$bs{host}) {
-	logndie "you must specify a Host directive in each backupset, even if the backup is local";
-    }
-    my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
-    if(defined $HOST and $host !~ /$HOST/) {
-	next;
-    }
+  my $host=$LOCALHOST;
 
     my $backupdest;
     if(defined $$bs{backupdestination}) {
@@ -304,13 +298,6 @@ if($LISTOLDEST) {
 	unless($TEST) {
 	    lock_pid_file();
 
-	    if ($BACKUPS{$tag}{host} ne $LOCALHOST) {
-		system("/usr/sbin/fping -q $BACKUPS{$tag}{host}");
-		unless($? == 0) {
-		    logentry('warning',"fping failed to ping $BACKUPS{$tag}{host}");
-		    next;
-		}
-	    }
 	    if (defined $$bh{prerun}) {
 		print $$bh{prerun}."\n";
 		system($$bh{prerun});
