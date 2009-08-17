@@ -1,25 +1,33 @@
 DefaultBackupDestination backup
 # verbosity 5
 # terminal-verbosity 3
-RdiffBackupPath /usr/bin/rdiff-backup
+# the following must be set, but that's a bug
+DuplicityBinary /usr/bin/duplicity
 #LockFile $HOME/rdiff-backup-runner.pid or something like that
 #excludepath /etc/rdiff-backup
 #maxage 10D
 
+# we'll take this from the command line, or the config file, or the hostname command
+# LocalHost lazarus
+
+# maybe these should be per-destination, but for now they are global
+GPGPassPhrase CandelHex1
+AWSAccessKeyID AKIAII3BB5MBWWHKH4PA 
+AWSSecretAccessKey 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
+SignKey B2BDB80E
+EncryptKey B2BDB80E
+
 <BackupDestination backup>
-Path /mnt/backup/rdiff-backup
-#MinFree XXX # in kbytes
-PercentUsed 95
-#minfree 100000000
+Path file:///mnt/backup/duplicity
+
 </BackupDestination>
 
 <BackupDestination backup2>
-Path /mnt/backup2/rdiff-backup
-PercentUsed 95
+Path file:///mnt/backup2/duplicity
 </BackupDestination>
 
 <BackupDestination home-spin>
-Path /home/spin/rdiff-backup
+Path file:///home/spin/duplicity
 </BackupDestination>
 
 
@@ -125,7 +133,7 @@ Path /var
 BackupDestination backup2
 Host male
 Path /home/acox
-compress 1
+#compress 1
 </BackupSet>
 
 #<BackupSet male-spin>
@@ -142,7 +150,7 @@ compress 1
 BackupDestination backup2
 Host 172.29.253.0
 path /home
-compress 1
+#compress 1
 tag lazarus-home
 </BackupSet>
 

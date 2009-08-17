@@ -235,6 +235,12 @@ if($LISTOLDEST) {
 	    # skip disabled backups
 	    next;
 	}
+
+	if(not -d $BACKUPS{$tag}{path}) {
+	  logentry('warn',"backup path $BACKUPS{$tag}{path} does not exist: skipping this backup");
+	  next BACKUP;
+	}
+
 	if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
 	    next BACKUP;
 	}
