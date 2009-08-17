@@ -276,7 +276,6 @@ if($LISTOLDEST) {
 	my @com=($DUPLICITY_BINARY,
 		 '--verbosity',$VERBOSITY,
 		 '--terminal-verbosity',$TVERBOSITY,
-		 '--exclude-special-files',
 		 '--exclude-other-filesystems',
 	    );
 	$VERBOSE and push(@com,'--print-statistics');
