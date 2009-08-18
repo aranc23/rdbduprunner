@@ -20,12 +20,11 @@ our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $DEST;
 our ($VERBOSE,$DEBUG);
-our $CHECK=0;
 our $CLEANUP=0;
 our $FULL=0;
 our $STATUS=0;
-our $DEFMAXINC;
-our $DEFMAXAGE;
+our $TIDY=0;
+our $MAXAGE;
 our $LOCK_FILE="$HOME/duplicity-runner.pid";
 
 our $CONFIG_FILE="$HOME/.duplicity-runner.rc";
@@ -51,13 +50,12 @@ GetOptions('test!'          => \$TEST,
 	   'dest=s'         => \$DEST,
            'verbose!'       => \$VERBOSE,
            'debug!'         => \$DEBUG,
-	   'check'          => \$CHECK,
 	   'config=s'       => \$CONFIG_FILE, # config file
 	   'cleanup'        => \$CLEANUP,
 	   'full'           => \$FULL,
 	   'status'         => \$STATUS,
-	   'maxinc=i'       => \$DEFMAXINC,
-	   'maxage=s'       => \$DEFMAXAGE,
+	   'tidy'           => \$TIDY,
+	   'maxage=s'       => \$MAXAGE,
 	   'lockfile=s'     => \$LOCK_FILE,
           );
 
@@ -168,21 +166,15 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       } else {
 	logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$tag." for backup $tag");
       }
-       if(defined $DEFMAXAGE) {
- 	  # override!
- 	  $BACKUPS{$tag}{maxage}=$DEFMAXAGE;
-       } elsif(not defined $BACKUPS{$tag}{maxage} and
+      if(defined $MAXAGE) {
+ 	  $BACKUPS{$tag}{maxage}=$MAXAGE;
+      } elsif(not defined $BACKUPS{$tag}{maxage} and
  	      defined $CONFIG{maxage}) {
  	  $BACKUPS{$tag}{maxage}=$CONFIG{maxage};
-       }
-       if(defined $DEFMAXINC) {
- 	  # override!
- 	  $BACKUPS{$tag}{maxinc}=$DEFMAXINC;
-       } elsif(not defined $BACKUPS{$tag}{maxinc} and
- 	      defined $CONFIG{maxinc}) {
- 	  $BACKUPS{$tag}{maxinc}=$CONFIG{maxinc};
-       }
-  }
+      } else {
+	  $BACKUPS{$tag}{maxage}='60D';
+      }
+    }
 }
 
 if($STATUS) {
@@ -214,6 +206,10 @@ if($STATUS) {
 	    }
 	    unlock_pid_file();
 	}
+    }
+} elsif($TIDY) {
+    foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
+	tidy($tag);
     }
 } else { # actually do a backup, please
   BACKUP:
@@ -329,49 +325,20 @@ sub unlock_pid_file {
     close LOCK;
 }
 
-sub cleanup {
+sub tidy {
     my $tag=$_[0];
     my @com=($DUPLICITY_BINARY,
+	     'remove-older-than',
+	     $BACKUPS{$tag}{maxage},
+	     '--force',
 	     '--verbosity',$VERBOSITY,
-             '--force',
-	     '--remove-older-than',
+	     $BACKUPS{$tag}{dest}
 	);
-    if(defined $BACKUPS{$tag}{maxinc} and not defined $BACKUPS{$tag}{increments}) {
-	list_increments($tag);
-    }
-    if(defined $BACKUPS{$tag}{maxinc} and
-       $BACKUPS{$tag}{maxinc} =~ /^\d+$/ and
-       @{$BACKUPS{$tag}{increments}} > $BACKUPS{$tag}{maxinc} ) {
-	    # too many!
-	    logentry('debug',"$tag\t Incs: ".
-		     scalar @{$BACKUPS{$tag}{increments}}.
-		     "\t Max: ".$BACKUPS{$tag}{maxinc});
-	    my $lastinc=(sort {$a <=> $b} (@{$BACKUPS{$tag}{increments}}))[$BACKUPS{$tag}{maxinc}-1];
-	    logentry('debug',"last time to keep for $tag: ".localtime($lastinc));
-
-	    my @icom=(@com,$lastinc);
-
-	    push(@icom,$BACKUPS{$tag}{dest});
-	    logentry('info',join(" ",@icom));
-	    unless($TEST) {
-		system(@icom);
-		unless($? == 0) {
-		    logentry('err',"unable to execute rdiff-backup!");
-		}
-	    }
-	}
-    if(defined $BACKUPS{$tag}{maxage} and
-       $BACKUPS{$tag}{maxage} =~ /^\d/) {
-
-	my @icom=(@com,$BACKUPS{$tag}{maxage});
-	push(@icom,$BACKUPS{$tag}{dest});
-
-	logentry('info',join(" ",@icom));
-	unless($TEST) {
-	    system(@icom);
-	    unless($? == 0) {
-		logentry('err',"unable to execute rdiff-backup!");
-	    }
+    logentry('info',join(" ",@com));
+    unless($TEST) {
+	system(@com);
+	unless($? == 0) {
+	    logentry('err',"unable to execute duplicity!");
 	}
     }
 }
