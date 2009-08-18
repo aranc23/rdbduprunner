@@ -49,7 +49,7 @@ GetOptions('test!'          => \$TEST,
 	   'dest=s'         => \$DEST,
            'verbose!'       => \$VERBOSE,
            'debug!'         => \$DEBUG,
-	   'check'          => \$CHECK, # perform a check-destination-dir on target
+	   'check'          => \$CHECK,
 	   'config=s'       => \$CONFIG_FILE, # config file
 	   'cleanup'        => \$CLEANUP,
 	   'maxinc=i'       => \$DEFMAXINC,
@@ -189,9 +189,9 @@ if($CLEANUP) {
 } elsif($CHECK) {
     # since duplicity has a check command, so this shall stay for now
     foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
-	my @com=($DUPLICITY_BINARY,
+	my @com=($DUPLICITY_BINARY,'check'
 		 '--verbosity',$VERBOSITY,
-		 '--check-destination-dir',$BACKUPS{$tag}{dest});
+		 $BACKUPS{$tag}{dest});
 	logentry('info',join(" ",@com));
 	unless($TEST) {
 	    lock_pid_file();
