@@ -189,7 +189,7 @@ if($CLEANUP) {
 } elsif($CHECK) {
     # since duplicity has a check command, so this shall stay for now
     foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
-	my @com=($DUPLICITY_BINARY,'check'
+	my @com=($DUPLICITY_BINARY,'check',
 		 '--verbosity',$VERBOSITY,
 		 $BACKUPS{$tag}{dest});
 	logentry('info',join(" ",@com));
