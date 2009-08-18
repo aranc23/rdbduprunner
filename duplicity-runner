@@ -19,7 +19,6 @@ our $DUPLICITY_BINARY;
 our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $DEST;
-our $FORCE=0;
 our ($VERBOSE,$DEBUG);
 our $AVERAGE;
 #our ($IFILES,$IFILESIZE,$DESTSIZECHANGE);
@@ -50,7 +49,6 @@ GetOptions('test!'          => \$TEST,
            'compare'        => \$COMPARE,
            'path=s'         => \$PATH,
 	   'dest=s'         => \$DEST,
-           'force!'         => \$FORCE,
            'verbose!'       => \$VERBOSE,
            'debug!'         => \$DEBUG,
            'calculate-average' => \$AVERAGE,
