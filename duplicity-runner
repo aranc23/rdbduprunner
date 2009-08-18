@@ -181,15 +181,15 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
   }
 }
 
-if($CLEANUP) {
+if($CHECK) {
     # since duplicity has a cleanup command, so this shall stay for now
     foreach my $tag (shuffle(keys(%BACKUPS))) {
 	cleanup($tag);
     }
-} elsif($CHECK) {
+} elsif($CLEANUP) {
     # since duplicity has a check command, so this shall stay for now
     foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
-	my @com=($DUPLICITY_BINARY,'check',
+	my @com=($DUPLICITY_BINARY,'cleanup',
 		 '--verbosity',$VERBOSITY,
 		 $BACKUPS{$tag}{dest});
 	logentry('info',join(" ",@com));
@@ -197,7 +197,7 @@ if($CLEANUP) {
 	    lock_pid_file();
 	    system(@com);
 	    unless($? == 0) {
-		logentry('err',"unable to execute rdiff-backup!");
+		logentry('err',"unable to execute duplicity!");
 	    }
 	    unlock_pid_file();
 	}
