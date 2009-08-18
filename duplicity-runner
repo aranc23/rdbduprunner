@@ -22,6 +22,8 @@ our $DEST;
 our ($VERBOSE,$DEBUG);
 our $CHECK=0;
 our $CLEANUP=0;
+our $FULL=0;
+our $STATUS=0;
 our $DEFMAXINC;
 our $DEFMAXAGE;
 our $LOCK_FILE="$HOME/duplicity-runner.pid";
@@ -52,6 +54,8 @@ GetOptions('test!'          => \$TEST,
 	   'check'          => \$CHECK,
 	   'config=s'       => \$CONFIG_FILE, # config file
 	   'cleanup'        => \$CLEANUP,
+	   'full'           => \$FULL,
+	   'status'         => \$STATUS,
 	   'maxinc=i'       => \$DEFMAXINC,
 	   'maxage=s'       => \$DEFMAXAGE,
 	   'lockfile=s'     => \$LOCK_FILE,
@@ -181,13 +185,22 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
   }
 }
 
-if($CHECK) {
-    # since duplicity has a cleanup command, so this shall stay for now
-    foreach my $tag (shuffle(keys(%BACKUPS))) {
-	cleanup($tag);
+if($STATUS) {
+    foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
+	my @com=($DUPLICITY_BINARY,'collection-status',
+		 '--verbosity',$VERBOSITY,
+		 $BACKUPS{$tag}{dest});
+	logentry('info',join(" ",@com));
+	unless($TEST) {
+	    lock_pid_file();
+	    system(@com);
+	    unless($? == 0) {
+		logentry('err',"unable to execute duplicity!");
+	    }
+	    unlock_pid_file();
+	}
     }
 } elsif($CLEANUP) {
-    # since duplicity has a check command, so this shall stay for now
     foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
 	my @com=($DUPLICITY_BINARY,'cleanup',
 		 '--verbosity',$VERBOSITY,
@@ -221,9 +234,11 @@ if($CHECK) {
 	    next BACKUP;
 	}
 
-	my @com=($DUPLICITY_BINARY,
-		 '--verbosity',$VERBOSITY,
-		 '--exclude-other-filesystems',
+	my @com=($DUPLICITY_BINARY);
+	$FULL and push(@com,'full');
+	push(@com,
+	     '--verbosity',$VERBOSITY,
+	     '--exclude-other-filesystems',
 	    );
 	if(defined $CONFIG{signkey}) {
 	  push(@com,'--sign-key',$CONFIG{signkey});
