@@ -10,7 +10,6 @@ use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Env qw( HOME );
 use List::Util qw( shuffle );
 use Config::General;
-use POSIX qw( strftime );
 
 our $TEST=1;
 our $VERBOSITY=5;
