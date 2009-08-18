@@ -5,10 +5,8 @@ use strict;
 use warnings;
 use Getopt::Long;
 use logentry;
-use Data::Dumper;
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Env qw( HOME );
-use List::Util qw( shuffle );
 use Config::General;
 
 our $TEST=1;
@@ -31,15 +29,6 @@ our $CONFIG_FILE="$HOME/.duplicity-runner.rc";
 our %CONFIG;
 our %BACKUPS;
 our @INCREMENTS;
-
-our %TSMAP=('s' => 1,
-	    'm' => 60,
-	    'h' => 60*60,
-	    'D' => 60*60*24,
-	    'W' => 60*60*24*7,
-	    'M' => 60*60*24*30,
-	    'Y' => 60*60*24*365,
-    );
 
 GetOptions('test!'          => \$TEST,
            'verbosity=i'    => \$VERBOSITY,
