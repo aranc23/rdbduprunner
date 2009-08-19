@@ -11,11 +11,11 @@ maxage 30D
 # LocalHost lazarus
 
 # maybe these should be per-destination, but for now they are global
-GPGPassPhrase CandelHex1
-AWSAccessKeyID AKIAII3BB5MBWWHKH4PA 
-AWSSecretAccessKey 3O6BuEoYoyHrlSLsqJtvaJkvpfNTVhTSQ8qiFypr
-SignKey B2BDB80E
-EncryptKey B2BDB80E
+#GPGPassPhrase CandelHex1
+#AWSAccessKeyID # your access key goes here
+#AWSSecretAccessKey # your super secret key goes here
+#SignKey # your signing key goes here
+#EncryptKey # your encryption key goes here
 
 <BackupDestination backup>
 Path file:///mnt/backup/duplicity
@@ -34,6 +34,7 @@ postrun rm -f /mnt/backup2/cain/cain.sql
 
 <BackupSet cain-mythcondumps>
 Path /home/spin/mythcondumps
-PreRun /home/spin/bin/mythcondump spin
+# don't run the script again, it's run by rdiff-backup 
+#PreRun /home/spin/bin/mythcondump spin
 </BackupSet>
 
