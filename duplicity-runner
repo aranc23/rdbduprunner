@@ -261,7 +261,7 @@ if($STATUS) {
 	    system(@com);
 	    my $mainret=$?;
 	    unless($mainret == 0) {
-		logentry('err',"unable to execute rdiff-backup!");
+		logentry('err',"unable to execute duplicity!");
 	    }
 	    if(defined $$bh{postrun}) {
 		print $$bh{postrun}."\n";
@@ -294,7 +294,7 @@ sub lock_pid_file {
     } elsif(defined $CONFIG{LockFile}) {
 	$LOCK_FILE=$CONFIG{LockFile};
     } else {
-	$LOCK_FILE="$HOME/rdiff-backup-runner.pid";
+	$LOCK_FILE="$HOME/duplicity-runner.pid";
     }
     unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
 	logentry('err',"unable to open pid file: $LOCK_FILE for writing");
