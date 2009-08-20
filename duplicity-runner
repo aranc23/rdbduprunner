@@ -187,7 +187,6 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       }
       # if this is defined in a backupset, allow that to override the global definition, if it exists
       foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey )))) {
-	debug($var);
 	unless(defined $$bh{$var}) {
 	  if(defined $CONFIG{$var}) {
 	    $$bh{$var}=$CONFIG{$var};
