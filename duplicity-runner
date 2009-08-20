@@ -13,7 +13,7 @@ use Log::Dispatch::Syslog;
 use Log::Dispatch::Screen;
 
 our $TEST=1;
-our $VERBOSITY=5;
+our $VERBOSITY;
 our $LOCALHOST;
 our $COMPARE=0;
 our $DUPLICITY_BINARY;
@@ -109,6 +109,14 @@ if(not defined $DUPLICITY_BINARY) {
 unless(-x $DUPLICITY_BINARY) {
     critical("unable to execute $DUPLICITY_BINARY");
     exit(1);
+}
+
+unless(defined $VERBOSITY) { # from the command line
+  if(defined $CONFIG{verbosity}) {
+    $VERBOSITY=$CONFIG{verbosity};
+  } else {
+    $VERBOSITY=5; # overkill probably
+  }
 }
 
 foreach my $bs (values(%{$CONFIG{backupset}})) {
