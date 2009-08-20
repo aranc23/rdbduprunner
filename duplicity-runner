@@ -15,7 +15,6 @@ use Log::Dispatch::Screen;
 our $TEST=1;
 our $VERBOSITY;
 our $LOCALHOST;
-our $COMPARE=0;
 our $DUPLICITY_BINARY;
 our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
@@ -41,7 +40,6 @@ GetOptions('test!'          => \$TEST,
            'verbosity=i'    => \$VERBOSITY,
            'localhost=s'    => \$LOCALHOST,
            'duplicity-binary=s' => \$DUPLICITY_BINARY,
-           'compare'        => \$COMPARE,
            'path=s'         => \$PATH,
 	   'dest=s'         => \$DEST,
 	   'config=s'       => \$CONFIG_FILE, # config file
@@ -283,10 +281,6 @@ if($STATUS) {
 	}
 
 	not $STATS and push(@com,'--no-print-statistics');
-
-	# if($COMPARE) {
-	#     push(@com,'--compare');
-	# }
 
 	foreach my $f (@{$$bh{excludes}}) {
 	    push(@com,'--exclude-globbing-filelist',
