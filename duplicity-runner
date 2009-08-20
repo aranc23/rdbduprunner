@@ -8,6 +8,7 @@ use logentry;
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Env qw( HOME );
 use Config::General;
+use Data::Dumper;
 
 our $TEST=1;
 our $VERBOSITY=5;
@@ -22,13 +23,13 @@ our $CLEANUP=0;
 our $FULL=0;
 our $STATUS=0;
 our $TIDY=0;
+our $DUMP=0;
 our $MAXAGE;
 our $LOCK_FILE="$HOME/duplicity-runner.pid";
 
 our $CONFIG_FILE="$HOME/.duplicity-runner.rc";
 our %CONFIG;
 our %BACKUPS;
-our @INCREMENTS;
 
 GetOptions('test!'          => \$TEST,
            'verbosity=i'    => \$VERBOSITY,
@@ -44,6 +45,7 @@ GetOptions('test!'          => \$TEST,
 	   'full'           => \$FULL,
 	   'status'         => \$STATUS,
 	   'tidy'           => \$TIDY,
+	   'dump'           => \$DUMP,
 	   'maxage=s'       => \$MAXAGE,
 	   'lockfile=s'     => \$LOCK_FILE,
           );
@@ -164,6 +166,11 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
 	  $BACKUPS{$tag}{maxage}='60D';
       }
     }
+}
+
+if($DUMP) {
+    print Dumper \%BACKUPS;
+    logndie "you asked me to dump and die!";
 }
 
 if($STATUS) {
