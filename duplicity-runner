@@ -20,12 +20,12 @@ our $DUPLICITY_BINARY;
 our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $DEST;
-our $VERBOSE;
 our $CLEANUP=0;
 our $FULL=0;
 our $STATUS=0;
 our $TIDY=0;
 our $DUMP=0;
+our $STATS=1;
 our $MAXAGE;
 our $LOCK_FILE="$HOME/duplicity-runner.pid";
 our $DISPATCHER;
@@ -37,13 +37,13 @@ our %CONFIG;
 our %BACKUPS;
 
 GetOptions('test!'          => \$TEST,
+	   'stats!'         => \$STATS,
            'verbosity=i'    => \$VERBOSITY,
            'localhost=s'    => \$LOCALHOST,
            'duplicity-binary=s' => \$DUPLICITY_BINARY,
            'compare'        => \$COMPARE,
            'path=s'         => \$PATH,
 	   'dest=s'         => \$DEST,
-           'verbose!'       => \$VERBOSE,
 	   'config=s'       => \$CONFIG_FILE, # config file
 	   'cleanup'        => \$CLEANUP,
 	   'full'           => \$FULL,
@@ -186,7 +186,7 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       if( -f $EXCLUDE_PATH.'/exclude-'.$tag ) {
 	push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-'.$tag);
       } else {
-	warn("unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$tag." for backup $tag");
+	warning("unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$tag." for backup $tag");
       }
       if(defined $MAXAGE) {
  	  $BACKUPS{$tag}{maxage}=$MAXAGE;
@@ -250,7 +250,7 @@ if($STATUS) {
 	}
 
 	if(not -d $BACKUPS{$tag}{path}) {
-	  warn("backup path $BACKUPS{$tag}{path} does not exist: skipping this backup");
+	  warning("backup path $BACKUPS{$tag}{path} does not exist: skipping this backup");
 	  next BACKUP;
 	}
 
@@ -271,7 +271,7 @@ if($STATUS) {
 	  push(@com,'--encrypt-key',$CONFIG{encryptkey});
 	}
 
-	not $VERBOSE and push(@com,'--no-print-statistics');
+	not $STATS and push(@com,'--no-print-statistics');
 
 	# if($COMPARE) {
 	#     push(@com,'--compare');
@@ -314,7 +314,7 @@ if($STATUS) {
     }
 }
 
-
+info('exiting');
 
 sub backup_sort {
     my $aprio=(defined $BACKUPS{$a}{priority} ? $BACKUPS{$a}{priority} : 0);
