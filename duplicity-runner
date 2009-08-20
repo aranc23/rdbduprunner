@@ -111,18 +111,6 @@ unless(-x $DUPLICITY_BINARY) {
     exit(1);
 }
 
-# grab more stuff from the config and put them into ENV for use by duplicity
-if(defined $CONFIG{gpgpassphrase}) {
-  $ENV{PASSPHRASE}=$CONFIG{gpgpassphrase};
-}
-if(defined $CONFIG{awsaccesskeyid}) {
-  $ENV{AWS_ACCESS_KEY_ID}=$CONFIG{awsaccesskeyid};
-}
-if(defined $CONFIG{awssecretaccesskey}) {
-  $ENV{AWS_SECRET_ACCESS_KEY}=$CONFIG{awssecretaccesskey};
-}
-
-
 foreach my $bs (values(%{$CONFIG{backupset}})) {
   my $host=$LOCALHOST;
 
@@ -197,6 +185,14 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       } else {
 	  $$bh{maxage}='60D';
       }
+      # if this is defined in a backupset, allow that to override the global definition, if it exists
+      foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey )))) {
+	unless(defined $$bh{$var}) {
+	  if(defined $CONFIG{$var}) {
+	    $$bh{$var}=$CONFIG{$var};
+	  }
+	}
+      }
       push(@BACKUPS,$bh);
     }
 }
@@ -264,11 +260,11 @@ if($STATUS) {
 	     '--verbosity',$VERBOSITY,
 	     '--exclude-other-filesystems',
 	    );
-	if(defined $CONFIG{signkey}) {
-	  push(@com,'--sign-key',$CONFIG{signkey});
+	if(defined $$bh{signkey}) {
+	  push(@com,'--sign-key',$$bh{signkey});
 	}
-	if(defined $CONFIG{encryptkey}) {
-	  push(@com,'--encrypt-key',$CONFIG{encryptkey});
+	if(defined $$bh{encryptkey}) {
+	  push(@com,'--encrypt-key',$$bh{encryptkey});
 	}
 
 	not $STATS and push(@com,'--no-print-statistics');
@@ -297,6 +293,19 @@ if($STATUS) {
 		    next;
 		}
 	    }
+            # grab more stuff from the config and put them into ENV for use by duplicity
+	    if(defined $CONFIG{gpgpassphrase}) {
+		$ENV{PASSPHRASE}=$CONFIG{gpgpassphrase};
+	    }
+	    if($$bh{dest} =~ /^s3/) {
+		if(defined $CONFIG{awsaccesskeyid}) {
+		    $ENV{AWS_ACCESS_KEY_ID}=$CONFIG{awsaccesskeyid};
+		}
+		if(defined $CONFIG{awssecretaccesskey}) {
+		    $ENV{AWS_SECRET_ACCESS_KEY}=$CONFIG{awssecretaccesskey};
+		}
+	    }
+
 	    system(@com);
 	    my $mainret=$?;
 	    unless($mainret == 0) {
