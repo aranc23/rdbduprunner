@@ -122,7 +122,7 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
     }
     unless(defined $backupdest and defined $CONFIG{backupdestination}{$backupdest}) {
       # can't easily verify the existance of all backup destinations without using duplicity itself
-	logndie("no backup root defined: $backupdest".(defined $CONFIG{backupdestination}{$backupdest}{path} ? " ($CONFIG{backupdestination}{$backupdest}{path})" : ''));
+	log_and_die("no backup root defined: $backupdest".(defined $CONFIG{backupdestination}{$backupdest}{path} ? " ($CONFIG{backupdestination}{$backupdest}{path})" : ''));
     }
     if(defined $DEST and $backupdest !~ /$DEST/) {
 	next;
@@ -153,6 +153,7 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
 
       $bh={%{$bs}}; # very important to make a copy here
+      print Dumper $bh;
       $$bh{dest}=$dest;
       $$bh{path}=$path;
       $$bh{tag}=$tag;
@@ -187,6 +188,7 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       }
       # if this is defined in a backupset, allow that to override the global definition, if it exists
       foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey )))) {
+	debug($var);
 	unless(defined $$bh{$var}) {
 	  if(defined $CONFIG{$var}) {
 	    $$bh{$var}=$CONFIG{$var};
@@ -211,6 +213,7 @@ if($STATUS) {
 	info(join(" ",@com));
 	unless($TEST) {
 	    lock_pid_file();
+	    set_env($bh);
 	    system(@com);
 	    unless($? == 0) {
 		error("unable to execute duplicity!");
@@ -226,6 +229,7 @@ if($STATUS) {
 	info(join(" ",@com));
 	unless($TEST) {
 	    lock_pid_file();
+	    set_env($bh);
 	    system(@com);
 	    unless($? == 0) {
 		error("unable to execute duplicity!");
@@ -287,25 +291,14 @@ if($STATUS) {
 
 	    if (defined $$bh{prerun}) {
 		print $$bh{prerun}."\n";
+		set_env($bh);
 		system($$bh{prerun});
 		unless($? == 0) {
 		    error("unable to execute prerun command: skipping backup!");
 		    next;
 		}
 	    }
-            # grab more stuff from the config and put them into ENV for use by duplicity
-	    if(defined $CONFIG{gpgpassphrase}) {
-		$ENV{PASSPHRASE}=$CONFIG{gpgpassphrase};
-	    }
-	    if($$bh{dest} =~ /^s3/) {
-		if(defined $CONFIG{awsaccesskeyid}) {
-		    $ENV{AWS_ACCESS_KEY_ID}=$CONFIG{awsaccesskeyid};
-		}
-		if(defined $CONFIG{awssecretaccesskey}) {
-		    $ENV{AWS_SECRET_ACCESS_KEY}=$CONFIG{awssecretaccesskey};
-		}
-	    }
-
+	    set_env($bh);
 	    system(@com);
 	    my $mainret=$?;
 	    unless($mainret == 0) {
@@ -373,6 +366,7 @@ sub tidy {
 	);
     info(join(" ",@com));
     unless($TEST) {
+	set_env($bh);
 	system(@com);
 	unless($? == 0) {
 	    error("unable to execute duplicity!");
@@ -403,4 +397,21 @@ sub alert {
 }
 sub emergency {
   $DISPATCHER->emergency(@_);
+}
+
+sub set_env {
+    my $bh=$_[0];
+    # grab more stuff from the config and put them into ENV for use by duplicity
+    if(defined $$bh{gpgpassphrase}) {
+	$ENV{PASSPHRASE}=$$bh{gpgpassphrase};
+    }
+    print Dumper $bh;
+    if($$bh{dest} =~ /^s3/) {
+	if(defined $$bh{awsaccesskeyid}) {
+	    $ENV{AWS_ACCESS_KEY_ID}=$$bh{awsaccesskeyid};
+	}
+	if(defined $$bh{awssecretaccesskey}) {
+	    $ENV{AWS_SECRET_ACCESS_KEY}=$$bh{awssecretaccesskey};
+	}
+    }
 }
