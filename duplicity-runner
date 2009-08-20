@@ -79,9 +79,9 @@ $DISPATCHER->add(Log::Dispatch::Syslog->new(name      => 'syslog',
 					    callbacks => sub { my %t=@_;
 							       chomp $t{message};
 							       return $t{message};
-					    },
-		 )
-    );
+							     },
+					   )
+		);
 
 $DISPATCHER->add(Log::Dispatch::Screen->new(name      => 'screen',
 					    min_level => $LOG_LEVEL,
@@ -89,9 +89,9 @@ $DISPATCHER->add(Log::Dispatch::Screen->new(name      => 'screen',
 					    callbacks => sub { my %t=@_;
 							       chomp $t{message};
 							       return $t{message}."\n"; # add a newline
-					    },
-		 )
-    );
+							     },
+					   )
+		);
 
 
 info('starting');
