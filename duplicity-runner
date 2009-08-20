@@ -409,7 +409,6 @@ sub set_env {
     if(defined $$bh{gpgpassphrase}) {
 	$ENV{PASSPHRASE}=$$bh{gpgpassphrase};
     }
-    print Dumper $bh;
     if($$bh{dest} =~ /^s3/) {
 	if(defined $$bh{awsaccesskeyid}) {
 	    $ENV{AWS_ACCESS_KEY_ID}=$$bh{awsaccesskeyid};
