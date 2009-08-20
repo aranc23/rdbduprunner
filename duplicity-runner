@@ -30,7 +30,7 @@ our $STATUS=0;
 our $TIDY=0;
 our $DUMP=0;
 our $MAXAGE;
-our $LOCK_FILE="$HOME/duplicity-runner.pid";
+our $LOCK_FILE;
 our $LOG_LEVEL='info';
 our $FACILITY='user';
 
@@ -119,6 +119,14 @@ unless(defined $VERBOSITY) { # from the command line
   } else {
     $VERBOSITY=5; # overkill probably
   }
+}
+
+if(defined $LOCK_FILE) {
+  # leave it alone, it comes from the command line
+} elsif(defined $CONFIG{lockfile}) {
+  $LOCK_FILE=$CONFIG{lockfile};
+} else {
+  $LOCK_FILE="$HOME/duplicity-runner.pid";
 }
 
 foreach my $bs (values(%{$CONFIG{backupset}})) {
@@ -339,13 +347,6 @@ sub backup_sort {
 #	if
 
 sub lock_pid_file {
-    if(defined $LOCK_FILE) {
-	# leave it alone
-    } elsif(defined $CONFIG{LockFile}) {
-	$LOCK_FILE=$CONFIG{LockFile};
-    } else {
-	$LOCK_FILE="$HOME/duplicity-runner.pid";
-    }
     unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
 	error("unable to open pid file: $LOCK_FILE for writing");
 	next;
