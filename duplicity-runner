@@ -4,11 +4,13 @@
 use strict;
 use warnings;
 use Getopt::Long;
-use logentry;
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Env qw( HOME );
 use Config::General;
 use Data::Dumper;
+use Log::Dispatch;
+use Log::Dispatch::Syslog;
+use Log::Dispatch::Screen;
 
 our $TEST=1;
 our $VERBOSITY=5;
@@ -18,7 +20,7 @@ our $DUPLICITY_BINARY;
 our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $DEST;
-our ($VERBOSE,$DEBUG);
+our $VERBOSE;
 our $CLEANUP=0;
 our $FULL=0;
 our $STATUS=0;
@@ -26,6 +28,9 @@ our $TIDY=0;
 our $DUMP=0;
 our $MAXAGE;
 our $LOCK_FILE="$HOME/duplicity-runner.pid";
+our $DISPATCHER;
+our $FACILITY='user';
+our $LOG_LEVEL='info';
 
 our $CONFIG_FILE="$HOME/.duplicity-runner.rc";
 our %CONFIG;
@@ -39,7 +44,6 @@ GetOptions('test!'          => \$TEST,
            'path=s'         => \$PATH,
 	   'dest=s'         => \$DEST,
            'verbose!'       => \$VERBOSE,
-           'debug!'         => \$DEBUG,
 	   'config=s'       => \$CONFIG_FILE, # config file
 	   'cleanup'        => \$CLEANUP,
 	   'full'           => \$FULL,
@@ -48,6 +52,8 @@ GetOptions('test!'          => \$TEST,
 	   'dump'           => \$DUMP,
 	   'maxage=s'       => \$MAXAGE,
 	   'lockfile=s'     => \$LOCK_FILE,
+	   'level=s'        => \$LOG_LEVEL,
+	   'facility=s'     => \$FACILITY,
           );
 
 if(not defined $LOCALHOST) {
@@ -61,8 +67,32 @@ if(not defined $LOCALHOST) {
   }
 }
 
-logentry::OpenLog('local5','duplcity-runner');
-logentry('info','starting');
+$DISPATCHER=Log::Dispatch->new;
+$DISPATCHER->add(Log::Dispatch::Syslog->new(name      => 'syslog',
+					    min_level => $LOG_LEVEL,
+					    ident     => 'duplicity-runner'.'['.$$.']',
+					    facility  => $FACILITY,
+					    socket    => (`uname` =~ /Linux/ ?
+							  'unix' : 'inet'),
+					    callbacks => sub { my %t=@_;
+							       chomp $t{message};
+							       return $t{message};
+					    },
+		 )
+    );
+
+$DISPATCHER->add(Log::Dispatch::Screen->new(name      => 'screen',
+					    min_level => $LOG_LEVEL,
+					    stderr    => 0,
+					    callbacks => sub { my %t=@_;
+							       chomp $t{message};
+							       return $t{message}."\n"; # add a newline
+					    },
+		 )
+    );
+
+
+info('starting');
 
 %CONFIG=new Config::General(-ConfigFile => $CONFIG_FILE,
 			    -UseApacheInclude => 1,
@@ -77,7 +107,8 @@ if(not defined $DUPLICITY_BINARY) {
     }
 }
 unless(-x $DUPLICITY_BINARY) {
-    logndie("unable to execute $DUPLICITY_BINARY");
+    critical("unable to execute $DUPLICITY_BINARY");
+    exit(1);
 }
 
 # grab more stuff from the config and put them into ENV for use by duplicity
@@ -130,7 +161,7 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       $dest=$backupdestpath.'/'.$tag;
       my @tags=split(/\-/,$tag);
 
-      logentry('debug',"Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
+      debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
 
       $BACKUPS{$tag}={%{$bs}}; # very important to make a copy here
       $BACKUPS{$tag}{dest}=$dest;
@@ -155,7 +186,7 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       if( -f $EXCLUDE_PATH.'/exclude-'.$tag ) {
 	push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-'.$tag);
       } else {
-	logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$tag." for backup $tag");
+	warn("unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$tag." for backup $tag");
       }
       if(defined $MAXAGE) {
  	  $BACKUPS{$tag}{maxage}=$MAXAGE;
@@ -170,7 +201,8 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
 
 if($DUMP) {
     print Dumper \%BACKUPS;
-    logndie "you asked me to dump and die!";
+    notice("you asked me to dump and exit!");
+    exit(0);
 }
 
 if($STATUS) {
@@ -178,12 +210,12 @@ if($STATUS) {
 	my @com=($DUPLICITY_BINARY,'collection-status',
 		 '--verbosity',$VERBOSITY,
 		 $BACKUPS{$tag}{dest});
-	logentry('info',join(" ",@com));
+	info(join(" ",@com));
 	unless($TEST) {
 	    lock_pid_file();
 	    system(@com);
 	    unless($? == 0) {
-		logentry('err',"unable to execute duplicity!");
+		error("unable to execute duplicity!");
 	    }
 	    unlock_pid_file();
 	}
@@ -193,12 +225,12 @@ if($STATUS) {
 	my @com=($DUPLICITY_BINARY,'cleanup',
 		 '--verbosity',$VERBOSITY,
 		 $BACKUPS{$tag}{dest});
-	logentry('info',join(" ",@com));
+	info(join(" ",@com));
 	unless($TEST) {
 	    lock_pid_file();
 	    system(@com);
 	    unless($? == 0) {
-		logentry('err',"unable to execute duplicity!");
+		error("unable to execute duplicity!");
 	    }
 	    unlock_pid_file();
 	}
@@ -218,7 +250,7 @@ if($STATUS) {
 	}
 
 	if(not -d $BACKUPS{$tag}{path}) {
-	  logentry('warn',"backup path $BACKUPS{$tag}{path} does not exist: skipping this backup");
+	  warn("backup path $BACKUPS{$tag}{path} does not exist: skipping this backup");
 	  next BACKUP;
 	}
 
@@ -252,7 +284,7 @@ if($STATUS) {
 	# this is fugly:
 	push(@com,$BACKUPS{$tag}{path},$BACKUPS{$tag}{dest});
 
-	logentry('info',join(" ",@com));
+	info(join(" ",@com));
 
 	unless($TEST) {
 	    lock_pid_file();
@@ -261,20 +293,20 @@ if($STATUS) {
 		print $$bh{prerun}."\n";
 		system($$bh{prerun});
 		unless($? == 0) {
-		    logentry('err',"unable to execute prerun command: skipping backup!");
+		    error("unable to execute prerun command: skipping backup!");
 		    next;
 		}
 	    }
 	    system(@com);
 	    my $mainret=$?;
 	    unless($mainret == 0) {
-		logentry('err',"unable to execute duplicity!");
+		error("unable to execute duplicity!");
 	    }
 	    if(defined $$bh{postrun}) {
 		print $$bh{postrun}."\n";
 		system($$bh{postrun});
 		unless($? == 0) {
-		    logentry('err',"unable to execute postrun command");
+		    error("unable to execute postrun command");
 		}
 		unlock_pid_file();
 	    }
@@ -304,11 +336,11 @@ sub lock_pid_file {
 	$LOCK_FILE="$HOME/duplicity-runner.pid";
     }
     unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
-	logentry('err',"unable to open pid file: $LOCK_FILE for writing");
+	error("unable to open pid file: $LOCK_FILE for writing");
 	next;
     }
     unless(flock(LOCK,LOCK_EX|LOCK_NB)) {
-	logentry('err',"unable to flock the pid file: $LOCK_FILE");
+	error("unable to flock the pid file: $LOCK_FILE");
 	next;
     }
     truncate(LOCK,0); # this shouldn't fail if we have the file opened and locked!
@@ -330,12 +362,36 @@ sub tidy {
 	     '--verbosity',$VERBOSITY,
 	     $BACKUPS{$tag}{dest}
 	);
-    logentry('info',join(" ",@com));
+    info(join(" ",@com));
     unless($TEST) {
 	system(@com);
 	unless($? == 0) {
-	    logentry('err',"unable to execute duplicity!");
+	    error("unable to execute duplicity!");
 	}
     }
 }
 
+sub debug {
+  $DISPATCHER->debug(@_);
+}
+sub info {
+  $DISPATCHER->info(@_);
+}
+sub notice {
+  $DISPATCHER->notice(@_);
+}
+sub warning {
+  $DISPATCHER->warning(@_);
+}
+sub error {
+  $DISPATCHER->error(@_);
+}
+sub critical {
+  $DISPATCHER->critical(@_);
+}
+sub alert {
+  $DISPATCHER->alert(@_);
+}
+sub emergency {
+  $DISPATCHER->emergency(@_);
+}
