@@ -34,7 +34,7 @@ our $LOG_LEVEL='info';
 
 our $CONFIG_FILE="$HOME/.duplicity-runner.rc";
 our %CONFIG;
-our %BACKUPS;
+our @BACKUPS;
 
 GetOptions('test!'          => \$TEST,
 	   'stats!'         => \$STATS,
@@ -142,6 +142,7 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
     my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
 
     foreach my $path (ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path})) {
+      my $bh={};
       if(defined $PATH and $path !~ /$PATH/) {
 	  next;
       }
@@ -163,53 +164,54 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
 
       debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
 
-      $BACKUPS{$tag}={%{$bs}}; # very important to make a copy here
-      $BACKUPS{$tag}{dest}=$dest;
-      $BACKUPS{$tag}{path}=$path;
-      $BACKUPS{$tag}{tag}=$tag;
-      $BACKUPS{$tag}{host}=$host;
-      $BACKUPS{$tag}{backupdestination}=$backupdest;
-      $BACKUPS{$tag}{gtag}='generic-'.$tags[1];
+      $bh={%{$bs}}; # very important to make a copy here
+      $$bh{dest}=$dest;
+      $$bh{path}=$path;
+      $$bh{tag}=$tag;
+      $$bh{host}=$host;
+      $$bh{backupdestination}=$backupdest;
+      $$bh{gtag}='generic-'.$tags[1];
 
       if( -f $EXCLUDE_PATH.'/exclude-generic' ) {
-	push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-generic');
+	push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-generic');
       } else {
-	#logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$BACKUPS{$tag}{gtag}." for backup $tag");
+	#logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$$bh{gtag}." for backup $tag");
       }
 
-      if( -f $EXCLUDE_PATH.'/exclude-'.$BACKUPS{$tag}{gtag} ) {
-	push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-'.$BACKUPS{$tag}{gtag});
+      if( -f $EXCLUDE_PATH.'/exclude-'.$$bh{gtag} ) {
+	push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-'.$$bh{gtag});
       } else {
-	#logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$BACKUPS{$tag}{gtag}." for backup $tag");
+	#logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$$bh{gtag}." for backup $tag");
       }
 
       if( -f $EXCLUDE_PATH.'/exclude-'.$tag ) {
-	push(@{$BACKUPS{$tag}{excludes}},$EXCLUDE_PATH.'/exclude-'.$tag);
+	push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-'.$tag);
       } else {
 	warning("unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$tag." for backup $tag");
       }
       if(defined $MAXAGE) {
- 	  $BACKUPS{$tag}{maxage}=$MAXAGE;
-      } elsif(not defined $BACKUPS{$tag}{maxage} and
+ 	  $$bh{maxage}=$MAXAGE;
+      } elsif(not defined $$bh{maxage} and
  	      defined $CONFIG{maxage}) {
- 	  $BACKUPS{$tag}{maxage}=$CONFIG{maxage};
+ 	  $$bh{maxage}=$CONFIG{maxage};
       } else {
-	  $BACKUPS{$tag}{maxage}='60D';
+	  $$bh{maxage}='60D';
       }
+      push(@BACKUPS,$bh);
     }
 }
 
 if($DUMP) {
-    print Dumper \%BACKUPS;
+    print Dumper \@BACKUPS;
     notice("you asked me to dump and exit!");
     exit(0);
 }
 
 if($STATUS) {
-    foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
+    foreach my $bh (sort backup_sort (@BACKUPS)) {
 	my @com=($DUPLICITY_BINARY,'collection-status',
 		 '--verbosity',$VERBOSITY,
-		 $BACKUPS{$tag}{dest});
+		 $$bh{dest});
 	info(join(" ",@com));
 	unless($TEST) {
 	    lock_pid_file();
@@ -221,10 +223,10 @@ if($STATUS) {
 	}
     }
 } elsif($CLEANUP) {
-    foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
+    foreach my $bh (sort backup_sort (@BACKUPS)) {
 	my @com=($DUPLICITY_BINARY,'cleanup',
 		 '--verbosity',$VERBOSITY,
-		 $BACKUPS{$tag}{dest});
+		 $$bh{dest});
 	info(join(" ",@com));
 	unless($TEST) {
 	    lock_pid_file();
@@ -236,21 +238,19 @@ if($STATUS) {
 	}
     }
 } elsif($TIDY) {
-    foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
-	tidy($tag);
+    foreach my $bh (sort backup_sort (@BACKUPS)) {
+	tidy($bh);
     }
 } else { # actually do a backup, please
   BACKUP:
-    foreach my $tag (sort backup_sort (keys(%BACKUPS))) {
-	my $bh=$BACKUPS{$tag}; # for convenience of typing
-
+    foreach my $bh (sort backup_sort (@BACKUPS)) {
 	if($$bh{disabled}) {
 	    # skip disabled backups
 	    next;
 	}
 
-	if(not -d $BACKUPS{$tag}{path}) {
-	  warning("backup path $BACKUPS{$tag}{path} does not exist: skipping this backup");
+	if(not -d $$bh{path}) {
+	  warning("backup path $$bh{path} does not exist: skipping this backup");
 	  next BACKUP;
 	}
 
@@ -277,12 +277,12 @@ if($STATUS) {
 	#     push(@com,'--compare');
 	# }
 
-	foreach my $f (@{$BACKUPS{$tag}{excludes}}) {
+	foreach my $f (@{$$bh{excludes}}) {
 	    push(@com,'--exclude-globbing-filelist',
 		 $f);
 	}
 	# this is fugly:
-	push(@com,$BACKUPS{$tag}{path},$BACKUPS{$tag}{dest});
+	push(@com,$$bh{path},$$bh{dest});
 
 	info(join(" ",@com));
 
@@ -317,9 +317,9 @@ if($STATUS) {
 info('exiting');
 
 sub backup_sort {
-    my $aprio=(defined $BACKUPS{$a}{priority} ? $BACKUPS{$a}{priority} : 0);
-    my $bprio=(defined $BACKUPS{$b}{priority} ? $BACKUPS{$b}{priority} : 0);
-    
+    my $aprio=(defined $$a{priority} ? $$a{priority} : 0);
+    my $bprio=(defined $$b{priority} ? $$b{priority} : 0);
+
     return $aprio <=> $bprio;
 }
 
@@ -354,13 +354,13 @@ sub unlock_pid_file {
 }
 
 sub tidy {
-    my $tag=$_[0];
+    my $bh=$_[0];
     my @com=($DUPLICITY_BINARY,
 	     'remove-older-than',
-	     $BACKUPS{$tag}{maxage},
+	     $$bh{maxage},
 	     '--force',
 	     '--verbosity',$VERBOSITY,
-	     $BACKUPS{$tag}{dest}
+	     $$bh{dest}
 	);
     info(join(" ",@com));
     unless($TEST) {
