@@ -153,7 +153,6 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
 
       $bh={%{$bs}}; # very important to make a copy here
-      print Dumper $bh;
       $$bh{dest}=$dest;
       $$bh{path}=$path;
       $$bh{tag}=$tag;
@@ -193,6 +192,10 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
 	  if(defined $CONFIG{$var}) {
 	    $$bh{$var}=$CONFIG{$var};
 	  }
+	  if(defined $CONFIG{backupdestination}{$$bh{backupdestination}}{$var}) {
+	    # the above is why people hate perl, possibly
+	    $$bh{$var}=$CONFIG{backupdestination}{$$bh{backupdestination}}{$var};
+	  }
 	}
       }
       push(@BACKUPS,$bh);
@@ -200,9 +203,10 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
 }
 
 if($DUMP) {
-    print Dumper \@BACKUPS;
-    notice("you asked me to dump and exit!");
-    exit(0);
+  print Dumper \%CONFIG;
+  print Dumper \@BACKUPS;
+  notice("you asked me to dump and exit!");
+  exit(0);
 }
 
 if($STATUS) {
