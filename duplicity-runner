@@ -13,7 +13,6 @@ use Log::Dispatch::Syslog;
 use Log::Dispatch::Screen;
 
 # staticly defined
-our $EXCLUDE_PATH='/etc/rdiff-backup';
 
 # all of these are overridden via the command line
 our $TEST=1;
@@ -33,6 +32,7 @@ our $MAXAGE;
 our $LOCK_FILE;
 our $LOG_LEVEL='info';
 our $FACILITY='user';
+our $EXCLUDE_PATH;
 
 # global variables
 our %CONFIG;
@@ -56,6 +56,7 @@ GetOptions('test!'          => \$TEST,
 	   'lockfile=s'     => \$LOCK_FILE,
 	   'level=s'        => \$LOG_LEVEL,
 	   'facility=s'     => \$FACILITY,
+	   'exclude-path=s' => \$EXCLUDE_PATH,
           );
 
 if(not defined $LOCALHOST) {
@@ -129,6 +130,14 @@ if(defined $LOCK_FILE) {
   $LOCK_FILE="$HOME/duplicity-runner.pid";
 }
 
+if(defined $EXCLUDE_PATH) {
+  # leave it alone, it comes from the command line
+} elsif(defined $CONFIG{excludepath}) {
+  $EXCLUDE_PATH=$CONFIG{excludepath};
+} else {
+  $EXCLUDE_PATH='/etc/rdiff-backup';
+}
+
 foreach my $bs (values(%{$CONFIG{backupset}})) {
   my $host=$LOCALHOST;
 
@@ -180,14 +189,10 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
 
       if( -f $EXCLUDE_PATH.'/exclude-generic' ) {
 	push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-generic');
-      } else {
-	#logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$$bh{gtag}." for backup $tag");
       }
 
       if( -f $EXCLUDE_PATH.'/exclude-'.$$bh{gtag} ) {
 	push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-'.$$bh{gtag});
-      } else {
-	#logentry('warn',"unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$$bh{gtag}." for backup $tag");
       }
 
       if( -f $EXCLUDE_PATH.'/exclude-'.$tag ) {
@@ -195,6 +200,7 @@ foreach my $bs (values(%{$CONFIG{backupset}})) {
       } else {
 	warning("unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$tag." for backup $tag");
       }
+
       if(defined $MAXAGE) {
  	  $$bh{maxage}=$MAXAGE;
       } elsif(not defined $$bh{maxage} and
