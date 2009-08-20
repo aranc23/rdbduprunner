@@ -12,28 +12,32 @@ use Log::Dispatch;
 use Log::Dispatch::Syslog;
 use Log::Dispatch::Screen;
 
+# staticly defined
+our $EXCLUDE_PATH='/etc/rdiff-backup';
+
+# all of these are overridden via the command line
 our $TEST=1;
+our $STATS=1;
 our $VERBOSITY;
 our $LOCALHOST;
 our $DUPLICITY_BINARY;
-our $EXCLUDE_PATH='/etc/rdiff-backup';
 our $PATH;
 our $DEST;
+our $CONFIG_FILE="$HOME/.duplicity-runner.rc";
 our $CLEANUP=0;
 our $FULL=0;
 our $STATUS=0;
 our $TIDY=0;
 our $DUMP=0;
-our $STATS=1;
 our $MAXAGE;
 our $LOCK_FILE="$HOME/duplicity-runner.pid";
-our $DISPATCHER;
-our $FACILITY='user';
 our $LOG_LEVEL='info';
+our $FACILITY='user';
 
-our $CONFIG_FILE="$HOME/.duplicity-runner.rc";
+# global variables
 our %CONFIG;
 our @BACKUPS;
+our $DISPATCHER;
 
 GetOptions('test!'          => \$TEST,
 	   'stats!'         => \$STATS,
