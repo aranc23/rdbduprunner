@@ -228,8 +228,9 @@ if($STATUS) {
 } elsif($CLEANUP) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
 	my @com=($DUPLICITY_BINARY,'cleanup',
-		 '--verbosity',$VERBOSITY,
-		 $$bh{dest});
+             '--force',
+             '--verbosity',$VERBOSITY,
+             $$bh{dest});
 	info(join(" ",@com));
 	unless($TEST) {
 	    lock_pid_file();
