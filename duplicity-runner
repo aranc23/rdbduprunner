@@ -114,18 +114,19 @@ if(defined $EXCLUDE_PATH) {
   $EXCLUDE_PATH='/etc/rdiff-backup';
 }
 
-foreach my $bs (values(%{$CONFIG{backupset}})) {
-  my $host=$LOCALHOST;
+foreach my $bstag (keys(%{$CONFIG{backupset}})) {
+    my $bs=$CONFIG{backupset}{$bstag};
+    my $host=$LOCALHOST;
 
     my $backupdest;
     if(defined $$bs{backupdestination}) {
-	$backupdest=$$bs{backupdestination};
+        $backupdest=$$bs{backupdestination};
     } elsif(defined $CONFIG{defaultbackupdestination}) {
-	$backupdest=$CONFIG{defaultbackupdestination};
+        $backupdest=$CONFIG{defaultbackupdestination};
     }
-    unless(defined $backupdest and defined $CONFIG{backupdestination}{$backupdest}) {
-      # can't easily verify the existance of all backup destinations without using duplicity itself
-	log_and_die("no backup root defined: $backupdest".(defined $CONFIG{backupdestination}{$backupdest}{path} ? " ($CONFIG{backupdestination}{$backupdest}{path})" : ''));
+    unless(defined $backupdest) {
+        error("there is no BackupDestination defined for the BackupSet ($bstag): so it cannot be processed");
+        next;
     }
     if(defined $DEST and $backupdest !~ /$DEST/) {
 	next;
@@ -327,10 +328,6 @@ sub backup_sort {
       return $aprio <=> $bprio;
     }
 }
-
-#sub find_backup_by_tag {
-#    foreach my $hr (@BACKUPS) {
-#	if
 
 sub lock_pid_file {
     unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
