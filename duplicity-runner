@@ -321,7 +321,11 @@ sub backup_sort {
     my $aprio=(defined $$a{priority} ? $$a{priority} : 0);
     my $bprio=(defined $$b{priority} ? $$b{priority} : 0);
 
-    return $aprio <=> $bprio;
+    if($aprio == $bprio) {
+      return $$a{tag} cmp $$b{tag};
+    } else {
+      return $aprio <=> $bprio;
+    }
 }
 
 #sub find_backup_by_tag {
