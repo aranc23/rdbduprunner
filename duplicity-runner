@@ -129,76 +129,76 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         next;
     }
     if(defined $DEST and $backupdest !~ /$DEST/) {
-	next;
+        next;
     }
     my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
 
     foreach my $path (ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path})) {
-      my $bh={};
-      if(defined $PATH and $path !~ /$PATH/) {
-	  next;
-      }
-      my $dest;
-      my $tag='';
-      if(defined $$bs{tag}) {
-	  $dest=$$bs{tag};
-	  $tag=$dest;
-      } else {
-	  $dest=$path;
-	  $dest =~ s/\//\-/g;
-	  $dest =~ s/ /_/g;
-	  $dest eq '-' and $dest='-root';
-	  $tag=$host.$dest;
-      }
-      # I should use a perl module here, I guess, not .
-      $dest=$backupdestpath.'/'.$tag;
-      my @tags=split(/\-/,$tag);
+        my $bh={};
+        if(defined $PATH and $path !~ /$PATH/) {
+            next;
+        }
+        my $dest;
+        my $tag='';
+        if(defined $$bs{tag}) {
+            $dest=$$bs{tag};
+            $tag=$dest;
+        } else {
+            $dest=$path;
+            $dest =~ s/\//\-/g;
+            $dest =~ s/ /_/g;
+            $dest eq '-' and $dest='-root';
+            $tag=$host.$dest;
+        }
+        # I should use a perl module here, I guess, not .
+        $dest=$backupdestpath.'/'.$tag;
+        my @tags=split(/\-/,$tag);
 
-      debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
+        debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
 
-      $bh={%{$bs}}; # very important to make a copy here
-      $$bh{dest}=$dest;
-      $$bh{path}=$path;
-      $$bh{tag}=$tag;
-      $$bh{host}=$host;
-      $$bh{backupdestination}=$backupdest;
-      $$bh{gtag}='generic-'.$tags[1];
+        $bh={%{$bs}}; # very important to make a copy here
+        $$bh{dest}=$dest;
+        $$bh{path}=$path;
+        $$bh{tag}=$tag;
+        $$bh{host}=$host;
+        $$bh{backupdestination}=$backupdest;
+        $$bh{gtag}='generic-'.$tags[1];
 
-      if( -f $EXCLUDE_PATH.'/exclude-generic' ) {
-	push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-generic');
-      }
+        if( -f $EXCLUDE_PATH.'/exclude-generic' ) {
+            push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-generic');
+        }
 
-      if( -f $EXCLUDE_PATH.'/exclude-'.$$bh{gtag} ) {
-	push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-'.$$bh{gtag});
-      }
+        if( -f $EXCLUDE_PATH.'/exclude-'.$$bh{gtag} ) {
+            push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-'.$$bh{gtag});
+        }
 
-      if( -f $EXCLUDE_PATH.'/exclude-'.$tag ) {
-	push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-'.$tag);
-      } else {
-	warning("unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$tag." for backup $tag");
-      }
+        if( -f $EXCLUDE_PATH.'/exclude-'.$tag ) {
+            push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-'.$tag);
+        } else {
+            warning("unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$tag." for backup $tag");
+        }
 
-      if(defined $MAXAGE) {
- 	  $$bh{maxage}=$MAXAGE;
-      } elsif(not defined $$bh{maxage} and
- 	      defined $CONFIG{maxage}) {
- 	  $$bh{maxage}=$CONFIG{maxage};
-      } else {
-	  $$bh{maxage}='60D';
-      }
-      # if this is defined in a backupset, allow that to override the global definition, if it exists
-      foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey )))) {
-	unless(defined $$bh{$var}) {
-	  if(defined $CONFIG{$var}) {
-	    $$bh{$var}=$CONFIG{$var};
-	  }
-	  if(defined $CONFIG{backupdestination}{$$bh{backupdestination}}{$var}) {
-	    # the above is why people hate perl, possibly
-	    $$bh{$var}=$CONFIG{backupdestination}{$$bh{backupdestination}}{$var};
-	  }
-	}
-      }
-      push(@BACKUPS,$bh);
+        if(defined $MAXAGE) {
+            $$bh{maxage}=$MAXAGE;
+        } elsif(not defined $$bh{maxage} and
+                defined $CONFIG{maxage}) {
+            $$bh{maxage}=$CONFIG{maxage};
+        } else {
+            $$bh{maxage}='60D';
+        }
+        # if this is defined in a backupset, allow that to override the global definition, if it exists
+        foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey )))) {
+            unless(defined $$bh{$var}) {
+                if(defined $CONFIG{$var}) {
+                    $$bh{$var}=$CONFIG{$var};
+                }
+                if(defined $CONFIG{backupdestination}{$$bh{backupdestination}}{$var}) {
+                    # the above is why people hate perl, possibly
+                    $$bh{$var}=$CONFIG{backupdestination}{$$bh{backupdestination}}{$var};
+                }
+            }
+        }
+        push(@BACKUPS,$bh);
     }
 }
 
