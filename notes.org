@@ -6,7 +6,8 @@
    should show the --option to use that function and the two related rdiff-backup and duplicity modes
 ** DONE do something sane with --verbosity and --terminal-verbosity
    CLOSED: [2009-08-27 Thu 14:25]
-** TODO add back a --host option 
+** DONE add back a --host option 
+   CLOSED: [2009-08-27 Thu 14:39]
 ** TODO merge cleanup/tidy
 ** TODO check for the parsing of a config file paramater to set the backup type of a backupdestination
 ** TODO document all the config options in the sample .rc file

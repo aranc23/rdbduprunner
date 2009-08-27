@@ -22,8 +22,10 @@ our $TVERBOSITY;
 our $LOCALHOST;
 our $DUPLICITY_BINARY;
 our $RDIFF_BACKUP_BINARY;
+# the next three options limit which backups get acted upon
 our $PATH;
 our $DEST;
+our $HOST;
 our $CONFIG_FILE="$HOME/.rdbduprunner.rc";
 our $CLEANUP=0;
 our $FULL=0;
@@ -48,8 +50,9 @@ GetOptions('test!'          => \$TEST,
            'localhost=s'    => \$LOCALHOST,
            'duplicity-binary=s' => \$DUPLICITY_BINARY,
            'rdiff-backup-binary=s' => \$RDIFF_BACKUP_BINARY,
-           'path=s'         => \$PATH,
-	   'dest=s'         => \$DEST,
+           'path=s'                => \$PATH,
+           'dest=s'                => \$DEST,
+           'host=s'                => \$HOST,
 	   'config=s'       => \$CONFIG_FILE, # config file
 	   'cleanup'        => \$CLEANUP,
 	   'full'           => \$FULL,
@@ -128,9 +131,14 @@ if(defined $EXCLUDE_PATH) {
 
 foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my $bs=$CONFIG{backupset}{$bstag};
-    my $host=$LOCALHOST;
+    my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
     my $btype;
     my $backupdest;
+
+    if(defined $HOST and $host !~ /$HOST/) {
+      next;
+    }
+
     if(defined $$bs{backupdestination}) {
         $backupdest=$$bs{backupdestination};
     } elsif(defined $CONFIG{defaultbackupdestination}) {
@@ -147,6 +155,11 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     } else {
       $btype='duplicity';
     }
+    if($btype eq 'duplicity' and $host ne $LOCALHOST) {
+      error("$bstag is a duplicity backup with host set to $host: duplicity backups must have a local source!");
+      next;
+    }
+
     if(defined $DEST and $backupdest !~ /$DEST/) {
         next;
     }
