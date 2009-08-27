@@ -283,32 +283,47 @@ if($STATUS) {
 } else { # actually do a backup, please
   BACKUP:
     foreach my $bh (sort backup_sort (@BACKUPS)) {
+      my @com;
 	if($$bh{disabled}) {
 	    # skip disabled backups
 	    next;
 	}
 
-	if(not -d $$bh{path}) {
-	  warning("backup path $$bh{path} does not exist: skipping this backup");
+	if($$bh{btype} eq 'duplicity' and not -d $$bh{path}) {
+	  warning("backup path $$bh{path} does not exist for $$bh{tag}: skipping this backup");
 	  next BACKUP;
 	}
 
 	if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
-	    next BACKUP;
+      # I guess this is a way to mark a backupdestination as unavailable
+      next BACKUP;
 	}
 
-	my @com=($DUPLICITY_BINARY);
-	$FULL and push(@com,'full');
+      if($$bh{btype} eq 'duplicity') {
+        @com=($DUPLICITY_BINARY);
+        $FULL and push(@com,'full');
+        if(defined $$bh{signkey}) {
+          push(@com,'--sign-key',$$bh{signkey});
+        }
+        if(defined $$bh{encryptkey}) {
+          push(@com,'--encrypt-key',$$bh{encryptkey});
+        }
+        unless($STATS) {
+          push(@com,'--no-print-statistics');
+        }
+      } else {
+        @com=($RDIFF_BACKUP_BINARY,
+              '--exclude-special-files',
+             );
+        unless($$bh{sshcompress}) {
+          push(@com,'--ssh-no-compression');
+        }
+        if($STATS) {
+          push(@com,'--print-statistics');
+        }
+      }
     push(@com,verbargs($bh),
          '--exclude-other-filesystems');
-	if(defined $$bh{signkey}) {
-	  push(@com,'--sign-key',$$bh{signkey});
-	}
-	if(defined $$bh{encryptkey}) {
-	  push(@com,'--encrypt-key',$$bh{encryptkey});
-	}
-
-	not $STATS and push(@com,'--no-print-statistics');
 
 	foreach my $f (@{$$bh{excludes}}) {
 	    push(@com,'--exclude-globbing-filelist',
@@ -335,7 +350,7 @@ if($STATUS) {
 	    system(@com);
 	    my $mainret=$?;
 	    unless($mainret == 0) {
-		error("unable to execute duplicity!");
+		error("unable to execute $$bh{btype}!");
 	    }
 	    if(defined $$bh{postrun}) {
 		print $$bh{postrun}."\n";
