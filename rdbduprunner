@@ -23,7 +23,7 @@ our $DUPLICITY_BINARY;
 our $RDIFF_BACKUP_BINARY;
 our $PATH;
 our $DEST;
-our $CONFIG_FILE="$HOME/.duplicity-runner.rc";
+our $CONFIG_FILE="$HOME/.rdbduprunner.rc";
 our $CLEANUP=0;
 our $FULL=0;
 our $STATUS=0;
@@ -109,7 +109,7 @@ if(defined $LOCK_FILE) {
 } elsif(defined $CONFIG{lockfile}) {
   $LOCK_FILE=$CONFIG{lockfile};
 } else {
-  $LOCK_FILE="$HOME/duplicity-runner.pid";
+  $LOCK_FILE="$HOME/rdbduprunner.pid";
 }
 
 if(defined $EXCLUDE_PATH) {
@@ -117,7 +117,7 @@ if(defined $EXCLUDE_PATH) {
 } elsif(defined $CONFIG{excludepath}) {
   $EXCLUDE_PATH=$CONFIG{excludepath};
 } else {
-  $EXCLUDE_PATH='/etc/rdiff-backup';
+  $EXCLUDE_PATH='/etc/rdbduprunner-excludes';
 }
 
 foreach my $bstag (keys(%{$CONFIG{backupset}})) {
@@ -419,7 +419,7 @@ sub create_dispatcher {
   $DISPATCHER=Log::Dispatch->new;
   $DISPATCHER->add(Log::Dispatch::Syslog->new(name      => 'syslog',
 					      min_level => $LOG_LEVEL,
-					      ident     => 'duplicity-runner'.'['.$$.']',
+					      ident     => 'rdbduprunner'.'['.$$.']',
 					      facility  => $FACILITY,
 					      socket    => (`uname` =~ /Linux/ ?
 							    'unix' : 'inet'),
