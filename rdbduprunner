@@ -20,6 +20,7 @@ our $STATS=1;
 our $VERBOSITY;
 our $LOCALHOST;
 our $DUPLICITY_BINARY;
+our $RDIFF_BACKUP_BINARY;
 our $PATH;
 our $DEST;
 our $CONFIG_FILE="$HOME/.duplicity-runner.rc";
@@ -44,6 +45,7 @@ GetOptions('test!'          => \$TEST,
            'verbosity=i'    => \$VERBOSITY,
            'localhost=s'    => \$LOCALHOST,
            'duplicity-binary=s' => \$DUPLICITY_BINARY,
+           'rdiff-backup-binary=s' => \$RDIFF_BACKUP_BINARY,
            'path=s'         => \$PATH,
 	   'dest=s'         => \$DEST,
 	   'config=s'       => \$CONFIG_FILE, # config file
@@ -85,9 +87,13 @@ if(not defined $DUPLICITY_BINARY) {
 	$DUPLICITY_BINARY='duplicity'; # in our path we hope
     }
 }
-unless(-x $DUPLICITY_BINARY) {
-    critical("unable to execute $DUPLICITY_BINARY");
-    exit(1);
+
+if(not defined $RDIFF_BACKUP_BINARY) {
+    if(defined $CONFIG{rdiffbackupbinary}) {
+	$RDIFF_BACKUP_BINARY=$CONFIG{rdiffbackupbinary};
+    } else {
+	$RDIFF_BACKUP_BINARY='rdiff-backup'; # in our path we hope
+    }
 }
 
 unless(defined $VERBOSITY) { # from the command line
