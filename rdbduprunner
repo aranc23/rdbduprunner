@@ -330,7 +330,7 @@ if($STATUS) {
 		 $f);
 	}
 	# this is fugly:
-	push(@com,$$bh{path},$$bh{dest});
+	push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.'::'.$$bh{path}),$$bh{dest});
 
 	info(join(" ",@com));
 
