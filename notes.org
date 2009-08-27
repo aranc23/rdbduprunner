@@ -9,7 +9,8 @@
 ** DONE add back a --host option 
    CLOSED: [2009-08-27 Thu 14:39]
 ** TODO merge cleanup/tidy
-** TODO check for the parsing of a config file paramater to set the backup type of a backupdestination
+** DONE check for the parsing of a config file paramater to set the backup type of a backupdestination
+   CLOSED: [2009-08-27 Thu 14:41]
 ** TODO document all the config options in the sample .rc file
 
 
