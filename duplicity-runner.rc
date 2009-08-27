@@ -10,7 +10,7 @@ maxage 30D
 # we'll take this from the command line, or the config file, or the hostname command
 # LocalHost lazarus
 
-# maybe these should be per-destination, but for now they are global
+# maybe these should be per-destination, but for now they are global (actually, I fixed that, I think)
 #GPGPassPhrase CandelHex1
 #AWSAccessKeyID # your access key goes here
 #AWSSecretAccessKey # your super secret key goes here

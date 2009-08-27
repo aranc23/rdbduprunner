@@ -1,0 +1,33 @@
+* merge rdiff-backup-runner into duplicity-runner to create rdbduprunner
+** DONE add checking for both rdiff-backup and duplicity binaries
+   CLOSED: [2009-08-27 Thu 12:50]
+** DONE create an operations map
+   CLOSED: [2009-08-27 Thu 13:35]
+   should show the --option to use that function and the two related rdiff-backup and duplicity modes
+** do something sane with --verbosity and --terminal-verbosity
+** add back a --host option 
+** merge cleanup/tidy
+** check for the parsing of a config file paramater to set the backup type of a backupdestination
+
+| command line option  | rdiff-backup               | duplicity              | comments                                                                                                                                                         |
+|----------------------+----------------------------+------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| compare or verify    | --compare or --verify      | verify                 | not exactly the same thing, verify is more of an integrity check and --compare would be useful to see what's changed                                             |
+| list-oldest          | uses -l to build a list    |                        | no sane mapping                                                                                                                                                  |
+| status               | -l                         | destination-status     | mild mapping                                                                                                                                                     |
+| calculate-average    | calculate-average          |                        | no dup equiv.                                                                                                                                                    |
+| check                | check-destination-dir      | cleanup                | cleans up after a failed backup, in theory (requires --force for duplicity to actually remove files)                                                             |
+| cleanup/tidy         | -l and --remove-older-than | remove-older-than      | removes old backups, in rdiff-backup-runner cleanup() is run often to make room, in duplicity-runner tidy() is only called on demand via the command line option |
+| remove-oldest        | -l and --remove-older-than | none                   | uses the list of all increments to remove the oldest increment within the constraints  of --host, etc.  only applies to rdiff-backup                             |
+| stats                |                            | --nostats              | do or don't print stats at the end of a run, duplicity only                                                                                                      |
+| full                 |                            | --full                 | force a full backup, duplicity only                                                                                                                              |
+| maxage               | remove-older-than X        | remove-older-than X    | used by cleanup() in rdb and tidy() in dup                                                                                                                       |
+| maxinc               | remove-older-than func(X)  | remove-all-but-n-full? | in rdb it's calculated using the increment list, and in dup it /might/ map to all-but-n                                                                          |
+| path                 |                            |                        | limits backups acted on to those matching path                                                                                                                   |
+| host                 |                            |                        | not implemented in dup, all "hosts" are local                                                                                                                    |
+| dest                 |                            |                        | currently matches the tagnamething of the backupdestination, not the destination url/path                                                                        |
+| restore              | -r                         | restore                | not implemented in either one!                                                                                                                                   |
+| list-increment-sizes | --list-increment-sizes     |                        | not implented in rdb currently                                                                                                                                   |
+| list-current-files   | ?                          | list-current-files     | maybe useful but not sensible for rdb mostly                                                                                                                     |
+| verbosity            | verbosity                  | verbosity              | perfect mapping (more or less)                                                                                                                                   |
+| terminal-verbosity   | terminal-verbosity         |                        | doesn't exist in dup, dup doesn't write logs                                                                                                                     |
+|                      |                            |                        |                                                                                                                                                                  |
