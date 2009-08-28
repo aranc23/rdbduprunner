@@ -35,6 +35,7 @@ our $STATUS=0;
 our $TIDY=0;
 our $DUMP=0;
 our $MAXAGE;
+our $MAXINC;
 our $LOCK_FILE;
 our $LOG_LEVEL='info';
 our $FACILITY='user';
@@ -67,6 +68,7 @@ GetOptions('test!'          => \$TEST,
 	   'tidy'           => \$TIDY,
 	   'dump'           => \$DUMP,
 	   'maxage=s'       => \$MAXAGE,
+	   'maxinc=s'       => \$MAXINC,
 	   'lockfile=s'     => \$LOCK_FILE,
 	   'level=s'        => \$LOG_LEVEL,
 	   'facility=s'     => \$FACILITY,
@@ -225,8 +227,12 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         } elsif(not defined $$bh{maxage} and
                 defined $CONFIG{maxage}) {
             $$bh{maxage}=$CONFIG{maxage};
-        } else {
-            $$bh{maxage}='60D';
+        }
+        if(defined $MAXINC) {
+            $$bh{maxinc}=$MAXINC;
+        } elsif(not defined $$bh{maxinc} and
+                defined $CONFIG{maxinc}) {
+            $$bh{maxinc}=$CONFIG{maxinc};
         }
         # if this is defined in a backupset, allow that to override the global definition, if it exists
         foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey )))) {
@@ -422,22 +428,75 @@ sub unlock_pid_file {
 
 sub tidy {
     my $bh=$_[0];
-    my @com=($DUPLICITY_BINARY,
-	     'remove-older-than',
-	     $$bh{maxage},
-	     '--force');
-    push(@com,verbargs($bh),
-         $$bh{dest});
+    my $tag=$$bh{tag};
+    my @com;
+    if($$bh{btype} eq 'rdiff-backup') {
+      @com=($RDIFF_BACKUP_BINARY,
+            verbargs($bh),
+            '--force',
+            '--remove-older-than',
+           );
+      if(defined $$bh{maxinc} and not defined $$bh{increments}) {
+        list_increments($bh);
+      }
+      if(defined $$bh{maxinc}) {
+        if($$bh{maxinc} =~ /^\d+$/ and
+           @{$$bh{increments}} > $$bh{maxinc} ) {
+          # too many!
+          debug("$tag\t Incs: ".
+                scalar @{$$bh{increments}}.
+                "\t Max: ".$$bh{maxinc});
+          my $lastinc=(sort {$a <=> $b} (@{$$bh{increments}}))[$$bh{maxinc}-1];
+          debug("last time to keep for $tag: ".localtime($lastinc));
 
-    info(join(" ",@com));
-    unless($TEST) {
-	set_env($bh);
-	system(@com);
-	unless($? == 0) {
-	    error("unable to execute duplicity!");
-	}
+          my @icom=(@com,$lastinc);
+
+          push(@icom,$$bh{dest});
+          info(join(" ",@icom));
+          unless($TEST) {
+            system(@icom);
+            unless($? == 0) {
+              error("unable to execute rdiff-backup!");
+            }
+          }
+        }
+      }
+      if(defined $$bh{maxage} and
+         $$bh{maxage} =~ /^\d/) {
+
+        my @icom=(@com,$$bh{maxage});
+        push(@icom,$$bh{dest});
+
+        info(join(" ",@icom));
+        unless($TEST) {
+          system(@icom);
+          unless($? == 0) {
+            logentry('err',"unable to execute rdiff-backup!");
+          }
+        }
+      }
+    } else {
+      # must be duplicity
+      unless(defined $$bh{maxage}) {
+        next;
+      }
+      my @com=($DUPLICITY_BINARY,
+               'remove-older-than',
+               $$bh{maxage},
+               '--force');
+      push(@com,verbargs($bh),
+           $$bh{dest});
+
+      info(join(" ",@com));
+      unless($TEST) {
+        set_env($bh);
+        system(@com);
+        unless($? == 0) {
+          error("unable to execute duplicity!");
+        }
+      }
     }
-}
+  }
 
 sub debug {
   $DISPATCHER->debug(@_);
