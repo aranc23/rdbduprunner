@@ -462,11 +462,11 @@ sub backup_sort {
 sub lock_pid_file {
     unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
 	error("unable to open pid file: $LOCK_FILE for writing");
-	next;
+	die("unable to open pid file: $LOCK_FILE for writing");
     }
     unless(flock(LOCK,LOCK_EX|LOCK_NB)) {
 	error("unable to flock the pid file: $LOCK_FILE");
-	next;
+	die("unable to flock the pid file: $LOCK_FILE");
     }
     truncate(LOCK,0); # this shouldn't fail if we have the file opened and locked!
     print LOCK $$."\n"; # who really cares if this fails?
