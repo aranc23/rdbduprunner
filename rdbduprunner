@@ -139,7 +139,7 @@ if(defined $EXCLUDE_PATH) {
 } else {
   $EXCLUDE_PATH='/etc/rdbduprunner-excludes';
 }
-print Dumper \%CONFIG;
+
 foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my $bs=$CONFIG{backupset}{$bstag};
     my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
