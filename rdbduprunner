@@ -40,6 +40,7 @@ our $LOG_LEVEL='info';
 our $FACILITY='user';
 our $EXCLUDE_PATH;
 our $LISTOLDEST=0;
+our $REMOVE;
 
 # global variables
 our %CONFIG;
@@ -71,6 +72,7 @@ GetOptions('test!'          => \$TEST,
 	   'facility=s'     => \$FACILITY,
 	   'exclude-path=s' => \$EXCLUDE_PATH,
 	   'list-oldest'    => \$LISTOLDEST,
+       'remove-oldest'  => \$REMOVE,
           );
 
 if(not defined $LOCALHOST) {
@@ -271,6 +273,9 @@ if($STATUS) {
     foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
       print localtime($$ih{inctime}).' '.$$ih{bh}{dest}.' '.$$ih{tag}."\n";
     }
+  } elsif(defined $REMOVE) {
+    build_increment_list();
+    remove_oldest('any');
 } elsif($CLEANUP) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
     my @com;
@@ -571,5 +576,47 @@ sub list_increments {
       chomp $ln;
       $ln =~ /^(\d+)\sdirectory$/ or next;
       push(@{$$bp{increments}},$1);
+    }
+}
+sub remove_oldest {
+    my $backupdest=$_[0];
+
+    unless(@INCREMENTS > 0) {
+	build_increment_list();
+    }
+    foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
+	debug("remove_oldest: $$ih{inctime}");
+	if(defined $$ih{removed} and $$ih{removed}) {
+	    debug("cannot remove previously removed increment for $$ih{tag}");
+	    next;
+	}
+	if(scalar @{$$ih{bh}{increments}} == 1) {
+	    # cannot remove the only increment!
+	    debug("cannot remove only increment for $$ih{tag}");
+	    next;
+	}
+	unless($backupdest eq 'any' or
+	       $backupdest eq $$ih{bh}{backupdestination}) {
+	    debug("skipping because it isn't in the backupdestination we are looking for: $backupdest $$ih{bh}{backupdestination}");
+	    next;
+	}
+	my $t=$$ih{inctime};
+	my @com=($RDIFF_BACKUP_BINARY,
+             verbargs($$ih{bh}),
+		 '--remove-older-than',($t+1), # do I really need to add 1?
+		 $$ih{bh}{dest});
+	info(join(" ",@com));
+	unless($TEST) {
+	    system(@com);
+	    unless($? == 0) {
+		error("rdiff-backup did not exit cleanly!");
+		return 0;
+	    }
+	}
+	$$ih{removed}=1;
+#	print Dumper $BACKUPS{$$ih{tag}}{increments};
+	shift(@{$$ih{bh}{increments}});
+#	print Dumper $BACKUPS{$$ih{tag}}{increments};
+	return 1;
     }
 }

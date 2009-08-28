@@ -40,7 +40,8 @@
    CLOSED: [2009-08-27 Thu 15:28]
 ** DONE bring back list-oldest and whatever infrastructure that requires
    CLOSED: [2009-08-28 Fri 11:17]
-** TODO bring back remove-oldest
+** DONE bring back remove-oldest
+   CLOSED: [2009-08-28 Fri 11:31]
 ** TODO bring back calculate-average
 ** TODO add a compare/verify that works for both backup types
 ** TODO add a restore command
