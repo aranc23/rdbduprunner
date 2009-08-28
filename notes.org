@@ -38,5 +38,6 @@
    CLOSED: [2009-08-27 Thu 15:02]
 ** DONE create a combined check/cleanup command that does check-dest or cleanup appropriately
    CLOSED: [2009-08-27 Thu 15:28]
-** bring back list-oldest and whatever infrastructure that requires
+** DONE bring back list-oldest and whatever infrastructure that requires
+   CLOSED: [2009-08-28 Fri 11:17]
 
