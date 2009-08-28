@@ -57,4 +57,5 @@
 ** TODO there are numerous places where we assume the destination of a rdiff-backup type backup will be a local directory, that should be fixed
 ** TODO test (and probably fix) the increment listing/removing functions when there are no increments yet
 it's probable that it may choke and die if the rdiff-backup destination directories aren't there
-** make maxinc and maxage be settable in a BackupDestination block, not just in globally or in BackupSet
+** TODO make maxinc and maxage be settable in a BackupDestination block, not just in globally or in BackupSet
+** TODO fix all the path creation code to use File::Path or something standard
