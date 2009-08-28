@@ -40,4 +40,12 @@
    CLOSED: [2009-08-27 Thu 15:28]
 ** DONE bring back list-oldest and whatever infrastructure that requires
    CLOSED: [2009-08-28 Fri 11:17]
-
+** TODO bring back remove-oldest
+** TODO bring back calculate-average
+** TODO add a compare/verify that works for both backup types
+** TODO add a restore command
+** TODO add a list-increment-sizes for rdiff-backup
+** TODO add a list-current-files for duplicity
+** TODO re-organize the use directives
+** TODO re-organize the global variables
+** TODO re-organize the command line options
