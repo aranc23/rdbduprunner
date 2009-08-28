@@ -139,7 +139,7 @@ if(defined $EXCLUDE_PATH) {
 } else {
   $EXCLUDE_PATH='/etc/rdbduprunner-excludes';
 }
-
+print Dumper \%CONFIG;
 foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my $bs=$CONFIG{backupset}{$bstag};
     my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
@@ -478,7 +478,8 @@ sub tidy {
     } else {
       # must be duplicity
       unless(defined $$bh{maxage}) {
-        next;
+        debug("max age is not defined for $$bh{tag}, so we cannot tidy it");
+        return;
       }
       my @com=($DUPLICITY_BINARY,
                'remove-older-than',
