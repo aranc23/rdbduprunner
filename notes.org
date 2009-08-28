@@ -4,19 +4,6 @@
 ** DONE create an operations map
    CLOSED: [2009-08-27 Thu 13:35]
    should show the --option to use that function and the two related rdiff-backup and duplicity modes
-** DONE do something sane with --verbosity and --terminal-verbosity
-   CLOSED: [2009-08-27 Thu 14:25]
-** DONE add back a --host option 
-   CLOSED: [2009-08-27 Thu 14:39]
-** TODO merge cleanup/tidy
-** DONE check for the parsing of a config file paramater to set the backup type of a backupdestination
-   CLOSED: [2009-08-27 Thu 14:41]
-** TODO document all the config options in the sample .rc file
-** DONE fix the main "backup" section of the program to do both rdiff-backup and duplicity backups
-   CLOSED: [2009-08-27 Thu 15:02]
-** DONE create a combined check/cleanup command that does check-dest or cleanup appropriately
-   CLOSED: [2009-08-27 Thu 15:28]
-
 | command line option  | rdiff-backup               | duplicity              | comments                                                                                                                                                         |
 |----------------------+----------------------------+------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | compare or verify    | --compare or --verify      | verify                 | not exactly the same thing, verify is more of an integrity check and --compare would be useful to see what's changed                                             |
@@ -39,3 +26,17 @@
 | verbosity            | verbosity                  | verbosity              | perfect mapping (more or less)                                                                                                                                   |
 | terminal-verbosity   | terminal-verbosity         |                        | doesn't exist in dup, dup doesn't write logs                                                                                                                     |
 |                      |                            |                        |                                                                                                                                                                  |
+** DONE do something sane with --verbosity and --terminal-verbosity
+   CLOSED: [2009-08-27 Thu 14:25]
+** DONE add back a --host option 
+   CLOSED: [2009-08-27 Thu 14:39]
+** TODO merge cleanup/tidy
+** DONE check for the parsing of a config file paramater to set the backup type of a backupdestination
+   CLOSED: [2009-08-27 Thu 14:41]
+** TODO document all the config options in the sample .rc file
+** DONE fix the main "backup" section of the program to do both rdiff-backup and duplicity backups
+   CLOSED: [2009-08-27 Thu 15:02]
+** DONE create a combined check/cleanup command that does check-dest or cleanup appropriately
+   CLOSED: [2009-08-27 Thu 15:28]
+** bring back list-oldest and whatever infrastructure that requires
+
