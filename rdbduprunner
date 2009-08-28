@@ -278,172 +278,171 @@ if($DUMP) {
 
 if($STATUS) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
-
-	my @com=($DUPLICITY_BINARY,'collection-status');
-    push(@com,verbargs($bh),
-         $$bh{dest});
-	info(join(" ",@com));
-	unless($TEST) {
-	    lock_pid_file();
-	    set_env($bh);
-	    system(@com);
-	    unless($? == 0) {
-		error("unable to execute duplicity!");
-	    }
-	    unlock_pid_file();
-	}
+        my @com=($DUPLICITY_BINARY,'collection-status');
+        push(@com,verbargs($bh),
+             $$bh{dest});
+        info(join(" ",@com));
+        unless($TEST) {
+            lock_pid_file();
+            set_env($bh);
+            system(@com);
+            unless($? == 0) {
+                error("unable to execute duplicity!");
+            }
+            unlock_pid_file();
+        }
     }
-  } elsif($LISTOLDEST) {
+} elsif($LISTOLDEST) {
     build_increment_list();
     foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
-      print localtime($$ih{inctime}).' '.$$ih{bh}{dest}.' '.$$ih{tag}."\n";
+        print localtime($$ih{inctime}).' '.$$ih{bh}{dest}.' '.$$ih{tag}."\n";
     }
-  } elsif(defined $REMOVE) {
+} elsif(defined $REMOVE) {
     build_increment_list();
     remove_oldest('any');
 } elsif($CLEANUP) {
-  foreach my $bh (sort backup_sort (@BACKUPS)) {
-    my @com;
-    if($$bh{btype} eq 'duplicity') {
-      push(@com,$DUPLICITY_BINARY,'cleanup');
-      if($FORCE) {
-        push(@com,'--force');
-      }
-    } else {
-      push(@com,$RDIFF_BACKUP_BINARY,'--check-destination-dir');
+    foreach my $bh (sort backup_sort (@BACKUPS)) {
+        my @com;
+        if($$bh{btype} eq 'duplicity') {
+            push(@com,$DUPLICITY_BINARY,'cleanup');
+            if($FORCE) {
+                push(@com,'--force');
+            }
+        } else {
+            push(@com,$RDIFF_BACKUP_BINARY,'--check-destination-dir');
+        }
+        push(@com,verbargs($bh),
+             $$bh{dest});
+        info(join(" ",@com));
+        unless($TEST) {
+            lock_pid_file();
+            set_env($bh);
+            system(@com);
+            unless($? == 0) {
+                error("unable to execute $$bh{btype}!");
+            }
+            unlock_pid_file();
+        }
     }
-    push(@com,verbargs($bh),
-         $$bh{dest});
-	info(join(" ",@com));
-	unless($TEST) {
-      lock_pid_file();
-      set_env($bh);
-      system(@com);
-      unless($? == 0) {
-		error("unable to execute $$bh{btype}!");
-      }
-      unlock_pid_file();
-	}
-  }
 } elsif ($TIDY) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
-	tidy($bh);
+        tidy($bh);
     }
-  } elsif($AVERAGE) {
+} elsif($AVERAGE) {
     my $avcom="$RDIFF_BACKUP_BINARY --calculate-average";
     foreach my $bh (sort backup_sort (@BACKUPS)) {
-      unless($$bh{btype} eq 'rdiff-backup') {
-        next;
-      }
-      $avcom.=" $$bh{dest}/rdiff-backup-data/session_statistics.*.data";
+        unless($$bh{btype} eq 'rdiff-backup') {
+            next;
+        }
+        $avcom.=" $$bh{dest}/rdiff-backup-data/session_statistics.*.data";
     }
     exec($avcom);
 } else { # actually do a backup, please
   BACKUP:
     foreach my $bh (sort backup_sort (@BACKUPS)) {
-      my @com;
-	if($$bh{disabled}) {
-	    # skip disabled backups
-	    next;
-	}
-
-	if($$bh{btype} eq 'duplicity' and not -d $$bh{path}) {
-	  warning("backup path $$bh{path} does not exist for $$bh{tag}: skipping this backup");
-	  next BACKUP;
-	}
-
-	if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
-      # I guess this is a way to mark a backupdestination as unavailable
-      next BACKUP;
-	}
-
-      if($$bh{btype} eq 'duplicity') {
-        @com=($DUPLICITY_BINARY);
-        $FULL and push(@com,'full');
-        if(defined $$bh{signkey}) {
-          push(@com,'--sign-key',$$bh{signkey});
+        my @com;
+        if($$bh{disabled}) {
+            # skip disabled backups
+            next;
         }
-        if(defined $$bh{encryptkey}) {
-          push(@com,'--encrypt-key',$$bh{encryptkey});
-        }
-        unless($STATS) {
-          push(@com,'--no-print-statistics');
-        }
-      } else { # must be rdiff-backup
-        @com=($RDIFF_BACKUP_BINARY,
-              '--exclude-special-files',
-             );
-        unless($$bh{sshcompress}) {
-          push(@com,'--ssh-no-compression');
-        }
-        if($STATS) {
-          push(@com,'--print-statistics');
-        }
-      }
-    push(@com,verbargs($bh),
-         '--exclude-other-filesystems');
 
-	foreach my $f (@{$$bh{excludes}}) {
-	    push(@com,'--exclude-globbing-filelist',
-		 $f);
-	}
-	# this is fugly:
-	push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.'::'.$$bh{path}),$$bh{dest});
-
-      if($$bh{btype} eq 'rdiff-backup') {
-        while(1) {
-          my $ans=check_space($$bh{backupdestination});
-          if($ans == -1) {
-            error("unable to determine if this backupdestination ($$bh{backupdestination}) has enough free space");
-            error("no backups to this backupdestination will be attempted and this message will be repeated only once");
-            $CONFIG{$$bh{backupdestination}}{busted}=1;
+        if($$bh{btype} eq 'duplicity' and not -d $$bh{path}) {
+            warning("backup path $$bh{path} does not exist for $$bh{tag}: skipping this backup");
             next BACKUP;
-          } elsif($ans == 0) {
-            unless(remove_oldest($$bh{backupdestination})) {
-              # we failed to remove an increment from the backupdestination
-              # we cannot do backups on this bd for this run!
-              warning("unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
-              warning("no further attempts will be made to do backups to this destination");
-              $CONFIG{$$bh{backupdestination}}{busted}=1;
-              next BACKUP;
+        }
+
+        if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
+            # I guess this is a way to mark a backupdestination as unavailable
+            next BACKUP;
+        }
+
+        if($$bh{btype} eq 'duplicity') {
+            @com=($DUPLICITY_BINARY);
+            $FULL and push(@com,'full');
+            if(defined $$bh{signkey}) {
+                push(@com,'--sign-key',$$bh{signkey});
             }
-            # we can just fall out now and let check_space() run again to see if it helped
-          } elsif($ans == 1) {
-            # we have enough space to proceed
-            last;
-          }
-	    }
-      }
+            if(defined $$bh{encryptkey}) {
+                push(@com,'--encrypt-key',$$bh{encryptkey});
+            }
+            unless($STATS) {
+                push(@com,'--no-print-statistics');
+            }
+        } else { # must be rdiff-backup
+            @com=($RDIFF_BACKUP_BINARY,
+                  '--exclude-special-files',
+                );
+            unless($$bh{sshcompress}) {
+                push(@com,'--ssh-no-compression');
+            }
+            if($STATS) {
+                push(@com,'--print-statistics');
+            }
+        }
+        push(@com,verbargs($bh),
+             '--exclude-other-filesystems');
 
-	info(join(" ",@com));
+        foreach my $f (@{$$bh{excludes}}) {
+            push(@com,'--exclude-globbing-filelist',
+                 $f);
+        }
+        # this is fugly:
+        push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.'::'.$$bh{path}),$$bh{dest});
 
-	unless($TEST) {
-	    lock_pid_file();
+        if($$bh{btype} eq 'rdiff-backup') {
+            while(1) {
+                my $ans=check_space($$bh{backupdestination});
+                if($ans == -1) {
+                    error("unable to determine if this backupdestination ($$bh{backupdestination}) has enough free space");
+                    error("no backups to this backupdestination will be attempted and this message will be repeated only once");
+                    $CONFIG{$$bh{backupdestination}}{busted}=1;
+                    next BACKUP;
+                } elsif($ans == 0) {
+                    unless(remove_oldest($$bh{backupdestination})) {
+                        # we failed to remove an increment from the backupdestination
+                        # we cannot do backups on this bd for this run!
+                        warning("unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
+                        warning("no further attempts will be made to do backups to this destination");
+                        $CONFIG{$$bh{backupdestination}}{busted}=1;
+                        next BACKUP;
+                    }
+                    # we can just fall out now and let check_space() run again to see if it helped
+                } elsif($ans == 1) {
+                    # we have enough space to proceed
+                    last;
+                }
+            }
+        }
 
-	    if (defined $$bh{prerun}) {
-		print $$bh{prerun}."\n";
-		set_env($bh);
-		system($$bh{prerun});
-		unless($? == 0) {
-		    error("unable to execute prerun command: skipping backup!");
-		    next;
-		}
-	    }
-	    set_env($bh);
-	    system(@com);
-	    my $mainret=$?;
-	    unless($mainret == 0) {
-		error("unable to execute $$bh{btype}!");
-	    }
-	    if(defined $$bh{postrun}) {
-		print $$bh{postrun}."\n";
-		system($$bh{postrun});
-		unless($? == 0) {
-		    error("unable to execute postrun command");
-		}
-		unlock_pid_file();
-	    }
-	}
+        info(join(" ",@com));
+
+        unless($TEST) {
+            lock_pid_file();
+
+            if (defined $$bh{prerun}) {
+                print $$bh{prerun}."\n";
+                set_env($bh);
+                system($$bh{prerun});
+                unless($? == 0) {
+                    error("unable to execute prerun command: skipping backup!");
+                    next;
+                }
+            }
+            set_env($bh);
+            system(@com);
+            my $mainret=$?;
+            unless($mainret == 0) {
+                error("unable to execute $$bh{btype}!");
+            }
+            if(defined $$bh{postrun}) {
+                print $$bh{postrun}."\n";
+                system($$bh{postrun});
+                unless($? == 0) {
+                    error("unable to execute postrun command");
+                }
+                unlock_pid_file();
+            }
+        }
     }
 }
 
