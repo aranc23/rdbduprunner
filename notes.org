@@ -51,4 +51,9 @@
 ** TODO re-organize the use directives
 ** TODO re-organize the global variables
 ** TODO re-organize the command line options
-** TODO fix disk-space based auto-removal for rdiff-backup types
+** DONE fix disk-space based auto-removal for rdiff-backup types
+   CLOSED: [2009-08-28 Fri 12:27]
+** TODO there are numerous places where we assume the destination of a rdiff-backup type backup will be a local directory, that should be fixed
+** TODO test (and probably fix) the increment listing/removing functions when there are no increments yet
+it's probable that it may choke and die if the rdiff-backup destination directories aren't there
+

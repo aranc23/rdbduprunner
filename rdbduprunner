@@ -341,7 +341,7 @@ if($STATUS) {
         unless($STATS) {
           push(@com,'--no-print-statistics');
         }
-      } else {
+      } else { # must be rdiff-backup
         @com=($RDIFF_BACKUP_BINARY,
               '--exclude-special-files',
              );
@@ -361,6 +361,31 @@ if($STATUS) {
 	}
 	# this is fugly:
 	push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.'::'.$$bh{path}),$$bh{dest});
+
+      if($$bh{btype} eq 'rdiff-backup') {
+        while(1) {
+          my $ans=check_space($$bh{backupdestination});
+          if($ans == -1) {
+            error("unable to determine if this backupdestination ($$bh{backupdestination}) has enough free space");
+            error("no backups to this backupdestination will be attempted and this message will be repeated only once");
+            $CONFIG{$$bh{backupdestination}}{busted}=1;
+            next BACKUP;
+          } elsif($ans == 0) {
+            unless(remove_oldest($$bh{backupdestination})) {
+              # we failed to remove an increment from the backupdestination
+              # we cannot do backups on this bd for this run!
+              warning("unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
+              warning("no further attempts will be made to do backups to this destination");
+              $CONFIG{$$bh{backupdestination}}{busted}=1;
+              next BACKUP;
+            }
+            # we can just fall out now and let check_space() run again to see if it helped
+          } elsif($ans == 1) {
+            # we have enough space to proceed
+            last;
+          }
+	    }
+      }
 
 	info(join(" ",@com));
 
@@ -638,6 +663,7 @@ sub list_increments {
       push(@{$$bp{increments}},$1);
     }
 }
+
 sub remove_oldest {
     my $backupdest=$_[0];
 
@@ -679,4 +705,36 @@ sub remove_oldest {
 #	print Dumper $BACKUPS{$$ih{tag}}{increments};
 	return 1;
     }
+}
+
+sub check_space {
+    my $bh=$CONFIG{backupdestination}{$_[0]};
+    update_bd_space($bh) or return -1;    
+    if(defined $$bh{minfree} and $$bh{avail} < $$bh{minfree}) {
+	return 0;
+    } elsif(defined $$bh{percentused} and $$bh{percent} > $$bh{percentused}) {
+	return 0;
+    }
+    return 1;
+}
+
+sub update_bd_space {
+    my $bh=$_[0];
+    my $com="df -vP $$bh{path}";
+    my @a=`$com`;
+    unless($? == 0) {
+	error("unable to run \"$com\": no further backups will be attempted to this directory");
+	$$bh{busted}=1;
+	return 0;
+    }
+    unless($a[1] =~ /(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\%/) {
+	error("unable to parse output from \"$com\": no further backups will be attempted to this directory");
+	$$bh{busted}=1;
+	return 0;
+    }
+    $$bh{size}=$1;
+    $$bh{used}=$2;
+    $$bh{avail}=$3;
+    $$bh{percent}=$4;
+    return 1;
 }
