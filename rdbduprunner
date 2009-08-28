@@ -3,46 +3,53 @@
 
 use strict;
 use warnings;
+
+#from a standard perl distribution, on UNIX at least
 use Getopt::Long;
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Env qw( HOME );
-use Config::General;
 use Data::Dumper;
+use POSIX qw( strftime );
+
+# added from CPAN or system packages
+use Config::General;
 use Log::Dispatch;
 use Log::Dispatch::Syslog;
 use Log::Dispatch::Screen;
-use POSIX qw( strftime );
 
-# staticly defined
+# can be overridden from the command line, but not the config
+our $CONFIG_FILE="$HOME/.rdbduprunner.rc";
 
-# all of these are overridden via the command line
-our $TEST=1;
+# these are command line options, and in some cases config file options
+# the following changes the major mode of operation for rdbduprunner:
+our $AVERAGE;
+our $CLEANUP=0;
+our $DUMP=0;
+our $LISTOLDEST=0;
+our $REMOVE;
+our $STATUS=0;
+our $TIDY=0;
+# the following affect what options are passed to rdiff-backup and/or duplicity
+our $FORCE=0;
+our $FULL=0;
+our $MAXAGE;
+our $MAXINC;
 our $STATS=1;
 our $VERBOSITY;
 our $TVERBOSITY;
-our $LOCALHOST;
-our $DUPLICITY_BINARY;
-our $RDIFF_BACKUP_BINARY;
 # the next three options limit which backups get acted upon
-our $PATH;
 our $DEST;
 our $HOST;
-our $FORCE=0;
-our $CONFIG_FILE="$HOME/.rdbduprunner.rc";
-our $CLEANUP=0;
-our $FULL=0;
-our $STATUS=0;
-our $TIDY=0;
-our $DUMP=0;
-our $MAXAGE;
-our $MAXINC;
-our $LOCK_FILE;
-our $LOG_LEVEL='info';
-our $FACILITY='user';
+our $PATH;
+# configuring rdbduprunner:
+our $DUPLICITY_BINARY;
+our $RDIFF_BACKUP_BINARY;
 our $EXCLUDE_PATH;
-our $LISTOLDEST=0;
-our $REMOVE;
-our $AVERAGE;
+our $FACILITY='user';
+our $LOG_LEVEL='info';
+our $LOCALHOST;
+our $LOCK_FILE;
+our $TEST=1;
 
 # global variables
 our %CONFIG;
@@ -50,33 +57,43 @@ our @BACKUPS;
 our $DISPATCHER;
 our @INCREMENTS;
 
-GetOptions('test!'          => \$TEST,
-	   'stats!'         => \$STATS,
-           'verbosity=i'    => \$VERBOSITY,
+GetOptions(
+           # can be overridden from the command line, but not the config
+           'config=s'       => \$CONFIG_FILE, # config file
+
+           # the following changes the major mode of operation for rdbduprunner:
+           'calculate-average'      => \$AVERAGE,
+           'cleanup'                => \$CLEANUP,
+           'check'                  => \$CLEANUP,
+           'dump'                   => \$DUMP,
+           'list-oldest'            => \$LISTOLDEST,
+           'remove-oldest'          => \$REMOVE,
+           'status'                 => \$STATUS,
+           'tidy'                   => \$TIDY,
+
+           # the following affect what options are passed to rdiff-backup and/or duplicity
+           'force!'                 => \$FORCE,
+           'full'                   => \$FULL,
+           'maxage=s'               => \$MAXAGE,
+           'maxinc=s'               => \$MAXINC,
+           'stats!'                 => \$STATS,
+           'verbosity=i'            => \$VERBOSITY,
            'v|terminal-verbosity=i' => \$TVERBOSITY,
-           'localhost=s'    => \$LOCALHOST,
-           'duplicity-binary=s' => \$DUPLICITY_BINARY,
-           'rdiff-backup-binary=s' => \$RDIFF_BACKUP_BINARY,
-           'path=s'                => \$PATH,
-           'dest=s'                => \$DEST,
-           'host=s'                => \$HOST,
-           'force!'                => \$FORCE,
-	   'config=s'       => \$CONFIG_FILE, # config file
-	   'cleanup'        => \$CLEANUP,
-       'check'          => \$CLEANUP,
-	   'full'           => \$FULL,
-	   'status'         => \$STATUS,
-	   'tidy'           => \$TIDY,
-	   'dump'           => \$DUMP,
-	   'maxage=s'       => \$MAXAGE,
-	   'maxinc=s'       => \$MAXINC,
-	   'lockfile=s'     => \$LOCK_FILE,
-	   'level=s'        => \$LOG_LEVEL,
-	   'facility=s'     => \$FACILITY,
-	   'exclude-path=s' => \$EXCLUDE_PATH,
-	   'list-oldest'    => \$LISTOLDEST,
-       'remove-oldest'  => \$REMOVE,
-           'calculate-average' => \$AVERAGE,
+
+           # the next three options limit which backups get acted upon
+           'dest=s'                 => \$DEST,
+           'host=s'                 => \$HOST,
+           'path=s'                 => \$PATH,
+
+           # configuring rdbduprunner:
+           'duplicity-binary=s'     => \$DUPLICITY_BINARY,
+           'rdiff-backup-binary=s'  => \$RDIFF_BACKUP_BINARY,
+           'exclude-path=s'         => \$EXCLUDE_PATH,
+           'facility=s'             => \$FACILITY,
+           'level=s'                => \$LOG_LEVEL,
+           'localhost=s'            => \$LOCALHOST,
+           'lockfile=s'             => \$LOCK_FILE,
+           'test!'                  => \$TEST,
           );
 
 if(not defined $LOCALHOST) {

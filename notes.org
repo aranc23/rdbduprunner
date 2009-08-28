@@ -49,9 +49,12 @@
 ** TODO add a restore command
 ** TODO add a list-increment-sizes for rdiff-backup
 ** TODO add a list-current-files for duplicity
-** TODO re-organize the use directives
-** TODO re-organize the global variables
-** TODO re-organize the command line options
+** DONE re-organize the use directives
+   CLOSED: [2009-08-28 Fri 14:50]
+** DONE re-organize the global variables
+   CLOSED: [2009-08-28 Fri 14:49]
+** DONE re-organize the command line options
+   CLOSED: [2009-08-28 Fri 14:49]
 ** DONE fix disk-space based auto-removal for rdiff-backup types
    CLOSED: [2009-08-28 Fri 12:27]
 ** TODO there are numerous places where we assume the destination of a rdiff-backup type backup will be a local directory, that should be fixed
