@@ -22,11 +22,12 @@ our $CONFIG_FILE="$HOME/.rdbduprunner.rc";
 
 # these are command line options, and in some cases config file options
 # the following changes the major mode of operation for rdbduprunner:
-our $AVERAGE;
+our $AVERAGE=0;
 our $CLEANUP=0;
+our $COMPARE=0;
 our $DUMP=0;
 our $LISTOLDEST=0;
-our $REMOVE;
+our $REMOVE=0;
 our $STATUS=0;
 our $TIDY=0;
 # the following affect what options are passed to rdiff-backup and/or duplicity
@@ -65,6 +66,8 @@ GetOptions(
            'calculate-average'      => \$AVERAGE,
            'cleanup'                => \$CLEANUP,
            'check'                  => \$CLEANUP,
+	   'compare'                => \$COMPARE,
+           'verify'                 => \$COMPARE,
            'dump'                   => \$DUMP,
            'list-oldest'            => \$LISTOLDEST,
            'remove-oldest'          => \$REMOVE,
@@ -297,7 +300,7 @@ if($STATUS) {
     foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
         print localtime($$ih{inctime}).' '.$$ih{bh}{dest}.' '.$$ih{tag}."\n";
     }
-} elsif(defined $REMOVE) {
+} elsif($REMOVE) {
     build_increment_list();
     remove_oldest('any');
 } elsif($CLEANUP) {
@@ -337,7 +340,41 @@ if($STATUS) {
         $avcom.=" $$bh{dest}/rdiff-backup-data/session_statistics.*.data";
     }
     exec($avcom);
-} else { # actually do a backup, please
+} elsif($COMPARE) {
+  foreach my $bh (sort backup_sort (@BACKUPS)) {
+    my @com;
+    if ($$bh{btype} eq 'duplicity') {
+      @com=($DUPLICITY_BINARY,'verify');
+    } else {
+      @com=($RDIFF_BACKUP_BINARY,'--compare');
+    }
+    push(@com,verbargs($bh),'--exclude-other-filesystems');
+    foreach my $f (@{$$bh{excludes}}) {
+      push(@com,'--exclude-globbing-filelist',
+	   $f);
+    }
+    if ($$bh{btype} eq 'duplicity') {
+      push(@com,$$bh{dest},$$bh{path});
+    } else {
+      unless($$bh{sshcompress}) {
+	push(@com,'--ssh-no-compression');
+      }
+      push(@com,'--exclude-special-files',($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.'::'.$$bh{path}),$$bh{dest});
+    }
+	
+    info(join(" ",@com));
+    unless($TEST) {
+      lock_pid_file();
+      set_env($bh);
+      system(@com);
+      my $mainret=$?;
+      unless($mainret == 0) {
+	error("$$bh{btype} exited with an error");
+      }
+      unlock_pid_file();
+    }
+  }
+} else {			# actually do a backup, please
   BACKUP:
     foreach my $bh (sort backup_sort (@BACKUPS)) {
         my @com;

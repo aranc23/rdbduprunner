@@ -6,7 +6,8 @@
    should show the --option to use that function and the two related rdiff-backup and duplicity modes
 | command line option  | rdiff-backup               | duplicity              | comments                                                                                                                                                         |
 |----------------------+----------------------------+------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| compare or verify    | --compare or --verify      | verify                 | not exactly the same thing, verify is more of an integrity check and --compare would be useful to see what's changed                                             |
+| compare              | --compare                  | verify                 | --compare and verify seem to be useful to tell you what's changed, and what would therefore be backed up
+| verify               | --verify                   |                        | rdiff-backup's --verify is a check on the sha sums in a backup directory                                                                                         |
 | list-oldest          | uses -l to build a list    |                        | no sane mapping                                                                                                                                                  |
 | status               | -l                         | destination-status     | mild mapping                                                                                                                                                     |
 | calculate-average    | calculate-average          |                        | no dup equiv.                                                                                                                                                    |
@@ -45,7 +46,12 @@
    CLOSED: [2009-08-28 Fri 11:31]
 ** DONE bring back calculate-average
    CLOSED: [2009-08-28 Fri 12:48]
-** TODO add a compare/verify that works for both backup types
+** DONE add a compare/verify that works for both backup types
+   CLOSED: [2009-08-28 Fri 16:54]
+   it seems that rdiff-backup's --verify option is pretty low-level, and that --compare is closer to duplicity's verify command
+*** DONE pass the exclude files to the compare invocation of rdiff-backup and duplicity
+    CLOSED: [2009-08-28 Fri 16:53]
+--compare and probably verify as well need the names of the exclude files, just like a regular backup
 ** TODO add a restore command
 ** TODO add a list-increment-sizes for rdiff-backup
 ** TODO add a list-current-files for duplicity
@@ -62,3 +68,6 @@
 it's probable that it may choke and die if the rdiff-backup destination directories aren't there
 ** TODO make maxinc and maxage be settable in a BackupDestination block, not just in globally or in BackupSet
 ** TODO fix all the path creation code to use File::Path or something standard
+** TODO revisit the use of --exclude-special-files, it's seems too broad and probably isn't what I want
+   it has the option to exclude just fifos, device files and symlinks and I think I would really want to backup symlinks at least!
+** TODO determine if the --ssh-no-compression option is really something I want to pass by default
