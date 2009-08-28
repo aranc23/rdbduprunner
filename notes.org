@@ -43,7 +43,8 @@
    CLOSED: [2009-08-28 Fri 11:17]
 ** DONE bring back remove-oldest
    CLOSED: [2009-08-28 Fri 11:31]
-** TODO bring back calculate-average
+** DONE bring back calculate-average
+   CLOSED: [2009-08-28 Fri 12:48]
 ** TODO add a compare/verify that works for both backup types
 ** TODO add a restore command
 ** TODO add a list-increment-sizes for rdiff-backup
@@ -56,4 +57,4 @@
 ** TODO there are numerous places where we assume the destination of a rdiff-backup type backup will be a local directory, that should be fixed
 ** TODO test (and probably fix) the increment listing/removing functions when there are no increments yet
 it's probable that it may choke and die if the rdiff-backup destination directories aren't there
-
+** make maxinc and maxage be settable in a BackupDestination block, not just in globally or in BackupSet

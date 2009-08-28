@@ -42,6 +42,7 @@ our $FACILITY='user';
 our $EXCLUDE_PATH;
 our $LISTOLDEST=0;
 our $REMOVE;
+our $AVERAGE;
 
 # global variables
 our %CONFIG;
@@ -75,6 +76,7 @@ GetOptions('test!'          => \$TEST,
 	   'exclude-path=s' => \$EXCLUDE_PATH,
 	   'list-oldest'    => \$LISTOLDEST,
        'remove-oldest'  => \$REMOVE,
+           'calculate-average' => \$AVERAGE,
           );
 
 if(not defined $LOCALHOST) {
@@ -310,6 +312,15 @@ if($STATUS) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
 	tidy($bh);
     }
+  } elsif($AVERAGE) {
+    my $avcom="$RDIFF_BACKUP_BINARY --calculate-average";
+    foreach my $bh (sort backup_sort (@BACKUPS)) {
+      unless($$bh{btype} eq 'rdiff-backup') {
+        next;
+      }
+      $avcom.=" $$bh{dest}/rdiff-backup-data/session_statistics.*.data";
+    }
+    exec($avcom);
 } else { # actually do a backup, please
   BACKUP:
     foreach my $bh (sort backup_sort (@BACKUPS)) {
