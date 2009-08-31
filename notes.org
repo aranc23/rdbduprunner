@@ -108,3 +108,5 @@ it's probable that it may choke and die if the rdiff-backup destination director
 
 
    
+** TODO in no case is tidy called automatically, maybe add AutoTidy as an option?
+** TODO --status is not implemented for rdiff-backup type and will call duplicity in stead

@@ -427,6 +427,9 @@ if($STATUS) {
         push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.'::'.$$bh{path}),$$bh{dest});
 
         if($$bh{btype} eq 'rdiff-backup') {
+	  if($$bh{dest} =~ /\:\:/) {
+	    info("we are assuming the destination $$bh{dest} is remote and will not attempt to manage it's disk space");
+	  } else {
             while(1) {
                 my $ans=check_space($$bh{backupdestination});
                 if($ans == -1) {
@@ -448,7 +451,8 @@ if($STATUS) {
                     # we have enough space to proceed
                     last;
                 }
-            }
+	      }
+	  }
         }
 
         info(join(" ",@com));
