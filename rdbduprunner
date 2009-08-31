@@ -80,8 +80,8 @@ GetOptions(
            'maxage=s'               => \$MAXAGE,
            'maxinc=s'               => \$MAXINC,
            'stats!'                 => \$STATS,
-           'verbosity=i'            => \$VERBOSITY,
-           'v|terminal-verbosity=i' => \$TVERBOSITY,
+           'v|verbosity=i'          => \$VERBOSITY,
+           't|terminal-verbosity=i' => \$TVERBOSITY,
 
            # the next three options limit which backups get acted upon
            'dest=s'                 => \$DEST,
