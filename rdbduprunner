@@ -359,7 +359,7 @@ if($STATUS) {
       unless($$bh{sshcompress}) {
 	push(@com,'--ssh-no-compression');
       }
-      push(@com,'--exclude-special-files',($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.'::'.$$bh{path}),$$bh{dest});
+      push(@com,'--exclude-device-files',($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.'::'.$$bh{path}),$$bh{dest});
     }
 	
     info(join(" ",@com));
@@ -407,7 +407,7 @@ if($STATUS) {
             }
         } else { # must be rdiff-backup
             @com=($RDIFF_BACKUP_BINARY,
-                  '--exclude-special-files',
+                  '--exclude-device-files',
                 );
             unless($$bh{sshcompress}) {
                 push(@com,'--ssh-no-compression');

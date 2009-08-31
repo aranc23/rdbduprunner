@@ -70,6 +70,7 @@ it's probable that it may choke and die if the rdiff-backup destination director
 ** TODO fix all the path creation code to use File::Path or something standard
 ** TODO revisit the use of --exclude-special-files, it's seems too broad and probably isn't what I want
    it has the option to exclude just fifos, device files and symlinks and I think I would really want to backup symlinks at least!
+   *** I have changed exclude-special-files to exclude-device-files, I guess that makes more sense
 ** TODO determine if the --ssh-no-compression option is really something I want to pass by default
 ** TODO write some documentation, possibly in pod?
    | command line option   | config file option | global variable or key | comments                                                                                                              |
