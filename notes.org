@@ -71,3 +71,39 @@ it's probable that it may choke and die if the rdiff-backup destination director
 ** TODO revisit the use of --exclude-special-files, it's seems too broad and probably isn't what I want
    it has the option to exclude just fifos, device files and symlinks and I think I would really want to backup symlinks at least!
 ** TODO determine if the --ssh-no-compression option is really something I want to pass by default
+** TODO write some documentation, possibly in pod?
+   | command line option   | config file option | global variable or key | comments                                                                                                              |
+   | --config-file         | none               | $CONFIG_FILE           | can't be set in the config file for obvious reasons                                                                   |
+   | --maxage              | MaxAge             | $MAXAGE maxage         | used to remove old backups                                                                                            |
+   | --maxinc              | MaxInc             | $MAXINC maxinc         | used to remove old backups                                                                                            |
+   | --verbosity           | Verbosity          | $VERBOSITY             | if set, will be used by both programs                                                                                 |
+   | --terminal-verbosity  | TerminalVerbosity  | $TVERBOSITY            | used only by rdiff-backup                                                                                             |
+   | --duplicity-binary    | DuplicityBinary    | $DUPLICITY_BINARY      | path to the binary                                                                                                    |
+   | --rdiff-backup-binary | RdiffBackupBinary  | $RDIFF_BACKUP_BINARY   | path to the binary                                                                                                    |
+   | --exclude-path        | ExcludePath        | $EXCLUDE_PATH          | where to look for exclude files                                                                                       |
+   | --facility            | Facility           | $FACILITY              | what syslog facility to use GLOBAL                                                                                    |
+   | --level               | Level              | $LOG_LEVEL             | used to limit what's actually output GLOBAL                                                                           |
+   | --localhost           | Localhost          | $LOCALHOST             | override the LOCALHOST?  not sure why I thought that would be useful                                                  |
+   |                       | GPGPassPhrase      | gpgpassphrase          |                                                                                                                       |
+   |                       | AWSAccessKeyID     | awsaccesskeyid         |                                                                                                                       |
+   |                       | AWSSecretAccessKey | awssecretaccesskey     |                                                                                                                       |
+   |                       | SignKey            | signkey                |                                                                                                                       |
+   |                       | EncryptKey         | encryptkey             |                                                                                                                       |
+   | --lock-file           | LockFile           | $LOCK_FILE             |                                                                                                                       |
+   |                       | BackupDestination  | backupdestination      |                                                                                                                       |
+   |                       | BackupSet          |                        | top level object in the @BACKUPS list                                                                                 |
+   |                       | Path               | dest or path           | dest if found in a BackupDestination and path if found in a BackupSet, can be specified multiple times in a BackupSet |
+   |                       | Type               | btype                  | rdiff-backup or duplicity (default)                                                                                   |
+   |                       | MinFree            | minfree                | amount of space to have free on a backupdestination before a backup will be allowed to proceed                        |
+   |                       | PercentUsed        | percentused            | must have that much free on a destination before backups are attempted                                                |
+   |                       | Host               | host                   | the backup source host                                                                                                |
+   |                       | PreRun             | prerun                 |                                                                                                                       |
+   |                       | PostRun            | postrun                |                                                                                                                       |
+   |                       | Tag                | tag                    | override the "tag"                                                                                                    |
+   |                       | Disabled           | disabled               | don't actually make this backup                                                                                       |
+   |                       | Compress           | sshcompress            | ???                                                                                                                   |
+   |                       | Priority           | priority               | use to affect the order in which backups are run, smaller is sooner                                                   |
+   |                       |                    |                        |                                                                                                                       |
+
+
+   
