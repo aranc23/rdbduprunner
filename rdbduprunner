@@ -329,7 +329,13 @@ if($STATUS) {
     }
 } elsif ($TIDY) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
+      unless($TEST) {
+	lock_pid_file();
+      }
         tidy($bh);
+      unless($TEST) {
+	unlock_pid_file();
+      }
     }
 } elsif($AVERAGE) {
     my $avcom="$RDIFF_BACKUP_BINARY --calculate-average";
