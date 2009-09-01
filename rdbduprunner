@@ -564,7 +564,7 @@ sub tidy {
         unless($TEST) {
           system(@icom);
           unless($? == 0) {
-            logentry('err',"unable to execute rdiff-backup!");
+            error("unable to execute rdiff-backup!");
           }
         }
       }
@@ -698,10 +698,10 @@ sub build_increment_list {
 		    }
 		    close(SSD);
 		} else {
-		    logentry('err',"unable to open increment file: $glob $ssdfile");
+		    error("unable to open increment file: $glob $ssdfile");
 		}
 	    } else {
-		logentry('notice',"unable to find the session statistics file for this increment: $tag $rbdate using glob: $glob");
+		notice("unable to find the session statistics file for this increment: $tag $rbdate using glob: $glob");
 	    }
 
 	    push(@INCREMENTS,{ inctime => $inctime,
