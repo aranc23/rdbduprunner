@@ -496,14 +496,24 @@ if($STATUS) {
 info('exiting');
 
 sub backup_sort {
-    my $aprio=(defined $$a{priority} ? $$a{priority} : 0);
-    my $bprio=(defined $$b{priority} ? $$b{priority} : 0);
+  my @sortorder=qw( tag host backupdestination );
 
-    if($aprio == $bprio) {
-      return $$a{tag} cmp $$b{tag};
-    } else {
-      return $aprio <=> $bprio;
+  unless(defined $$a{priority}) {
+    $$a{priority}=(defined $$a{priority} ? $$a{priority} : 0);
+  }
+  unless(defined $$b{priority}) {
+    $$b{priority}=(defined $$b{priority} ? $$b{priority} : 0);
+  }
+  if($$a{priority} != $$b{priority}) {
+    return $$a{priority} <=> $$b{priority};
+  }
+  foreach my $parm (@sortorder) {
+    if($$a{$parm} ne $$b{$parm}) {
+      return $$a{$parm} cmp $$b{$parm};
     }
+  }
+  # somehow, all the paramaters are equal, so just return 0
+  return 0;
 }
 
 sub lock_pid_file {
