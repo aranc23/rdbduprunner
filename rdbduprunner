@@ -281,35 +281,23 @@ if($DUMP) {
 
 if($STATUS) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
+    my @com;
     if($$bh{btype} eq 'duplicity') {
-      my @com=($DUPLICITY_BINARY,'collection-status');
-      push(@com,verbargs($bh),
-           $$bh{dest});
-      info(join(" ",@com));
-      unless($TEST) {
-        lock_pid_file();
-            set_env($bh);
-        system(@com);
-        unless($? == 0) {
-          error("unable to execute duplicity!");
-        }
-        unlock_pid_file();
-      }
+      @com=($DUPLICITY_BINARY,'collection-status');
     } else {
-      # rdiff-backup
-      my @com=($RDIFF_BACKUP_BINARY,'-l');
-      push(@com,verbargs($bh),
-           $$bh{dest});
-      info(join(" ",@com));
-      unless($TEST) {
-        lock_pid_file();
-        set_env($bh);
-        system(@com);
-        unless($? == 0) {
-          error('unable to execute '.$com[0].'!');
-        }
-        unlock_pid_file();
+      @com=($RDIFF_BACKUP_BINARY,'-l');
+    }
+    push(@com,verbargs($bh),
+         $$bh{dest});
+    info(join(" ",@com));
+    unless($TEST) {
+      lock_pid_file();
+      set_env($bh);
+      system(@com);
+      unless($? == 0) {
+        error('unable to execute '.$com[0].'!');
       }
+      unlock_pid_file();
     }
   }
 } elsif($LISTOLDEST) {
