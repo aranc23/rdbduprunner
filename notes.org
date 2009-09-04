@@ -70,7 +70,8 @@ it's probable that it may choke and die if the rdiff-backup destination director
 ** TODO fix all the path creation code to use File::Path or something standard
 ** TODO revisit the use of --exclude-special-files, it's seems too broad and probably isn't what I want
    it has the option to exclude just fifos, device files and symlinks and I think I would really want to backup symlinks at least!
-   *** I have changed exclude-special-files to exclude-device-files, I guess that makes more sense
+*** DONE I have changed exclude-special-files to exclude-device-files, I guess that makes more sense
+    CLOSED: [2009-09-04 Fri 13:39]
 ** TODO determine if the --ssh-no-compression option is really something I want to pass by default
 ** TODO write some documentation, possibly in pod?
    | command line option   | config file option | global variable or key | comments                                                                                                              |
@@ -109,4 +110,7 @@ it's probable that it may choke and die if the rdiff-backup destination director
 
    
 ** TODO in no case is tidy called automatically, maybe add AutoTidy as an option?
-** TODO --status is not implemented for rdiff-backup type and will call duplicity in stead
+** DONE --status is not implemented for rdiff-backup type and will call duplicity in stead
+   SCHEDULED: <2009-09-04 Fri> CLOSED: [2009-09-04 Fri 13:38]
+** DONE there is a bug in tag creation... it adds a - at the end if you leave the trailing slash on the Path specification
+   CLOSED: [2009-09-04 Fri 15:14]

@@ -199,6 +199,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
 
     foreach my $path (ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path})) {
+        $path =~ s/\/$//; # remove any trailing slash
         my $bh={};
         if(defined $PATH and $path !~ /$PATH/) {
             next;
