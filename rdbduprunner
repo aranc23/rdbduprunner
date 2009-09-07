@@ -493,8 +493,8 @@ if($STATUS) {
                 unless($? == 0) {
                     error("unable to execute postrun command");
                 }
-                unlock_pid_file();
             }
+	    unlock_pid_file();
         }
     }
 }
