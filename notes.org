@@ -114,3 +114,5 @@ it's probable that it may choke and die if the rdiff-backup destination director
    SCHEDULED: <2009-09-04 Fri> CLOSED: [2009-09-04 Fri 13:38]
 ** DONE there is a bug in tag creation... it adds a - at the end if you leave the trailing slash on the Path specification
    CLOSED: [2009-09-04 Fri 15:14]
+** TODO re-examine all the locking calls and make sure they make sense
+** TODO add the ability to use gpg-agent as a command line and config file option
