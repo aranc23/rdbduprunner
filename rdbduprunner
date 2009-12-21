@@ -39,6 +39,7 @@ our $STATS=1;
 our $VERBOSITY;
 our $TVERBOSITY;
 our $USEAGENT;
+our $ALLOWSOURCEMISMATCH=0;
 # the next three options limit which backups get acted upon
 our $DEST;
 our $HOST;
@@ -84,6 +85,7 @@ GetOptions(
            'v|verbosity=i'          => \$VERBOSITY,
            't|terminal-verbosity=i' => \$TVERBOSITY,
            'u|use-agent'            => \$USEAGENT,
+	   'alow-source-mismatch!'  => \$ALLOWSOURCEMISMATCH,
 
            # the next three options limit which backups get acted upon
            'dest=s'                 => \$DEST,
@@ -422,6 +424,7 @@ if($STATUS) {
             @com=($DUPLICITY_BINARY);
             $FULL and push(@com,'full');
             $USEAGENT and push(@com,'--use-agent');
+	    $ALLOWSOURCEMISMATCH and push(@com,'--allow-source-mismatch');
             if(defined $$bh{signkey}) {
                 push(@com,'--sign-key',$$bh{signkey});
             }
