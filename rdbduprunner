@@ -85,7 +85,7 @@ GetOptions(
            'v|verbosity=i'          => \$VERBOSITY,
            't|terminal-verbosity=i' => \$TVERBOSITY,
            'u|use-agent'            => \$USEAGENT,
-	   'alow-source-mismatch!'  => \$ALLOWSOURCEMISMATCH,
+	   'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
 
            # the next three options limit which backups get acted upon
            'dest=s'                 => \$DEST,
