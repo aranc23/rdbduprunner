@@ -40,6 +40,7 @@ our $VERBOSITY;
 our $TVERBOSITY;
 our $USEAGENT;
 our $ALLOWSOURCEMISMATCH=0;
+our $TEMPDIR;
 # the next three options limit which backups get acted upon
 our $DEST;
 our $HOST;
@@ -86,6 +87,7 @@ GetOptions(
            't|terminal-verbosity=i' => \$TVERBOSITY,
            'u|use-agent'            => \$USEAGENT,
 	   'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
+           'tempdir=s'              => \$TEMPDIR,
 
            # the next three options limit which backups get acted upon
            'dest=s'                 => \$DEST,
@@ -171,6 +173,12 @@ if(not defined $USEAGENT) {
     $USEAGENT=1;
   } else {
     $USEAGENT=0;
+  }
+}
+
+if(not defined $TEMPDIR) {
+  if(defined $CONFIG{tempdir}) {
+    $TEMPDIR=$CONFIG{tempdir};
   }
 }
 
@@ -444,6 +452,13 @@ if($STATUS) {
             if($STATS) {
                 push(@com,'--print-statistics');
             }
+        }
+        if(defined $TEMPDIR) {
+          if(-d $TEMPDIR) {
+            push(@com,'--tempdir',$TEMPDIR);
+          } else {
+            warn("specified temporary directory does not exist, not using it");
+          }
         }
         push(@com,verbargs($bh),
              '--exclude-other-filesystems');
