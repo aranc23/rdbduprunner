@@ -85,7 +85,7 @@ GetOptions(
            'stats!'                 => \$STATS,
            'v|verbosity=i'          => \$VERBOSITY,
            't|terminal-verbosity=i' => \$TVERBOSITY,
-           'u|use-agent'            => \$USEAGENT,
+           'u|use-agent!'            => \$USEAGENT,
 	   'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
            'tempdir=s'              => \$TEMPDIR,
 
