@@ -1,0 +1,41 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+
+use Getopt::Long;
+use POSIX qw( strftime );
+
+# inifinite snapshots for some filesystems
+
+my @zfs=qw( cain/pics cain/music );
+
+my $time=strftime('%F%T',localtime(time()));
+$time =~ s/[\:\-]//g;
+
+foreach my $zfs (@zfs) {
+    system("zfs snapshot $zfs\@$time");
+    if($? != 0) {
+        warn "unable to create zfs snapshot for $zfs at $time";
+    }
+}
+
+@zfs=qw( cain/video );
+
+my @days=qw( Sunday Monday Tuesday Wednesday Thursday Friday Saturday );
+
+$time=$days[strftime('%w',localtime(time()))];
+foreach my $zfs (@zfs) {
+    system("zfs destroy $zfs\@$time 2>/dev/null >/dev/null");
+    system("zfs snapshot $zfs\@$time");
+    if($? != 0) {
+        warn "unable to create zfs snapshot for $zfs at $time";
+    }
+}
+
+
+# zfs list -H -t snapshot -o name,creation,referenced,used,usedbydataset -s creation
+# zfs list -H -t snapshot -o name -s creation 
+#zfs list -r -H -t snapshot -o name,creation -s creation cain/music
+
+
