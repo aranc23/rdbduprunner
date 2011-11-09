@@ -760,7 +760,7 @@ sub verbargs {
     if(defined $TVERBOSITY and $$bh{btype} eq 'rdiff-backup') {
       push(@a,'--terminal-verbosity',$TVERBOSITY);
     }
-  } elsif(defined $VERBOSITY or defined $TVERBOSITY) {
+  } elsif(defined $TVERBOSITY and $TVERBOSITY > 3) {
     @a='-v';
   }
   @a;
