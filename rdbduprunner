@@ -472,6 +472,7 @@ if($STATUS) {
         } elsif($$bh{btype} eq 'rsync') {
           @com=($RSYNC_BINARY,
                 '-ax',
+                '--delete',
                 '--delete-excluded',
                );
           if($$bh{sshcompress}) {
