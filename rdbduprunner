@@ -322,10 +322,10 @@ if($STATUS) {
       @com=('du','-cshx');
     }
     unless($$bh{btype} eq 'rsync') {
-      push(@com,
-           verbargs($bh),
-           $$bh{dest});
+      push(@com,verbargs($bh));
+
     }
+    push(@com,$$bh{dest});
     info(join(" ",@com));
     unless($TEST) {
       lock_pid_file();
