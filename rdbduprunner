@@ -212,7 +212,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         next;
     }
     if(defined $CONFIG{backupdestination}{$backupdest}{type} and
-           $CONFIG{backupdestination}{$backupdest}{type} =~ /^(rdiff\-backup|duplicity)$/) {
+           $CONFIG{backupdestination}{$backupdest}{type} =~ /^(rdiff\-backup|duplicity|rsync)$/) {
       # check to make sure that if the type isn't set, we set it to duplicity
       $btype=$CONFIG{backupdestination}{$backupdest}{type};
     } else {
@@ -316,11 +316,16 @@ if($STATUS) {
     if($$bh{btype} eq 'duplicity') {
       @com=($DUPLICITY_BINARY,'collection-status');
       $USEAGENT and push(@com,'--use-agent');
-    } else {
+    } elsif($$bh{btype} eq 'rdiff-backup') {
       @com=($RDIFF_BACKUP_BINARY,'-l');
+    } elsif($$bh{btype} eq 'rsync') {
+      @com=('du','-cshx');
     }
-    push(@com,verbargs($bh),
-         $$bh{dest});
+    unless($$bh{btype} eq 'rsync') {
+      push(@com,
+           verbargs($bh),
+           $$bh{dest});
+    }
     info(join(" ",@com));
     unless($TEST) {
       lock_pid_file();
