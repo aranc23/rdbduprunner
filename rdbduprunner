@@ -637,8 +637,7 @@ sub tidy {
           }
         }
       }
-    } else {
-      # must be duplicity
+    } elsif($$bh{btype} eq 'duplicity') {
       unless(defined $$bh{maxage}) {
         debug("max age is not defined for $$bh{tag}, so we cannot tidy it");
         return;
