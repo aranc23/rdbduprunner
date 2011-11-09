@@ -457,30 +457,50 @@ if($STATUS) {
             unless($STATS) {
                 push(@com,'--no-print-statistics');
             }
-        } else { # must be rdiff-backup
-            @com=($RDIFF_BACKUP_BINARY,
-                  '--exclude-device-files',
-                );
+            push(@com,'--exclude-other-filesystems');
+        } elsif($$bh{btype} eq 'rdiff-backup') { # must be rdiff-backup
+          @com=($RDIFF_BACKUP_BINARY,
+                '--exclude-device-files',
+                '--exclude-other-filesystems',
+               );
             unless($$bh{sshcompress}) {
                 push(@com,'--ssh-no-compression');
             }
             if($STATS) {
                 push(@com,'--print-statistics');
             }
+        } elsif($$bh{btype} eq 'rsync') {
+          @com=($RSYNC_BINARY,
+                '-ax',
+                '--delete-excluded',
+               );
+          if($$bh{sshcompress}) {
+            push(@com,'-z');
+          }
+          if($STATS) {
+            push(@com,'--stats');
+          }
         }
         if(defined $TEMPDIR) {
           if(-d $TEMPDIR) {
-            push(@com,'--tempdir',$TEMPDIR);
+            if($$bh{btype} eq 'rsync') {
+              push(@com,"--temp-dir=$TEMPDIR");
+            } else {
+              push(@com,'--tempdir',$TEMPDIR);
+            }
           } else {
             warn("specified temporary directory does not exist, not using it");
           }
         }
-        push(@com,verbargs($bh),
-             '--exclude-other-filesystems');
+        push(@com,verbargs($bh));
 
         foreach my $f (@{$$bh{excludes}}) {
+          if($$bh{btype} eq 'rsync') {
+            push(@com,"--exclude-from=$f");
+          } else { # rdiff-backup and duplicity
             push(@com,'--exclude-globbing-filelist',
                  $f);
+          }
         }
         # this is fugly:
         push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.'::'.$$bh{path}),$$bh{dest});
@@ -733,11 +753,15 @@ sub create_dispatcher {
 sub verbargs {
   my $bh=$_[0];
   my @a;
-  if(defined $VERBOSITY) {
-    push(@a,'--verbosity',$VERBOSITY);
-  }
-  if(defined $TVERBOSITY and $$bh{btype} eq 'rdiff-backup') {
-    push(@a,'--terminal-verbosity',$TVERBOSITY);
+  if($$bh{btype} ne 'rsync') {
+    if(defined $VERBOSITY) {
+      push(@a,'--verbosity',$VERBOSITY);
+    }
+    if(defined $TVERBOSITY and $$bh{btype} eq 'rdiff-backup') {
+      push(@a,'--terminal-verbosity',$TVERBOSITY);
+    }
+  } elsif(defined $VERBOSITY or defined $TVERBOSITY) {
+    @a='-v';
   }
   @a;
 }
