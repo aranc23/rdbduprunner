@@ -354,7 +354,7 @@ if($STATUS) {
             if($FORCE) {
                 push(@com,'--force');
             }
-        } else {
+        } elsif($$bh{btype} eq 'rdiff-backup') {
             push(@com,$RDIFF_BACKUP_BINARY,'--check-destination-dir');
         }
         push(@com,verbargs($bh),
