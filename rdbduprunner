@@ -48,6 +48,7 @@ our $PATH;
 # configuring rdbduprunner:
 our $DUPLICITY_BINARY;
 our $RDIFF_BACKUP_BINARY;
+our $RSYNC_BINARY;
 our $EXCLUDE_PATH;
 our $FACILITY='user';
 our $LOG_LEVEL='info';
@@ -97,6 +98,7 @@ GetOptions(
            # configuring rdbduprunner:
            'duplicity-binary=s'     => \$DUPLICITY_BINARY,
            'rdiff-backup-binary=s'  => \$RDIFF_BACKUP_BINARY,
+           'rsync-binary=s'         => \$RSYNC_BINARY,
            'exclude-path=s'         => \$EXCLUDE_PATH,
            'facility=s'             => \$FACILITY,
            'level=s'                => \$LOG_LEVEL,
@@ -138,6 +140,14 @@ if(not defined $RDIFF_BACKUP_BINARY) {
     } else {
 	$RDIFF_BACKUP_BINARY='rdiff-backup'; # in our path we hope
     }
+}
+
+if(not defined $RSYNC_BINARY) {
+  if(defined $CONFIG{rsyncbinary}) {
+	$RSYNC_BINARY=$CONFIG{rsyncbinary};
+  } else {
+	$RSYNC_BINARY='rsync'; # in our path we hope
+  }
 }
 
 unless(defined $VERBOSITY) { # from the command line
