@@ -4,38 +4,67 @@ use strict;
 use warnings;
 
 use Getopt::Long;
-use POSIX qw( strftime );
+use POSIX qw( strftime mktime );
+use Data::Dumper;
 
 # inifinite snapshots for some filesystems
 
-my @zfs=qw( cain/pics cain/music );
+our %months=(Jan => 0,
+             Feb => 1,
+             Mar => 2,
+             Apr => 3,
+             May => 4,
+             Jun => 5,
+             Jul => 6,
+             Aug => 7,
+             Sep => 8,
+             Oct => 9,
+             Nov => 10,
+             Dec => 11,
+            );
+
+our $DESTROY=1;
+our $SNAP=1;
+
+our %zfs=( 'cain/backups'         => 365,
+           'cain/pics'            => 365,
+           'cain/music'           => 365,
+           'cainp/home'           => 365,
+           'cainp/home/spin'      => 365,
+           'cain/video'           => 6,
+           'cainp/home/spin/down' => 7,
+         );
+
+GetOptions('snap!'    => \$SNAP,
+           'destroy!' => \$DESTROY,
+          );
 
 my $time=strftime('%F%T',localtime(time()));
 $time =~ s/[\:\-]//g;
 
-foreach my $zfs (@zfs) {
-    system("zfs snapshot $zfs\@$time");
-    if($? != 0) {
-        warn "unable to create zfs snapshot for $zfs at $time";
+while(my ($zfs,$days)=each(%zfs)) {
+  if($DESTROY) {
+    foreach(`zfs list -t snapshot -o name,creation -s creation -r -H $zfs`) {
+      chomp;
+      my ($snap,$creation)=split(/\t/);
+      next unless $snap =~ /^$zfs\@/;
+      unless($creation =~ /\s+(\w\w\w)\s+(\d+)\s+(\d+)\:(\d+)\s+(\d\d\d\d)/) {
+        die "unable to parse the date: $creation";
+      }
+      my $age=mktime(0,$4,$3,$2,$months{$1},($5-1900));
+      #printf("%s\t%s\t%s\t%d\t%s\n",strftime('%F %T',localtime(time())),$creation,strftime('%F %T',localtime($age)),$days,strftime('%F %T',localtime($age + ($days * 24 * 60 * 60 ))));
+      if(time() > ($age + ($days * 24 * 60 * 60 ))) {
+        printf("removing: %s created at %s\n",$snap,strftime('%F %T',localtime($age)));
+        system("zfs destroy $snap");
+      }
     }
-}
-
-@zfs=qw( cain/video );
-
-my @days=qw( Sunday Monday Tuesday Wednesday Thursday Friday Saturday );
-
-$time=$days[strftime('%w',localtime(time()))];
-foreach my $zfs (@zfs) {
-    system("zfs destroy $zfs\@$time 2>/dev/null >/dev/null");
-    system("zfs snapshot $zfs\@$time");
+  }
+  if($SNAP) {
+    my $com="zfs snapshot $zfs\@$time";
+    print $com."\n";
+    system($com);
     if($? != 0) {
-        warn "unable to create zfs snapshot for $zfs at $time";
+      warn "unable to create zfs snapshot for $zfs at $time";
     }
+  }
 }
-
-
-# zfs list -H -t snapshot -o name,creation,referenced,used,usedbydataset -s creation
-# zfs list -H -t snapshot -o name -s creation 
-#zfs list -r -H -t snapshot -o name,creation -s creation cain/music
-
-
