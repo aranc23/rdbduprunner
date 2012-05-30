@@ -1,0 +1,20 @@
+#! /bin/bash
+
+for dir in music pics ; do
+    /sbin/btrfs subvolume snapshot /mnt/btrfs/$dir /mnt/btrfs/snaps/$dir-`date +%Y%m%d-%H%M%S`
+done
+
+if [[ ! -d /mnt/btrfs2/.snaps ]]; then
+	mkdir /mnt/btrfs2/.snaps
+fi
+for dir in home; do
+	/sbin/btrfs subvolume snapshot /mnt/btrfs2/$dir /mnt/btrfs2/.snaps/$dir-`date +%Y%m%d-%H%M%S`
+done
+
+if [[ ! -d /mnt/btrfs2/home/.snaps ]]; then
+        mkdir /mnt/btrfs2/home/.snaps
+fi
+for dir in spin; do
+	/sbin/btrfs subvolume snapshot /mnt/btrfs2/home/$dir /mnt/btrfs2/home/.snaps/$dir-`date +%Y%m%d-%H%M%S`
+done
+
