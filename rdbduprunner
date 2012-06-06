@@ -504,7 +504,7 @@ if($STATUS) {
           }
         }
         # this is fugly:
-        push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.'::'.$$bh{path}),$$bh{dest});
+        push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.($$bh{btype} eq 'rsync' ? ':' : '::').$$bh{path}),$$bh{dest});
 
         if($$bh{btype} eq 'rdiff-backup') {
 	  if($$bh{dest} =~ /\:\:/) {
