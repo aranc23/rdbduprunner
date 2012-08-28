@@ -30,6 +30,7 @@ our $LISTOLDEST=0;
 our $REMOVE=0;
 our $STATUS=0;
 our $TIDY=0;
+our $LIST=0;
 # the following affect what options are passed to rdiff-backup and/or duplicity
 our $FORCE=0;
 our $FULL=0;
@@ -77,6 +78,7 @@ GetOptions(
            'remove-oldest'          => \$REMOVE,
            'status'                 => \$STATUS,
            'tidy'                   => \$TIDY,
+           'list'                   => \$LIST,
 
            # the following affect what options are passed to rdiff-backup and/or duplicity
            'force!'                 => \$FORCE,
@@ -420,6 +422,27 @@ if($STATUS) {
       my $mainret=$?;
       unless($mainret == 0) {
 	error("$$bh{btype} exited with an error");
+      }
+      unlock_pid_file();
+    }
+  }
+} elsif($LIST) {
+  foreach my $bh (sort backup_sort (@BACKUPS)) {
+    my @com;
+    unless($$bh{btype} eq 'duplicity') {
+      next;
+    }
+    @com=($DUPLICITY_BINARY,'list-current-files');
+    $USEAGENT and push(@com,'--use-agent');
+    push(@com,verbargs($bh));
+    push(@com,$$bh{dest});
+    info(join(" ",@com));
+    unless($TEST) {
+      lock_pid_file();
+      set_env($bh);
+      system(@com);
+      unless($? == 0) {
+        error('unable to execute '.$com[0].'!');
       }
       unlock_pid_file();
     }
