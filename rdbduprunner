@@ -288,7 +288,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
             $$bh{maxinc}=$CONFIG{maxinc};
         }
         # if this is defined in a backupset, allow that to override the global definition, if it exists
-        foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey )))) {
+        foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle )))) {
             unless(defined $$bh{$var}) {
                 if(defined $CONFIG{$var}) {
                     $$bh{$var}=$CONFIG{$var};
@@ -535,8 +535,8 @@ if($STATUS) {
 	  }
         }
         # if Trickle is set for a destination, use the trickle binary to slow upload rates to the value given
-        if(defined $$bh{backupdestination}{trickle} and $$bh{backupdestination}{trickle} =~ /^\d+$/) {
-          unshift(@com,'/usr/bin/trickle','-u',$$bh{backupdestination}{trickle});
+        if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/) {
+          unshift(@com,'/usr/bin/trickle','-u',$$bh{trickle});
         }
         info(join(" ",@com));
 
