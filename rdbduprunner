@@ -534,7 +534,10 @@ if($STATUS) {
 	      }
 	  }
         }
-
+        # if Trickle is set for a destination, use the trickle binary to slow upload rates to the value given
+        if(defined $$bh{backupdestination}{trickle} and $$bh{backupdestination}{trickle} =~ /^\d+$/) {
+          unshift(@com,'/usr/bin/trickle','-u',$$bh{backupdestination}{trickle});
+        }
         info(join(" ",@com));
 
         unless($TEST) {
