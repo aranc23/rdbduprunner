@@ -563,7 +563,7 @@ if($STATUS) {
 	  }
         }
         # if Trickle is set for a destination, use the trickle binary to slow upload rates to the value given
-        if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/ and $$bh{type} ne 'rsync') {
+        if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/ and $$bh{btype} ne 'rsync') {
           unshift(@com,'/usr/bin/trickle','-s','-u',$$bh{trickle});
         }
         info(join(" ",@com));
