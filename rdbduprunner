@@ -262,7 +262,9 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         $$bh{backupdestination}=$backupdest;
         $$bh{gtag}='generic-'.$tags[1];
         $$bh{btype}=$btype;
-
+        if($$bh{btype} eq 'rsync') {
+          $$bh{path}=$$bh{path}.'/';
+        }
         if( -f $EXCLUDE_PATH.'/exclude-generic' ) {
             push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-generic');
         }
