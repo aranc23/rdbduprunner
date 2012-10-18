@@ -27,14 +27,15 @@ our $DESTROY=1;
 our $SNAP=1;
 
 our %zfs=(
+          'data/crashplan'       => 2,
           'data/home'            => 365,
           'data/home/spin'       => 365,
           'data/home/spin/down'  => 7,
+          'data/logstash'        => 2,
           'data/music'           => 365,
           'data/pics'            => 365,
+          'data/spidermonk-home' => 7,
           'data/video'           => 7,
-          'data/crashplan'       => 2,
-          'data/logstash'        => 2,
          );
 
 GetOptions('snap!'    => \$SNAP,
