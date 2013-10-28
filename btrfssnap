@@ -23,17 +23,12 @@ our %months=(Jan => 0,
              Dec => 11,
             );
 
-our $BTRFSROOT='/data';
+our $BTRFSROOT='/blob';
 our $DESTROY=1;
 our $SNAP=1;
 
-our %btrfs=( 'backups'         => 365,
-             'pics'            => 365,
+our %btrfs=(
              'music'           => 365,
-             'home'            => 365,
-             'home/spin'       => 365,
-             'video'           => 7,
-             'home/spin/down'  => 7,
          );
 
 GetOptions(
