@@ -69,7 +69,7 @@ while(my ($btrfs,$days)=each(%btrfs)) {
     }
   }
   if($SNAP) {
-    my @com=qw( btrfs subvolume snapshot );
+    my @com=qw( btrfs subvolume snapshot -r );
     push(@com,join('/',$BTRFSROOT,$btrfs));
     push(@com,join('/',$BTRFSROOT,'snapshots',$btrfs,$time));
     print join(' ',@com)."\n";
