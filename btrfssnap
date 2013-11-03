@@ -6,6 +6,7 @@ use warnings;
 use Getopt::Long;
 use POSIX qw( strftime mktime );
 use Data::Dumper;
+use YAML;
 
 # inifinite snapshots for some filesystems
 
