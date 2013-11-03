@@ -8,35 +8,23 @@ use POSIX qw( strftime mktime );
 use Data::Dumper;
 use YAML;
 
-# inifinite snapshots for some filesystems
-
-our %months=(Jan => 0,
-             Feb => 1,
-             Mar => 2,
-             Apr => 3,
-             May => 4,
-             Jun => 5,
-             Jul => 6,
-             Aug => 7,
-             Sep => 8,
-             Oct => 9,
-             Nov => 10,
-             Dec => 11,
-            );
-
-our $BTRFSROOT='/blob';
-our $DESTROY=1;
-our $SNAP=1;
-
-our %btrfs=(
-             'music'           => 365,
-         );
+my $CONFIG='/etc/btrfssnap.conf';
+my $DESTROY=1;
+my $SNAP=1;
 
 GetOptions(
-           'btrfs=s'  => \$BTRFSROOT,
            'snap!'    => \$SNAP,
            'destroy!' => \$DESTROY,
+           'config=s' => \$CONFIG,
           );
+
+open(C,$CONFIG) or die "unable to open $CONFIG";
+my ($config) = Load(join("",<C>)) or die "unable to load configuration from $CONFIG";
+close(C);
+print Dumper $config;
+
+my %btrfs=%{$$config{btrfs}};
+my $BTRFSROOT=$$config{root};
 
 my $time=strftime('%F%T',localtime(time()));
 $time =~ s/[\:\-]//g;
