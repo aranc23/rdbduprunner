@@ -70,7 +70,7 @@ while(my ($zfs,$days)=each(%zfs)) {
     }
   }
   if($SNAP) {
-    my $com="/sbin/zfs snapshot $zfs\@$time";
+    my $com="/sbin/zfs snapshot $zfs\@zfssnapman-$time";
     system($com);
     if($? != 0) {
       warn "unable to create zfs snapshot for $zfs at $time";
