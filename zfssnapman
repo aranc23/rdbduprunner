@@ -39,15 +39,11 @@ foreach my $CONFIG ($CONFIG_FILE,glob('/etc/zfssnapman.d/*.conf')) {
   open(C,$CONFIG) or die "unable to open $CONFIG";
   my ($config) = Load(join("",<C>)) or die "unable to load configuration from $CONFIG";
   close(C);
-  print Dumper $config;
 
   foreach my $zfs (keys{%{$config}}) { # I love perl!
-      $zfs{$zfs}=eval $$config{$zfs};
-    }
+    $zfs{$zfs}=eval $$config{$zfs};
   }
 }
-
-print Dumper \%zfs;exit;
 
 my $time=strftime('%F%T',localtime(time()));
 $time =~ s/[\:\-]//g;
