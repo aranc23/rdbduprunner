@@ -6,10 +6,11 @@ use warnings;
 use Getopt::Long;
 use POSIX qw( strftime mktime );
 use Data::Dumper;
+use YAML;
 
-# inifinite snapshots for some filesystems
+my $CONFIG_FILE='/etc/zfssnapman.conf';
 
-our %months=(Jan => 0,
+my %months=(Jan => 0,
              Feb => 1,
              Mar => 2,
              Apr => 3,
@@ -23,23 +24,30 @@ our %months=(Jan => 0,
              Dec => 11,
             );
 
-our $DESTROY=1;
-our $SNAP=1;
+my $DESTROY=1;
+my $SNAP=1;
 
-our %zfs=(
-          'a-lnx010-pool/local'                => (365*2),
-          'a-lnx010-pool/local/accx'           => (365*2),
-          'a-lnx010-pool/local/accx/Downloads' => 10,
-          'a-lnx010-pool/local/accx/Music'     => (365*3),
-          'a-lnx010-pool/local/accx/MusicSync' => 10,
-          'a-lnx010-pool/local/accx/Pictures'  => (365*3),
-          'a-lnx010-pool/local/accx/df'        => (365*3),
-          'a-lnx010-pool/local/accx/skyrim'    => 10
-         );
+my %zfs;
 
 GetOptions('snap!'    => \$SNAP,
            'destroy!' => \$DESTROY,
+           'config=s' => \$CONFIG_FILE,
           );
+
+foreach my $CONFIG ($CONFIG_FILE,glob('/etc/zfssnapman.d/*.conf')) {
+  -f $CONFIG or next;
+  open(C,$CONFIG) or die "unable to open $CONFIG";
+  my ($config) = Load(join("",<C>)) or die "unable to load configuration from $CONFIG";
+  close(C);
+  print Dumper $config;
+
+  foreach my $zfs (keys{%{$config}}) { # I love perl!
+      $zfs{$zfs}=eval $$config{$zfs};
+    }
+  }
+}
+
+print Dumper \%zfs;exit;
 
 my $time=strftime('%F%T',localtime(time()));
 $time =~ s/[\:\-]//g;
