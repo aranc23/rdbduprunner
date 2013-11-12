@@ -124,7 +124,7 @@ create_dispatcher();
 info('starting');
 
 %CONFIG=new Config::General(-ConfigFile => $CONFIG_FILE,
-			    -UseApacheInclude => 1,
+			    -IncludeGlob => 1,
 			    -AutoTrue => 1,
 			    -LowerCaseNames => 1)->getall() or die "unable to parse $CONFIG_FILE";
 
