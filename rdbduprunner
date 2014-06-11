@@ -760,8 +760,7 @@ sub create_dispatcher {
 					      min_level => $LOG_LEVEL,
 					      ident     => 'rdbduprunner'.'['.$$.']',
 					      facility  => $FACILITY,
-					      socket    => (`uname` =~ /Linux/ ?
-							    'unix' : 'inet'),
+					      socket    => 'unix',
 					      callbacks => sub { my %t=@_;
 								 chomp $t{message};
 								 return $t{message};
