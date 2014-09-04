@@ -400,7 +400,7 @@ if($STATUS) {
       @com=($DUPLICITY_BINARY,'verify');
       $USEAGENT and push(@com,'--use-agent');
     } else {
-      @com=($RDIFF_BACKUP_BINARY,'--compare');
+      @com=($RDIFF_BACKUP_BINARY,'--compare','--no-eas');
     }
     push(@com,verbargs($bh),'--exclude-other-filesystems');
     foreach my $f (@{$$bh{excludes}}) {
@@ -487,6 +487,7 @@ if($STATUS) {
           @com=($RDIFF_BACKUP_BINARY,
                 '--exclude-device-files',
                 '--exclude-other-filesystems',
+                '--no-eas',
                );
             unless($$bh{sshcompress}) {
                 push(@com,'--ssh-no-compression');
