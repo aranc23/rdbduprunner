@@ -913,7 +913,7 @@ sub check_space {
 
 sub update_bd_space {
     my $bh=$_[0];
-    my $com="df -vP $$bh{path}";
+    my $com='df '.(`uname` =~ /Linux/ ? '-P ' : '').$$bh{path};
     my @a=`$com`;
     unless($? == 0) {
 	error("unable to run \"$com\": no further backups will be attempted to this directory");
