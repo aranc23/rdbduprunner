@@ -953,7 +953,9 @@ sub update_bd_space {
 
 sub log_exit_status {
   my($bh,$exit)=@_;
-  notice(stringy({'msg' => 'exit status', 'exit' => $exit, timestamp => time(), datetime => localtime().""},$bh));
+  dlog('notice','exit status',
+       {'exit' => $exit},
+       $bh);
 }
 
 sub stringy {
@@ -970,4 +972,17 @@ sub stringy {
     }
   }
   return join(" ",@a);
+}
+
+sub dlog {
+  my $level = shift;
+  my $msg   = shift;
+  my $time  = time();
+  $DISPATCHER->log( level   => $level,
+                    message => stringy({'msg'      => $msg,
+                                        'severity' => $level,
+                                        timestamp  => $time,
+                                        datetime   => localtime($time).""},
+                                       @_),
+                  );
 }
