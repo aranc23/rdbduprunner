@@ -948,3 +948,24 @@ sub update_bd_space {
     $$bh{percent}=$4;
     return 1;
 }
+
+sub final_summary {
+  my($bh,$return)=@_;
+  notice(stringy({msg => "final summary", return => $return},$bh));
+}
+
+sub stringy {
+  # each element passed to stringy should be a HASH REF
+  my @a; # strings
+  foreach my $h (@_) {
+    next unless ref $h == 'HASH';
+    foreach my $key (%{$h}) {
+      my $val=$${h}{$key};
+      next if ref $val; # must not be a reference
+      $val =~ s/\n/NL/g; # remove newlines
+      $val =~ s/"/\\"/g; # replace " with \"
+      push(@a,"$key=\"$val\"");
+    }
+  }
+  return join(" ",@a);
+}
