@@ -779,20 +779,14 @@ sub create_dispatcher {
 					      ident     => 'rdbduprunner'.'['.$$.']',
 					      facility  => $FACILITY,
 					      socket    => 'unix',
-					      callbacks => sub { my %t=@_;
-								 chomp $t{message};
-								 return $t{message};
-							       },
+					      callbacks => $callback_clean,
 					     )
 		  );
 
   $DISPATCHER->add(Log::Dispatch::Screen->new(name      => 'screen',
 					      min_level => $LOG_LEVEL,
 					      stderr    => 0,
-					      callbacks => sub { my %t=@_;
-								 chomp $t{message};
-								 return $t{message}."\n"; # add a newline
-							       },
+					      callbacks => $callback_clean,
 					     )
 		  );
   $DISPATCHER->add(
@@ -800,6 +794,7 @@ sub create_dispatcher {
                                             name      => 'logfile',
                                             min_level => $LOG_LEVEL,
                                             filename  => $LOG_FILE,
+                                            callbacks => $callback_clean,
                                            )
                   );
 }
