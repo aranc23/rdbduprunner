@@ -7,7 +7,7 @@ use warnings;
 #from a standard perl distribution, on UNIX at least
 use Getopt::Long;
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
-use Env qw( HOME );
+use Env qw( HOME USER );
 use Data::Dumper;
 use POSIX qw( strftime );
 
@@ -55,6 +55,7 @@ our $FACILITY='user';
 our $LOG_LEVEL='info';
 our $LOCALHOST;
 our $LOCK_FILE;
+our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
 our $TEST=1;
 
 # global variables
@@ -106,6 +107,7 @@ GetOptions(
            'level=s'                => \$LOG_LEVEL,
            'localhost=s'            => \$LOCALHOST,
            'lockfile=s'             => \$LOCK_FILE,
+           'logfile=s'              => \$LOG_FILE,
            'test!'                  => \$TEST,
           );
 
@@ -778,8 +780,13 @@ sub create_dispatcher {
 							       },
 					     )
 		  );
-
-
+  $DISPATCHER->add(
+                   Log::Dispatch::File->new(
+                                            name      => 'logfile',
+                                            min_level => $LOG_LEVEL,
+                                            filename  => $LOG_FILE,
+                                           )
+                  );
 }
 
 sub verbargs {
