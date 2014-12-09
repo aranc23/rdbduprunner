@@ -767,6 +767,11 @@ sub set_env {
     }
 }
 
+my $callback_clean = sub { my %t=@_;
+                           chomp $t{message};
+                           return $t{message}."\n"; # add a newline
+                         };
+
 sub create_dispatcher {
   $DISPATCHER=Log::Dispatch->new;
   $DISPATCHER->add(Log::Dispatch::Syslog->new(name      => 'syslog',
