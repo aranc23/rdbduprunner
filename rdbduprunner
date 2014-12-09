@@ -986,7 +986,7 @@ sub dlog {
                     message => stringy({'msg'      => $msg,
                                         'severity' => $level,
                                         timestamp  => $time,
-                                        datetime   => localtime($time).""},
+                                        datetime   => strftime("%F %T",localtime($time))},
                                        @_),
                   );
 }
