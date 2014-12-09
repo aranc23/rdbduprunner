@@ -579,7 +579,9 @@ if($STATUS) {
                 set_env($bh);
                 system($$bh{prerun});
                 unless($? == 0) {
+                    # if we failed to run the pre-run, issue the final summary based on that
                     error("unable to execute prerun command: skipping backup!");
+                    final_summary($bh,$?);
                     next;
                 }
             }
@@ -589,12 +591,20 @@ if($STATUS) {
             unless($mainret == 0) {
                 error("unable to execute $$bh{btype}!");
             }
+            # if there is no postrun, return the final_summary using $mainret
+            # if there is a postrun, return that value instead regardless of failure
             if(defined $$bh{postrun}) {
                 info($$bh{postrun});
                 system($$bh{postrun});
                 unless($? == 0) {
                     error("unable to execute postrun command");
                 }
+                # issue final summary based on the return value of the postrun command
+                final_summary($bh,$?);
+            }
+            else {
+              # issue final summary based on the main backup process
+              final_summary($bh,$mainret);
             }
 	    unlock_pid_file();
         }
