@@ -284,7 +284,9 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         if( -f $EXCLUDE_PATH.'/exclude-'.$tag ) {
             push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-'.$tag);
         } else {
-            warning("unable to find the exclude file: ".$EXCLUDE_PATH.'/exclude-'.$tag." for backup $tag");
+            my $path=$EXCLUDE_PATH.'/exclude-'.$tag;
+            warning("unable to find the exclude file: $path for backup $tag");
+            warning(stringy({msg => 'missing exclude file', path => $path},$bh));
         }
 
         if(defined $MAXAGE) {
