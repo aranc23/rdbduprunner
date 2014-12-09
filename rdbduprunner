@@ -575,7 +575,7 @@ if($STATUS) {
             lock_pid_file();
 
             if (defined $$bh{prerun}) {
-                print $$bh{prerun}."\n";
+                info($$bh{prerun});
                 set_env($bh);
                 system($$bh{prerun});
                 unless($? == 0) {
@@ -590,7 +590,7 @@ if($STATUS) {
                 error("unable to execute $$bh{btype}!");
             }
             if(defined $$bh{postrun}) {
-                print $$bh{postrun}."\n";
+                info($$bh{postrun});
                 system($$bh{postrun});
                 unless($? == 0) {
                     error("unable to execute postrun command");
