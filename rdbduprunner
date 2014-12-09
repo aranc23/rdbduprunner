@@ -960,7 +960,7 @@ sub log_exit_status {
 
 sub stringy {
   # each element passed to stringy should be a HASH REF
-  my @a; # strings
+  my %a; # strings
   foreach my $h (@_) {
     next unless ref $h eq 'HASH';
     foreach my $key (keys(%$h)) {
@@ -968,10 +968,14 @@ sub stringy {
       my $val=${$h}{$key};
       $val =~ s/\n/NL/g; # remove newlines
       $val =~ s/"/\\"/g; # replace " with \"
-      push(@a,"$key=\"$val\"");
+      $a{$key}=$val;
     }
   }
-  return join(" ",@a);
+  my @f;
+  foreach my $key (sort {&sort_tags} (keys(%a))) {
+    push(@f,"$key=\"$a{$key}\"");
+  }
+  return join(" ",@f);
 }
 
 sub dlog {
@@ -985,4 +989,26 @@ sub dlog {
                                         datetime   => localtime($time).""},
                                        @_),
                   );
+}
+
+sub sort_tags {
+  return tag_prio($a) <=> tag_prio($b);
+}
+
+sub tag_prio {
+  my %prios=(
+             datetime  => -10,
+             severity  => -9,
+             msg       => -5,
+             timestamp => 50,
+             host      => 2,
+             tag       => 1,
+             backupdestination => 10,
+             dest      => 10,
+             gtag      => 10,
+             btype     => 10,
+            );
+  my $t=lc $_[0];
+  return $prios{$t} if defined $prios{$t};
+  return 0;
 }
