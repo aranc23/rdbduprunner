@@ -1107,8 +1107,17 @@ path on the host to be backed up.
 
 Increases logging verbosity to the terminal.
 
-=item {B<-v|--verbosity> I<integer>}
+=item {B<--verbosity> I<integer>}
 
 Increases logging verbosity to the rdiff-backup/duplicity log files.
 
+=item {B<-v|--verbose>}
+
+Rsync specific. Passes -v to rsync invocations.
+
+=item {B<--progress>}
+
+Rsync specific. Passes --progress to rsync invocations.
+
 =back
+
