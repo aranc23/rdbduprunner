@@ -47,6 +47,8 @@ our $TVERBOSITY;
 our $USEAGENT;
 our $ALLOWSOURCEMISMATCH=0;
 our $TEMPDIR;
+# rsync specific
+my $PROGRESS=0;
 # the next three options limit which backups get acted upon
 our $DEST;
 our $HOST;
@@ -100,6 +102,8 @@ GetOptions(
 	   'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
            'tempdir=s'              => \$TEMPDIR,
 
+           # rsync specific options
+           'progress!'              => \$PROGRESS,
            # the next three options limit which backups get acted upon
            'dest=s'                 => \$DEST,
            'host=s'                 => \$HOST,
@@ -835,6 +839,9 @@ sub verbargs {
       push(@a,'--terminal-verbosity',$TVERBOSITY);
     }
   } elsif(defined $TVERBOSITY and $TVERBOSITY > 3) {
+    if($PROGRESS) {
+      push(@a,'--progress');
+    }
     @a='-v';
   }
   @a;
