@@ -418,8 +418,13 @@ if($STATUS) {
     if ($$bh{btype} eq 'duplicity') {
       @com=($DUPLICITY_BINARY,'verify');
       $USEAGENT and push(@com,'--use-agent');
-    } else {
+    }
+    elsif($$bh{btype} eq 'rdiff-backup') {
       @com=($RDIFF_BACKUP_BINARY,'--compare','--no-eas');
+    }
+    else {
+      warn("verify function not implemented for rsync backups");
+      next;
     }
     push(@com,verbargs($bh),'--exclude-other-filesystems');
     foreach my $f (@{$$bh{excludes}}) {
