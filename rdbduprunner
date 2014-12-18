@@ -64,6 +64,7 @@ our $LOG_LEVEL='info';
 our $LOCALHOST;
 our $LOCK_FILE;
 our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
+my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
 our $TEST=1;
 
 # global variables
@@ -106,6 +107,7 @@ GetOptions(
            # rsync specific options
            'v|verbose'              => \$VERBOSE,
            'progress!'              => \$PROGRESS,
+           'logdir=s'               => \$LOG_DIR,
            # the next three options limit which backups get acted upon
            'dest=s'                 => \$DEST,
            'host=s'                 => \$HOST,
@@ -547,7 +549,7 @@ if($STATUS) {
             push(@com,'--stats');
           }
           # use logging
-          push(@com,'--log-file=/var/log/rdbduprunner/'.$$bh{tag}.'.log')
+          push(@com,'--log-file='.$LOG_DIR.'/'.$$bh{tag}.'.log')
         }
         if(defined $TEMPDIR) {
           if(-d $TEMPDIR) {
