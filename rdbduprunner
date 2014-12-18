@@ -407,6 +407,7 @@ if($STATUS) {
     my $avcom="$RDIFF_BACKUP_BINARY --calculate-average";
     foreach my $bh (sort backup_sort (@BACKUPS)) {
         unless($$bh{btype} eq 'rdiff-backup') {
+          warn("average function only applies to rdiff-backup type backupes");
             next;
         }
         $avcom.=" $$bh{dest}/rdiff-backup-data/session_statistics.*.data";
