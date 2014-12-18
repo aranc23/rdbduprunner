@@ -1045,7 +1045,56 @@ rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
 
 B<rdbduprunner> {B<-h|--help>}
 
-B<rdbduprunner> {B<--notest>} {B<--config> <path>} {B<--dest> <regex>} {B<--dest> <regex>} {B<--host> <regex>} {B<--path> <regex>} {B<--facility> <user|daemon|...>} {B<--level> <info|warn|...>} {B<--lockfile> <path>} {B<--logfile> <path>}
+B<rdbduprunner> {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<-v|--verbosity> I<integer>}
 
 
 =head1 DESCRIPTION
+
+rdbduprunner is a wrapper for rsync, rdiff-backup, and duplicity
+backups.  By default rdbduprunner will get all it's configuration from
+~/.rdbduprunner.rc using an apache-esque config file format parsed by
+the Config::General module.
+
+General usage involves running rdbduprunner with no options which will
+only print out warnings and the commands that would be invoked if you
+were to run it with the --notest option. Then run it again with the
+--notest option to see the output.
+
+Other common options involve filtering which backups to run, adjusting
+the verbosity of the output, adjusting logging.
+
+
+=head1 OPTIONS
+
+=over 4
+
+=item {B<--test>|B<--notest>}
+
+The default invocation assumes --test which causes rdbduprunner to
+print which commands it would run.  Passing --notest will cause
+rdbduprunner to actually run the backup commands.
+
+=item {B<--dest> I<regex>}
+
+This option causes the backups to be run to be filtered based on the
+BackupDestination.
+
+=item {B<--host> I<regex>}
+
+This option causes the backups to be run to be filtered based on the
+Host.
+
+=item {B<--path> I<regex>}
+
+This option causes the backups to be run to be filtered based on the
+path on the host to be backed up.
+
+=item {B<-t|--terminal-verbosity> I<integer>}
+
+Increases logging verbosity to the terminal.
+
+=item {B<-v|--verbosity> I<integer>}
+
+Increases logging verbosity to the rdiff-backup/duplicity log files.
+
+=back
