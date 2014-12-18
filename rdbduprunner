@@ -546,6 +546,8 @@ if($STATUS) {
           if($STATS) {
             push(@com,'--stats');
           }
+          # use logging
+          push(@com,'--log-file=/var/log/rdbduprunner/'.$$bh{tag}.'.log')
         }
         if(defined $TEMPDIR) {
           if(-d $TEMPDIR) {
