@@ -380,6 +380,10 @@ if($STATUS) {
         } elsif($$bh{btype} eq 'rdiff-backup') {
             push(@com,$RDIFF_BACKUP_BINARY,'--check-destination-dir');
         }
+        else {
+          warn("cleanup function only implmented for duplicity and rdiff-backup");
+          next;
+        }
         push(@com,verbargs($bh),
              $$bh{dest});
         info(join(" ",@com));
