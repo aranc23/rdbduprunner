@@ -457,6 +457,7 @@ if($STATUS) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
     my @com;
     unless($$bh{btype} eq 'duplicity') {
+      warn("list function only applies to duplicity type backups");
       next;
     }
     @com=($DUPLICITY_BINARY,'list-current-files');
