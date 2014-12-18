@@ -10,6 +10,7 @@ use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Env qw( HOME USER );
 use Data::Dumper;
 use POSIX qw( strftime );
+use Pod::Usage;
 
 # added from CPAN or system packages
 use Config::General;
@@ -17,6 +18,9 @@ use Log::Dispatch;
 use Log::Dispatch::Syslog;
 use Log::Dispatch::Screen;
 use Log::Dispatch::File;
+
+# print usage and exit
+my $HELP=0;
 
 # can be overridden from the command line, but not the config
 our $CONFIG_FILE="$HOME/.rdbduprunner.rc";
@@ -66,6 +70,8 @@ our $DISPATCHER;
 our @INCREMENTS;
 
 GetOptions(
+           # show usage
+           'h|help'                 => \$HELP,
            # can be overridden from the command line, but not the config
            'config=s'       => \$CONFIG_FILE, # config file
 
@@ -111,6 +117,9 @@ GetOptions(
            'logfile=s'              => \$LOG_FILE,
            'test!'                  => \$TEST,
           );
+
+# print the SYNOPSIS section and exit
+pod2usage(-1) if $HELP;
 
 if(not defined $LOCALHOST) {
   if(defined $CONFIG{localhost}) {
@@ -1012,3 +1021,22 @@ sub tag_prio {
   return $prios{$t} if defined $prios{$t};
   return 0;
 }
+
+
+=head1 NAME
+
+rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
+
+=head1 SYNOPSIS
+
+B<rdbduprunner> {B<-h|--help>}
+
+B<rdbduprunner> {B<--notest>} {B<--config> <path>} {B<--dest> <regex>} {B<--dest> <regex>} {B<--host> <regex>} {B<--path> <regex>} {B<--facility> <user|daemon|...>} {B<--level>                 => \$LOG_LEVEL,
+           'localhost=s'            => \$LOCALHOST,
+           'lockfile=s'             => \$LOCK_FILE,
+           'logfile=s'              => \$LOG_FILE,
+           'test!'                  => \$TEST,
+
+
+
+=head1 DESCRIPTION
