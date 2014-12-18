@@ -747,6 +747,9 @@ sub tidy {
         }
       }
     }
+    else {
+      warn("tidy only applies to duplicity and rdiff-backup");
+    }
   }
 
 sub debug {
