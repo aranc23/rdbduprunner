@@ -1031,12 +1031,7 @@ rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
 
 B<rdbduprunner> {B<-h|--help>}
 
-B<rdbduprunner> {B<--notest>} {B<--config> <path>} {B<--dest> <regex>} {B<--dest> <regex>} {B<--host> <regex>} {B<--path> <regex>} {B<--facility> <user|daemon|...>} {B<--level>                 => \$LOG_LEVEL,
-           'localhost=s'            => \$LOCALHOST,
-           'lockfile=s'             => \$LOCK_FILE,
-           'logfile=s'              => \$LOG_FILE,
-           'test!'                  => \$TEST,
-
+B<rdbduprunner> {B<--notest>} {B<--config> <path>} {B<--dest> <regex>} {B<--dest> <regex>} {B<--host> <regex>} {B<--path> <regex>} {B<--facility> <user|daemon|...>} {B<--level> <info|warn|...>} {B<--lockfile> <path>} {B<--logfile> <path>}
 
 
 =head1 DESCRIPTION
