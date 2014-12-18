@@ -48,6 +48,7 @@ our $USEAGENT;
 our $ALLOWSOURCEMISMATCH=0;
 our $TEMPDIR;
 # rsync specific
+my $VERBOSE=0;
 my $PROGRESS=0;
 # the next three options limit which backups get acted upon
 our $DEST;
@@ -96,13 +97,14 @@ GetOptions(
            'maxage=s'               => \$MAXAGE,
            'maxinc=s'               => \$MAXINC,
            'stats!'                 => \$STATS,
-           'v|verbosity=i'          => \$VERBOSITY,
+           'verbosity=i'            => \$VERBOSITY,
            't|terminal-verbosity=i' => \$TVERBOSITY,
            'u|use-agent!'            => \$USEAGENT,
 	   'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
            'tempdir=s'              => \$TEMPDIR,
 
            # rsync specific options
+           'v|verbose'              => \$VERBOSE,
            'progress!'              => \$PROGRESS,
            # the next three options limit which backups get acted upon
            'dest=s'                 => \$DEST,
@@ -843,8 +845,8 @@ sub verbargs {
     if($PROGRESS) {
       push(@a,'--progress');
     }
-    if(defined $TVERBOSITY and $TVERBOSITY > 3) {
-      @a='-v';
+    if($VERBOSE) {
+      push(@a,'-v');
     }
   }
   @a;
