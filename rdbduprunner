@@ -77,7 +77,7 @@ GetOptions(
            # show usage
            'h|help'                 => \$HELP,
            # can be overridden from the command line, but not the config
-           'config=s'       => \$CONFIG_FILE, # config file
+           'config=s'               => \$CONFIG_FILE, # config file
 
            # the following changes the major mode of operation for rdbduprunner:
            'calculate-average'      => \$AVERAGE,
@@ -100,7 +100,7 @@ GetOptions(
            'stats!'                 => \$STATS,
            'verbosity=i'            => \$VERBOSITY,
            't|terminal-verbosity=i' => \$TVERBOSITY,
-           'u|use-agent!'            => \$USEAGENT,
+           'u|use-agent!'           => \$USEAGENT,
            'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
            'tempdir=s'              => \$TEMPDIR,
 
