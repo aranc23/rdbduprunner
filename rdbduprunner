@@ -83,7 +83,7 @@ GetOptions(
            'calculate-average'      => \$AVERAGE,
            'cleanup'                => \$CLEANUP,
            'check'                  => \$CLEANUP,
-	   'compare'                => \$COMPARE,
+           'compare'                => \$COMPARE,
            'verify'                 => \$COMPARE,
            'dump'                   => \$DUMP,
            'list-oldest'            => \$LISTOLDEST,
@@ -101,7 +101,7 @@ GetOptions(
            'verbosity=i'            => \$VERBOSITY,
            't|terminal-verbosity=i' => \$TVERBOSITY,
            'u|use-agent!'            => \$USEAGENT,
-	   'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
+           'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
            'tempdir=s'              => \$TEMPDIR,
 
            # rsync specific options
