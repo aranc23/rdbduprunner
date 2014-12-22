@@ -301,7 +301,10 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         if( -f $EXCLUDE_PATH.'/exclude-'.$tag ) {
             push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-'.$tag);
         }
-
+        $$bh{exclude}=[];
+        foreach my $exc (ref($$bs{exclude}) eq "ARRAY" ? @{$$bs{exclude}} : ($$bs{exclude})) {
+          push(@{$$bh{exclude}},$exc);
+        }
         if(defined $MAXAGE) {
             $$bh{maxage}=$MAXAGE;
         } elsif(not defined $$bh{maxage} and
