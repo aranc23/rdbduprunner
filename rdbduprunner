@@ -571,6 +571,9 @@ if($STATUS) {
                  $f);
           }
         }
+        foreach my $x (@{$$bh{exclude}}) {
+          push(@com,'--exclude',$x);
+        }
         # this is fugly:
         push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.($$bh{btype} eq 'rsync' ? ':' : '::').$$bh{path}),$$bh{dest});
 
