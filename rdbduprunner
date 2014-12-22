@@ -1119,3 +1119,36 @@ Rsync specific. Passes --progress to rsync invocations.
 
 =back
 
+=head1 RETURN VALUE
+
+=head1 ERRORS
+
+=head1 DIAGNOSTICS
+
+=head1 EXAMPLES
+
+=head1 ENVIRONMENT
+
+=head1 FILES
+
+=head1 CAVEATS
+
+=head1 BUGS
+
+=head1 RESTRICTIONS
+
+=head1 NOTES
+
+=head1 AUTHOR
+
+Aran Cox <arancox@gmail.com>
+
+=head1 HISTORY
+
+=head1 SEE ALSO
+
+=over 4
+
+rdiff-backup(1), duplicity(1), rsync(1), trickle(1), ssh(1), unison(1).
+
+=back
