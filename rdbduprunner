@@ -1131,6 +1131,77 @@ Rsync specific. Passes --progress to rsync invocations.
 
 =head1 FILES
 
+=head2 F<$HOME/.rdbduprunner.rc>
+
+rdbduprunner's config file is an Apache style config file parsed by
+the Config::General perl module. It consists of global options,
+options enclosed in a BackupDestination config section and options
+enclosed in a BackupSet section.  The options names are case
+insensitive. Options are generally honored in this order:
+
+=over 4
+
+=item Command line options
+
+=item BackupSet options
+
+=item BackupDestination options
+
+=item Global options
+
+=back
+
+=head3 Global Options
+
+=over 4
+
+=item I<DuplicityBinary> - path to duplicity
+
+=item I<RdiffBackupBinary> - path to rdiff-backup
+
+=item I<RsyncBinary> - path to rsync
+
+=item I<LockFile> - change the default lock/pid file from
+F<$HOME/rdbduprunner.pid>
+
+=item I<ExcludePath> - What directory to look for exclude
+files. Defaults to F</etc/rdbduprunner-excludes>
+
+=item I<UseAgent>
+
+=item I<TempDir> - Passed to some binaries as an alternate temp dir
+path. Defaults to not pass any temp options therefore probably uses
+/tmp.
+
+=item I<DefaultBackupDestination> - Which backup destination to use if
+none is specified.
+
+=back
+
+=head3 BackupDestination Options
+
+Items enclosed in a <BackupDestination X> configuration block. The
+name of the block is referenced by the I<DefaultBackupDestination> global
+option and the I<BackupDestination> config option inside BackupSet
+blocks.
+
+=over 4
+
+=back
+
+=head3 BackupSet Options
+
+Items enclosed in a <BackupSet X> configuration block. The
+name of the block is not used anywhere but should be unique.
+
+=over 4
+
+=back
+
+=head2 F<$HOME/rdbduprunner.pid>
+
+Default PID/lock file.
+
 =head1 CAVEATS
 
 =head1 BUGS
