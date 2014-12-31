@@ -1111,7 +1111,8 @@ path on the host to be backed up.
 
 =item {B<-t|--terminal-verbosity> I<integer>}
 
-Increases logging verbosity to the terminal.
+Increases logging verbosity to the terminal with
+rdiff-backup/duplicity backups.
 
 =item {B<--verbosity> I<integer>}
 
