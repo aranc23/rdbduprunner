@@ -702,8 +702,7 @@ sub lock_pid_file {
 }
 
 sub unlock_pid_file {
-  my $LOCK_FILE=lock_file_compose(@_);
-    unlink $LOCK_FILE;
+    unlink lock_file_compose(@_);
     flock(LOCK,LOCK_UN);
     close LOCK;
 }
