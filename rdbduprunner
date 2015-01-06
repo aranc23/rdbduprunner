@@ -361,13 +361,13 @@ if($STATUS) {
     push(@com,$$bh{dest});
     info(join(" ",@com));
     unless($TEST) {
-      lock_pid_file();
+      lock_pid_file($$bh{host});
       set_env($bh);
       system(@com);
       unless($? == 0) {
         error('unable to execute '.$com[0].'!');
       }
-      unlock_pid_file();
+      unlock_pid_file($$bh{host});
     }
   }
 } elsif($LISTOLDEST) {
@@ -398,23 +398,23 @@ if($STATUS) {
              $$bh{dest});
         info(join(" ",@com));
         unless($TEST) {
-            lock_pid_file();
+            lock_pid_file($$bh{host});
             set_env($bh);
             system(@com);
             unless($? == 0) {
                 error("unable to execute $$bh{btype}!");
             }
-            unlock_pid_file();
+            unlock_pid_file($$bh{host});
         }
     }
 } elsif ($TIDY) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
       unless($TEST) {
-	lock_pid_file();
+	lock_pid_file($$bh{host});
       }
         tidy($bh);
       unless($TEST) {
-	unlock_pid_file();
+	unlock_pid_file($$bh{host});
       }
     }
 } elsif($AVERAGE) {
@@ -457,14 +457,14 @@ if($STATUS) {
 	
     info(join(" ",@com));
     unless($TEST) {
-      lock_pid_file();
+      lock_pid_file($$bh{host});
       set_env($bh);
       system(@com);
       my $mainret=$?;
       unless($mainret == 0) {
 	error("$$bh{btype} exited with an error");
       }
-      unlock_pid_file();
+      unlock_pid_file($$bh{host});
     }
   }
 } elsif($LIST) {
@@ -480,13 +480,13 @@ if($STATUS) {
     push(@com,$$bh{dest});
     info(join(" ",@com));
     unless($TEST) {
-      lock_pid_file();
+      lock_pid_file($$bh{host});
       set_env($bh);
       system(@com);
       unless($? == 0) {
         error('unable to execute '.$com[0].'!');
       }
-      unlock_pid_file();
+      unlock_pid_file($$bh{host});
     }
   }
 } else {			# actually do a backup, please
