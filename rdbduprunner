@@ -63,6 +63,7 @@ our $FACILITY='user';
 our $LOG_LEVEL='info';
 our $LOCALHOST;
 our $LOCK_FILE;
+my $LOCK_DIR;
 our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
 my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
 our $TEST=1;
@@ -122,6 +123,7 @@ GetOptions(
            'level=s'                => \$LOG_LEVEL,
            'localhost=s'            => \$LOCALHOST,
            'lockfile=s'             => \$LOCK_FILE,
+           'lockdir=s'              => \$LOCK_DIR,
            'logfile=s'              => \$LOG_FILE,
            'test!'                  => \$TEST,
           );
@@ -195,6 +197,14 @@ if(defined $LOCK_FILE) {
   $LOCK_FILE=$CONFIG{lockfile};
 } else {
   $LOCK_FILE="$HOME/rdbduprunner.pid";
+}
+
+if(defined $LOCK_DIR) {
+  # leave it alone, it comes from the command line
+} elsif(defined $CONFIG{lockdir}) {
+  $LOCK_DIR=$CONFIG{lockdir};
+} else {
+  $LOCK_DIR=($USER eq 'root' ? '/var/run/rdbduprunner' : $HOME.'/var/run/rdbduprunner');
 }
 
 if(defined $EXCLUDE_PATH) {
