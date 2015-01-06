@@ -289,6 +289,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         $$bh{btype}=$btype;
         if($$bh{btype} eq 'rsync') {
           $$bh{path}=$$bh{path}.'/';
+          $$bh{path} =~ s/\/\/$/\//; # remove double slashes
         }
         if( -f $EXCLUDE_PATH.'/exclude-generic' ) {
             push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-generic');
