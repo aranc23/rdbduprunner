@@ -62,7 +62,6 @@ our $EXCLUDE_PATH;
 our $FACILITY='user';
 our $LOG_LEVEL='info';
 our $LOCALHOST;
-our $LOCK_FILE;
 my $LOCK_DIR;
 our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
 my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
@@ -122,7 +121,6 @@ GetOptions(
            'facility=s'             => \$FACILITY,
            'level=s'                => \$LOG_LEVEL,
            'localhost=s'            => \$LOCALHOST,
-           'lockfile=s'             => \$LOCK_FILE,
            'lockdir=s'              => \$LOCK_DIR,
            'logfile=s'              => \$LOG_FILE,
            'test!'                  => \$TEST,
@@ -189,14 +187,6 @@ unless(defined $TVERBOSITY) { # from the command line
   if(defined $CONFIG{terminalverbosity}) {
     $TVERBOSITY=$CONFIG{terminalverbosity};
   }
-}
-
-if(defined $LOCK_FILE) {
-  # leave it alone, it comes from the command line
-} elsif(defined $CONFIG{lockfile}) {
-  $LOCK_FILE=$CONFIG{lockfile};
-} else {
-  $LOCK_FILE="$HOME/rdbduprunner.pid";
 }
 
 if(defined $LOCK_DIR) {
@@ -625,7 +615,10 @@ if($STATUS) {
         info(join(" ",@com));
 
         unless($TEST) {
-            lock_pid_file();
+          unless(lock_pid_file($$bh{host})) {
+            warn("lock for $$bh{host} is already in use elsewhere, skipping this host");
+            next BACKUP;
+          }
 
             if (defined $$bh{prerun}) {
                 info($$bh{prerun});
@@ -635,6 +628,7 @@ if($STATUS) {
                     # if we failed to run the pre-run, issue the final summary based on that
                     error("unable to execute prerun command: skipping backup!");
                     log_exit_status($bh,$?);
+                    unlock_pid_file($$bh{host});
                     next;
                 }
             }
@@ -659,7 +653,7 @@ if($STATUS) {
               # issue final summary based on the main backup process
               log_exit_status($bh,$mainret);
             }
-	    unlock_pid_file();
+	    unlock_pid_file($$bh{host});
         }
     }
 }
@@ -687,20 +681,28 @@ sub backup_sort {
   return 0;
 }
 
+sub lock_file_compose {
+  return sprintf('%s/%s.lock',$LOCK_DIR,$_[0]);
+}
+
 sub lock_pid_file {
+  my $LOCK_FILE=lock_file_compose(@_);
     unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
 	error("unable to open pid file: $LOCK_FILE for writing");
-	die("unable to open pid file: $LOCK_FILE for writing");
+    return 0; # false or fail
     }
     unless(flock(LOCK,LOCK_EX|LOCK_NB)) {
+    close(LOCK);
 	error("unable to flock the pid file: $LOCK_FILE");
-	die("unable to flock the pid file: $LOCK_FILE");
+    return 0; # false or fail
     }
     truncate(LOCK,0); # this shouldn't fail if we have the file opened and locked!
     print LOCK $$."\n"; # who really cares if this fails?
+  return 1; # happiness is a locked file
 }
 
 sub unlock_pid_file {
+  my $LOCK_FILE=lock_file_compose(@_);
     unlink $LOCK_FILE;
     flock(LOCK,LOCK_UN);
     close LOCK;
