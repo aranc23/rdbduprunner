@@ -66,7 +66,7 @@ my $LOCK_DIR;
 our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
 my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
 our $TEST=1;
-my @SKIP_FS=qw( rootfs proc sysfs devtmpfs devpts tmpfs selinuxfs usbfs binfmt_misc rpc_pipefs nfs exfat htfs vfat ntfs );
+my @SKIP_FS=qw( rootfs proc sysfs devtmpfs devpts tmpfs selinuxfs usbfs binfmt_misc rpc_pipefs nfs exfat htfs vfat ntfs cgroup pstore cifs hugetlbfs mqueue nfsd fuse.gvfsd-fuse securityfs configfs debugfs autofs fusectl );
 my $SKIP_FS_REGEX;
 
 # global variables
@@ -223,7 +223,7 @@ if(not defined $TEMPDIR) {
 }
 
 # combine the list of filesystems to skip into a regex
-$SKIP_FS_REGEX='^('.join('|',@SKIP_FS).')$';
+$SKIP_FS_REGEX='^('.join('|',map(quotemeta,@SKIP_FS)).')$';
 
 foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my $bs=$CONFIG{backupset}{$bstag};
@@ -262,13 +262,14 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
 
     my @extrapaths;
-    if($$bs{inventory} =~ /^(yes|true|on)$/) {
+    if(defined $$bs{inventory} and $$bs{inventory}) {
       # perform inventory
+      debug("performing inventory on $host");
       my @a=`ssh $host cat /proc/mounts`;
       if($? == 0) {
         foreach my $m (@a) {
           my @e=split(/\s+/,$m);
-          unless($e[2] =~ $SKIP_FS_REGEX) {
+          unless($e[2] =~ /$SKIP_FS_REGEX/) {
             push(@extrapaths,$e[1]);
           }
         }
