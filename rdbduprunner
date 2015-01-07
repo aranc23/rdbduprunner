@@ -267,9 +267,15 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
       debug("performing inventory on $host");
       my @a=`ssh $host cat /proc/mounts`;
       if($? == 0) {
+      M:
         foreach my $m (@a) {
           my @e=split(/\s+/,$m);
           unless($e[2] =~ /$SKIP_FS_REGEX/) {
+            foreach my $skip (ref($$bs{skip}) eq "ARRAY" ? @{$$bs{skip}} : ($$bs{skip})) {
+              if($e[1] eq $skip) {
+                next M;
+              }
+            }
             push(@extrapaths,$e[1]);
           }
         }
