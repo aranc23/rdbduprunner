@@ -261,7 +261,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     }
     my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
 
-    my @extrapaths;
+    my @paths=ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path});
     if(defined $$bs{inventory} and $$bs{inventory}) {
       # perform inventory
       debug("performing inventory on $host");
@@ -278,7 +278,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
                 }
               }
             }
-            push(@extrapaths,$e[1]);
+            push(@paths,$e[1]);
           }
         }
       }
@@ -286,7 +286,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         error("unable to inventory ${host}");
       }
     }
-    foreach my $path (ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path}),@extrapaths) {
+    foreach my $path (@paths) {
         $path =~ s/.+\/$//; # remove any trailing slash, but only if there is something before it!
         my $bh={};
         if(defined $PATH and $path !~ /$PATH/) {
