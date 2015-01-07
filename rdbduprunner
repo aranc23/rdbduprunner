@@ -66,6 +66,8 @@ my $LOCK_DIR;
 our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
 my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
 our $TEST=1;
+my @SKIP_FS=qw( rootfs proc sysfs devtmpfs devpts tmpfs selinuxfs usbfs binfmt_misc rpc_pipefs nfs exfat htfs vfat ntfs );
+my $SKIP_FS_REGEX;
 
 # global variables
 our %CONFIG;
@@ -124,6 +126,7 @@ GetOptions(
            'lockdir=s'              => \$LOCK_DIR,
            'logfile=s'              => \$LOG_FILE,
            'test!'                  => \$TEST,
+           'skipfs=s'               => \@SKIP_FS,
           );
 
 # print the SYNOPSIS section and exit
@@ -219,6 +222,9 @@ if(not defined $TEMPDIR) {
   }
 }
 
+# combine the list of filesystems to skip into a regex
+$SKIP_FS_REGEX='^('.join('|',@SKIP_FS).')$';
+
 foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my $bs=$CONFIG{backupset}{$bstag};
     my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
@@ -255,7 +261,23 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     }
     my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
 
-    foreach my $path (ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path})) {
+    my @extrapaths;
+    if($$bs{inventory} =~ /^(yes|true|on)$/) {
+      # perform inventory
+      my @a=`ssh $host cat /proc/mounts`;
+      if($? == 0) {
+        foreach my $m (@a) {
+          my @e=split(/\s+/,$m);
+          unless($e[2] =~ $SKIP_FS_REGEX) {
+            push(@extrapaths,$e[1]);
+          }
+        }
+      }
+      else {
+        error("unable to inventory ${host}");
+      }
+    }
+    foreach my $path (ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path}),@extrapaths) {
         $path =~ s/.+\/$//; # remove any trailing slash, but only if there is something before it!
         my $bh={};
         if(defined $PATH and $path !~ /$PATH/) {
