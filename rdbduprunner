@@ -261,7 +261,10 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     }
     my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
 
-    my @paths=ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path});
+    my @paths;
+    if(defined $$bs{path}) {
+      @paths=ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path});
+    }
     if(defined $$bs{inventory} and $$bs{inventory}) {
       # perform inventory
       debug("performing inventory on $host");
