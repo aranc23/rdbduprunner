@@ -199,6 +199,11 @@ if(defined $LOCK_DIR) {
 } else {
   $LOCK_DIR=($USER eq 'root' ? '/var/run/rdbduprunner' : $HOME.'/var/run/rdbduprunner');
 }
+if(! -d $LOCK_DIR) {
+  mkdir($LOCK_DIR);
+  # this is racy but seriously
+  chmod(0700,$LOCK_DIR);
+}
 
 if(defined $EXCLUDE_PATH) {
   # leave it alone, it comes from the command line
