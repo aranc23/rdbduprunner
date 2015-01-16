@@ -330,7 +330,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
           $$bh{path}=$$bh{path}.'/';
           $$bh{path} =~ s/\/\/$/\//; # remove double slashes
         }
-        my $epath=( $btype == 'rsync'
+        my $epath=( $btype eq 'rsync'
                     ? join('/',$EXCLUDE_PATH,'excludes')
                     : join('/',$EXCLUDE_PATH,'rdb-excludes')
                   );
