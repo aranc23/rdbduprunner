@@ -335,7 +335,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
                     : join('/',$EXCLUDE_PATH,'rdb-excludes')
                   );
         if( -f $epath.'/generic' ) {
-            push(@{$$bh{excludes}},$epath.'/exclude-generic');
+            push(@{$$bh{excludes}},$epath.'/generic');
         }
 
         if( -f $epath.'/'.$$bh{gtag} ) {
