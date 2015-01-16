@@ -210,7 +210,7 @@ if(defined $EXCLUDE_PATH) {
 } elsif(defined $CONFIG{excludepath}) {
   $EXCLUDE_PATH=$CONFIG{excludepath};
 } else {
-  $EXCLUDE_PATH='/etc/rdbduprunner/excludes';
+  $EXCLUDE_PATH='/etc/rdbduprunner';
 }
 
 if(not defined $USEAGENT) {
@@ -330,16 +330,20 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
           $$bh{path}=$$bh{path}.'/';
           $$bh{path} =~ s/\/\/$/\//; # remove double slashes
         }
-        if( -f $EXCLUDE_PATH.'/exclude-generic' ) {
-            push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-generic');
+        my $epath=( $btype == 'rsync'
+                    ? join('/',$EXCLUDE_PATH,'excludes')
+                    : join('/',$EXCLUDE_PATH,'rdb-excludes')
+                  );
+        if( -f $epath.'/generic' ) {
+            push(@{$$bh{excludes}},$epath.'/exclude-generic');
         }
 
-        if( -f $EXCLUDE_PATH.'/exclude-'.$$bh{gtag} ) {
-            push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-'.$$bh{gtag});
+        if( -f $epath.'/'.$$bh{gtag} ) {
+            push(@{$$bh{excludes}},$epath.'/'.$$bh{gtag});
         }
 
-        if( -f $EXCLUDE_PATH.'/exclude-'.$tag ) {
-            push(@{$$bh{excludes}},$EXCLUDE_PATH.'/exclude-'.$tag);
+        if( -f $epath.'/'.$tag ) {
+            push(@{$$bh{excludes}},$epath.'/'.$tag);
         }
         $$bh{exclude}=[];
         foreach my $exc (ref($$bs{exclude}) eq "ARRAY" ? @{$$bs{exclude}} : ($$bs{exclude})) {
