@@ -286,6 +286,13 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
                 }
               }
             }
+            if(defined $$bs{skipre}) {
+              foreach my $skipre (ref($$bs{skipre}) eq "ARRAY" ? @{$$bs{skipre}} : ($$bs{skipre})) {
+                if($e[1] =~ /$skipre/) {
+                  next M;
+                }
+              }
+            }
             push(@paths,$e[1]);
           }
         }
