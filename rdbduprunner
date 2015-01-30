@@ -281,8 +281,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
           unless($e[2] =~ /$SKIP_FS_REGEX/) {
             if(defined $$bs{skip}) {
               foreach my $skip (ref($$bs{skip}) eq "ARRAY" ? @{$$bs{skip}} : ($$bs{skip})) {
-                my $skip_regexp=quotemeata($skip);
-                if($e[1] =~ /$skip_regexp/) {
+                if($e[1] =~ $skip) {
                   next M;
                 }
               }
