@@ -275,8 +275,9 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
       debug("performing inventory on $host");
       my @a=`ssh $host cat /proc/mounts`;
       if($? == 0) {
+        my @seen;
       M:
-        foreach my $m (@a) {
+        foreach my $m (sort(@a)) {
           my @e=split(/\s+/,$m);
           unless($e[2] =~ /$SKIP_FS_REGEX/) {
             if(defined $$bs{skip}) {
@@ -293,6 +294,9 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
                 }
               }
             }
+            # skip seen devices
+            grep(/^$e[0]$/,@seen) and next;
+            push(@seen,$e[0]);
             push(@paths,$e[1]);
           }
         }
