@@ -313,20 +313,21 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         }
         my $dest;
         my $tag='';
+        my $gtag='';
         if(defined $$bs{tag}) {
             $dest=$$bs{tag};
             $tag=$dest;
+            $gtag='generic-'+$tag;
         } else {
             $dest=$path;
             $dest =~ s/\//\-/g;
             $dest =~ s/ /_/g;
             $dest eq '-' and $dest='-root';
             $tag=$host.$dest;
+            $gtag='generic'+$tag;
         }
         # I should use a perl module here, I guess, not .
         $dest=$backupdestpath.'/'.$tag;
-        my @tags=split(/\-/,$tag);
-
         debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
 
         $bh={%{$bs}}; # very important to make a copy here
@@ -335,7 +336,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         $$bh{tag}=$tag;
         $$bh{host}=$host;
         $$bh{backupdestination}=$backupdest;
-        $$bh{gtag}='generic-'.$tags[1];
+        $$bh{gtag}=$gtag;
         $$bh{btype}=$btype;
         if($$bh{btype} eq 'rsync') {
           $$bh{path}=$$bh{path}.'/';
