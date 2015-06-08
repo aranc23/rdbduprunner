@@ -324,7 +324,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
             $dest =~ s/ /_/g;
             $dest eq '-' and $dest='-root';
             $tag=$host.$dest;
-            $gtag='generic'.$tag;
+            $gtag='generic'.$dest;
         }
         # I should use a perl module here, I guess, not .
         $dest=$backupdestpath.'/'.$tag;
