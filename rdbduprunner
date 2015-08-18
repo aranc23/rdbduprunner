@@ -273,7 +273,11 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     if(defined $$bs{inventory} and $$bs{inventory}) {
       # perform inventory
       debug("performing inventory on $host");
-      my @a=`ssh $host cat /proc/mounts`;
+      my $inventory_command='cat /proc/mounts';
+      if($host eq $LOCALHOST) {
+        $inventory_command="ssh ${host} ${inventory_command}";
+      }
+      my @a=`${inventory_command}`;
       if($? == 0) {
         my @seen;
       M:
