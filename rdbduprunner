@@ -66,7 +66,7 @@ my $LOCK_DIR;
 our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
 my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
 our $TEST=1;
-my @SKIP_FS=qw( rootfs proc sysfs devtmpfs devpts tmpfs selinuxfs usbfs binfmt_misc rpc_pipefs nfs exfat htfs vfat ntfs cgroup pstore cifs hugetlbfs mqueue nfsd fuse.gvfsd-fuse securityfs configfs debugfs autofs fusectl ipathfs );
+my @SKIP_FS=qw( rootfs proc sysfs devtmpfs devpts tmpfs selinuxfs usbfs binfmt_misc rpc_pipefs nfs nfs4 exfat htfs vfat ntfs cgroup pstore cifs hugetlbfs mqueue nfsd fuse.gvfsd-fuse securityfs configfs debugfs autofs fusectl ipathfs );
 my $SKIP_FS_REGEX;
 
 # global variables
