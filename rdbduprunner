@@ -596,7 +596,7 @@ if($STATUS) {
             }
         } elsif($$bh{btype} eq 'rsync') {
           @com=($RSYNC_BINARY,
-                '-ax',
+                '-axSH',
                 '--delete',
                 '--delete-excluded',
                );
