@@ -272,7 +272,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     }
     if(defined $$bs{inventory} and $$bs{inventory}) {
       # perform inventory
-      debug("performing inventory on $host");
+      notice("performing inventory on $host");
       my $inventory_command='cat /proc/mounts';
       if($host ne $LOCALHOST) {
         $inventory_command="ssh -o BatchMode=yes ${host} ${inventory_command}";
