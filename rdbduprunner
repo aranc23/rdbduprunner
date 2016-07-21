@@ -393,6 +393,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
                 }
             }
         }
+        dlog('debug','backup',$bh);
         push(@BACKUPS,$bh);
     }
 }
