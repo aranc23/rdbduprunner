@@ -235,6 +235,8 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
     my $btype;
     my $backupdest;
+    dlog('info','backupset',
+         $bs);
 
     if(defined $HOST and $host !~ /$HOST/) {
       next;
