@@ -334,7 +334,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         }
         # I should use a perl module here, I guess, not .
         $dest=$backupdestpath.'/'.$tag;
-        debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
+        #debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
 
         $bh={%{$bs}}; # very important to make a copy here
         $$bh{dest}=$dest;
