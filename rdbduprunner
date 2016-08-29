@@ -69,7 +69,32 @@ our $TEST=1;
 my @SKIP_FS=qw( rootfs proc sysfs devtmpfs devpts tmpfs selinuxfs usbfs binfmt_misc rpc_pipefs nfs nfs4 exfat htfs vfat ntfs cgroup pstore cifs hugetlbfs mqueue nfsd fuse.gvfsd-fuse fuse.gvfs-fuse-daemon securityfs configfs debugfs autofs fusectl zfs fuse.encfs iso9660 ipathfs fuse.vmware-vmblock );
 my $SKIP_FS_REGEX;
 
-# global variables
+# from the man page for rsync 3.1.1
+my $EXIT_CODE={
+               'rsync' => {
+                           '0' => 'Success',
+                           '1' => 'Syntax or usage error',
+                           '2' => 'Protocol incompatibility',
+                           '3' => 'Errors selecting input/output files, dirs',
+                           '4' => 'Requested  action  not  supported',
+                           '5' => 'Error starting client-server protocol',
+                           '6' => 'Daemon unable to append to log-file',
+                           '10' => 'Error in socket I/O  Error in file I/O',
+                           '11' => 'Error in file I/O',
+                           '12' => 'Error in rsync protocol data stream',
+                           '13' => 'Errors with program diagnostics',
+                           '14' => 'Error in IPC code',
+                           '20' => 'Received SIGUSR1 or SIGINT',
+                           '21' => 'Some error returned by waitpid()',
+                           '22' => 'Error allocating core memory buffers',
+                           '23' => 'Partial transfer due to error',
+                           '24' => 'Partial transfer due to vanished source files',
+                           '25' => 'The --max-delete limit stopped deletions',
+                           '30' => 'Timeout in data send/receive',
+                           '35' => 'Timeout waiting for daemon connection',
+                          },
+              };
+
 our %CONFIG;
 our @BACKUPS;
 our $DISPATCHER;
@@ -697,6 +722,12 @@ if($STATUS) {
             set_env($bh);
             system(@com);
             my $mainret=$?;
+            if($$bh{btype} eq 'rsync') {
+              $mainret=($mainret/256);
+            }
+            if(defined $$EXIT_CODE{$$bh{btype}}{$mainret}) {
+              $$bh{'exit_code'}=$$EXIT_CODE{$$bh{btype}}{$mainret};
+            }
             unless($mainret == 0) {
                 error("unable to execute $$bh{btype}!");
             }
