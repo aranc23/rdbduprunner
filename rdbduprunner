@@ -720,7 +720,9 @@ if($STATUS) {
                 }
             }
             set_env($bh);
+            $$bh{runtime}=time();
             system(@com);
+            $$bh{runtime}=time()-$$bh{runtime};
             my $mainret=$?;
             if($$bh{btype} eq 'rsync') {
               $mainret=($mainret/256);
