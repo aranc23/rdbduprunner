@@ -96,6 +96,7 @@ my @SKIP_FS=qw(
                 rpc_pipefs
                 securityfs
                 selinuxfs
+				squashfs
                 sysfs
                 tmpfs
                 usbfs
