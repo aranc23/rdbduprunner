@@ -70,6 +70,7 @@ my @SKIP_FS=qw(
                 autofs
                 binfmt_misc
                 cgroup
+                cgroup2
                 cifs
                 configfs
                 debugfs
