@@ -69,6 +69,7 @@ our $TEST=1;
 my @SKIP_FS=qw(
                 autofs
                 binfmt_misc
+                bpf
                 cgroup
                 cgroup2
                 cifs
@@ -97,7 +98,7 @@ my @SKIP_FS=qw(
                 rpc_pipefs
                 securityfs
                 selinuxfs
-				squashfs
+                squashfs
                 sysfs
                 tmpfs
                 usbfs
