@@ -66,6 +66,8 @@ my $LOCK_DIR;
 our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
 my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
 our $TEST=1;
+my $MAXPROCS=1;
+
 my @SKIP_FS=qw(
                 autofs
                 binfmt_misc
@@ -190,6 +192,7 @@ GetOptions(
            'logfile=s'              => \$LOG_FILE,
            'test!'                  => \$TEST,
            'skipfs=s'               => \@SKIP_FS,
+           'maxprocs=i'             => \$MAXPROCS,
           );
 
 # print the SYNOPSIS section and exit
@@ -737,57 +740,90 @@ if($STATUS) {
         if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/ and $$bh{btype} ne 'rsync') {
           unshift(@com,'/usr/bin/trickle','-s','-u',$$bh{trickle});
         }
-        info(join(" ",@com));
-
+        #info(join(" ",@com));
+        push(@{$$bh{com}},@com);
+      }
+    my $current_priority=0;
+    # to my eternal shame I give the next 4 lines
+    foreach my $bh (sort backup_sort (@BACKUPS)) {
+      $current_priority=$$bh{priority};
+      last;
+    }
+    foreach my $bh (sort backup_sort (@BACKUPS)) {
+      if($current_priority != $$bh{priority}) {
+        info("priority changed: $current_priority to $$bh{priority}");
+        $current_priority=$$bh{priority};
+      }
+    }
+    my @sorted_backups=sort backup_sort (@BACKUPS);
+    my $current_proc=0;
+    my @pids;
+    foreach my $bh (sort backup_sort (@BACKUPS)) {
+      if($current_proc >= $MAXPROCS) {
+        $current_proc=0;
+      }
+      $current_proc++;
+      my $pid=fork();
+      if($pid == 0) {
+        create_dispatcher(); # to set the pid, may not work correctly
+        my ($lock1,$lock2);
         unless($TEST) {
-          unless(lock_pid_file($$bh{host})) {
-            warn("lock for $$bh{host} is already in use elsewhere, skipping this host");
-            next BACKUP;
+          unless($lock1=lock_pid_file($$bh{host}) and $lock2=lock_pid_file("rdbduprunner-proc-${current_proc}")) {
+            dlog('error','lock failure',$bh);
+            exit;
           }
 
-            if (defined $$bh{prerun}) {
-                info($$bh{prerun});
-                set_env($bh);
-                system($$bh{prerun});
-                unless($? == 0) {
-                    # if we failed to run the pre-run, issue the final summary based on that
-                    error("unable to execute prerun command: skipping backup!");
-                    log_exit_status($bh,$?);
-                    unlock_pid_file($$bh{host});
-                    next;
-                }
-            }
+          if (defined $$bh{prerun}) {
+            info($$bh{prerun});
             set_env($bh);
-            $$bh{runtime}=time();
-            system(@com);
-            $$bh{runtime}=time()-$$bh{runtime};
-            my $mainret=$?;
-            if($$bh{btype} eq 'rsync') {
-              $mainret=($mainret/256);
+            system($$bh{prerun});
+            unless($? == 0) {
+              # if we failed to run the pre-run, issue the final summary based on that
+              error("unable to execute prerun command: skipping backup!");
+              log_exit_status($bh,$?);
+              exit;
             }
-            if(defined $$EXIT_CODE{$$bh{btype}}{$mainret}) {
-              $$bh{'exit_code'}=$$EXIT_CODE{$$bh{btype}}{$mainret};
+          }
+          set_env($bh);
+          $$bh{runtime}=time();
+          system(@{$$bh{com}});
+          $$bh{runtime}=time()-$$bh{runtime};
+          my $mainret=$?;
+          if($$bh{btype} eq 'rsync') {
+            $mainret=($mainret/256);
+          }
+          if(defined $$EXIT_CODE{$$bh{btype}}{$mainret}) {
+            $$bh{'exit_code'}=$$EXIT_CODE{$$bh{btype}}{$mainret};
+          }
+          unless($mainret == 0) {
+            error("unable to execute $$bh{btype}!");
+          }
+          # if there is no postrun, return the log_exit_status using $mainret
+          # if there is a postrun, return that value instead regardless of failure
+          if(defined $$bh{postrun}) {
+            info($$bh{postrun});
+            system($$bh{postrun});
+            unless($? == 0) {
+              error("unable to execute postrun command");
             }
-            unless($mainret == 0) {
-                error("unable to execute $$bh{btype}!");
-            }
-            # if there is no postrun, return the log_exit_status using $mainret
-            # if there is a postrun, return that value instead regardless of failure
-            if(defined $$bh{postrun}) {
-                info($$bh{postrun});
-                system($$bh{postrun});
-                unless($? == 0) {
-                    error("unable to execute postrun command");
-                }
-                # issue final summary based on the return value of the postrun command
-                log_exit_status($bh,$?);
-            }
-            else {
-              # issue final summary based on the main backup process
-              log_exit_status($bh,$mainret);
-            }
-	    unlock_pid_file($$bh{host});
+            # issue final summary based on the return value of the postrun command
+            log_exit_status($bh,$?);
+          }
+          else {
+            # issue final summary based on the main backup process
+            log_exit_status($bh,$mainret);
+          }
+          exit $mainret;
         }
+        # child
+        exit 0; # I guess we were testing
+      }
+      elsif($pid > 0) {
+        push(@pids,$pid);
+      }
+    }
+    foreach my $pid (@pids) {
+      wait; # wait once for each pid
     }
 }
 
@@ -820,25 +856,29 @@ sub lock_file_compose {
 
 sub lock_pid_file {
   my $LOCK_FILE=lock_file_compose(@_);
-    unless(open(LOCK,'+<'.$LOCK_FILE) or open(LOCK,'>'.$LOCK_FILE)) {
-	error("unable to open pid file: $LOCK_FILE for writing");
+  my $LOCK;
+  print $LOCK_FILE,"\n";
+  unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
+    error("unable to open pid file: $LOCK_FILE for writing");
     return 0; # false or fail
-    }
-    unless(flock(LOCK,LOCK_EX|LOCK_NB)) {
-    close(LOCK);
-	error("unable to flock the pid file: $LOCK_FILE");
+  }
+  my $waittime=time();
+  unless(flock($LOCK,LOCK_EX)) {
+    close($LOCK);
+    error("unable to flock the pid file: $LOCK_FILE");
     return 0; # false or fail
-    }
-    truncate(LOCK,0); # this shouldn't fail if we have the file opened and locked!
-    print LOCK $$."\n"; # who really cares if this fails?
-  return 1; # happiness is a locked file
+  }
+  debug("lock wait time for $LOCK_FILE: ".(time()-$waittime));
+  truncate($LOCK,0); # this shouldn't fail if we have the file opened and locked!
+  print $LOCK $$."\n"; # who really cares if this fails?
+  return $LOCK; # happiness is a locked file
 }
 
 sub unlock_pid_file {
-    unlink lock_file_compose(@_);
-    flock(LOCK,LOCK_UN);
-    close LOCK;
+    flock($_[0],LOCK_UN);
+    close $_[0];
 }
+
 
 sub tidy {
     my $bh=$_[0];
