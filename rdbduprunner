@@ -63,10 +63,12 @@ our $FACILITY='user';
 our $LOG_LEVEL='info';
 our $LOCALHOST;
 my $LOCK_DIR;
+my $LOCK_BASE='rdbduprunner';
 our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
 my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
 our $TEST=1;
 my $MAXPROCS=1;
+my @children;
 
 my @SKIP_FS=qw(
                 autofs
@@ -189,6 +191,7 @@ GetOptions(
            'level=s'                => \$LOG_LEVEL,
            'localhost=s'            => \$LOCALHOST,
            'lockdir=s'              => \$LOCK_DIR,
+           'lockbase=s'             => \$LOCK_BASE,
            'logfile=s'              => \$LOG_FILE,
            'test!'                  => \$TEST,
            'skipfs=s'               => \@SKIP_FS,
@@ -291,6 +294,14 @@ if(not defined $TEMPDIR) {
   if(defined $CONFIG{tempdir}) {
     $TEMPDIR=$CONFIG{tempdir};
   }
+}
+
+if(not defined $MAXPROCS) {
+    if(defined $CONFIG{duplicitybinary}) {
+	$MAXPROCS=$CONFIG{duplicitybinary};
+    } else {
+	$MAXPROCS=1;
+    }
 }
 
 # combine the list of filesystems to skip into a regex
@@ -743,36 +754,20 @@ if($STATUS) {
         #info(join(" ",@com));
         push(@{$$bh{com}},@com);
       }
-    my $current_priority=0;
-    # to my eternal shame I give the next 4 lines
-    foreach my $bh (sort backup_sort (@BACKUPS)) {
-      $current_priority=$$bh{priority};
-      last;
+    my $biglock;
+    unless($TEST) {
+      $biglock=lock_pid_file($LOCK_BASE);
     }
     foreach my $bh (sort backup_sort (@BACKUPS)) {
-      if($current_priority != $$bh{priority}) {
-        info("priority changed: $current_priority to $$bh{priority}");
-        $current_priority=$$bh{priority};
-      }
-    }
-    my @sorted_backups=sort backup_sort (@BACKUPS);
-    my $current_proc=0;
-    my @pids;
-    foreach my $bh (sort backup_sort (@BACKUPS)) {
-      if($current_proc >= $MAXPROCS) {
-        $current_proc=0;
-      }
-      $current_proc++;
       my $pid=fork();
       if($pid == 0) {
         create_dispatcher(); # to set the pid, may not work correctly
         my ($lock1,$lock2);
         unless($TEST) {
-          unless($lock1=lock_pid_file($$bh{host}) and $lock2=lock_pid_file("rdbduprunner-proc-${current_proc}")) {
+          unless($lock1=lock_pid_file($$bh{host}) and $lock2=lock_proc_file()) {
             dlog('error','lock failure',$bh);
             exit;
           }
-
           if (defined $$bh{prerun}) {
             info($$bh{prerun});
             set_env($bh);
@@ -819,11 +814,12 @@ if($STATUS) {
         exit 0; # I guess we were testing
       }
       elsif($pid > 0) {
-        push(@pids,$pid);
+        push(@children,$pid);
       }
     }
-    foreach my $pid (@pids) {
-      wait; # wait once for each pid
+    for my $pid (@children) {
+      debug("waiting for child ${pid}");
+      waitpid $pid, 0;
     }
 }
 
@@ -871,6 +867,31 @@ sub lock_pid_file {
   truncate($LOCK,0); # this shouldn't fail if we have the file opened and locked!
   print $LOCK $$."\n"; # who really cares if this fails?
   return $LOCK; # happiness is a locked file
+}
+
+sub lock_proc_file {
+  my $waittime=time();
+  while(1) {
+    foreach my $proc (1..$MAXPROCS) {
+      my $LOCK_FILE=lock_file_compose("rdbduprunner-proc-${proc}");
+      my $LOCK;
+      unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
+        error("unable to open pid file: $LOCK_FILE for writing");
+        return 0; # false or fail
+      }
+      debug("attempting to lock $LOCK_FILE");
+      unless(flock($LOCK,LOCK_EX|LOCK_NB)) {
+        close($LOCK);
+        next;
+      }
+      debug("process lock wait time: ".(time()-$waittime));
+      truncate($LOCK,0); # this shouldn't fail if we have the file opened and locked!
+      print $LOCK $$."\n"; # who really cares if this fails?
+      return $LOCK; # happiness is a locked file
+    }
+    debug("sleeping between lock attempts");
+    sleep 10;
+  }
 }
 
 sub unlock_pid_file {
@@ -1239,7 +1260,6 @@ sub tag_prio {
   return $prios{$t} if defined $prios{$t};
   return 0;
 }
-
 
 =head1 NAME
 
