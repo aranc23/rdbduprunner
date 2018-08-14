@@ -823,7 +823,7 @@ if($STATUS) {
       while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
         delete $children{$pid};
       }
-      debug("still waiting on ".(scalar(keys(%children)))." to exit");
+      debug("still waiting on ".(scalar(keys(%children)))." sub-processes to exit");
       sleep 10;
     }
 }
