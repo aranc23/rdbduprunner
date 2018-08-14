@@ -884,7 +884,6 @@ sub lock_proc_file {
         error("unable to open pid file: $LOCK_FILE for writing");
         return 0; # false or fail
       }
-      debug("attempting to lock $LOCK_FILE");
       unless(flock($LOCK,LOCK_EX|LOCK_NB)) {
         close($LOCK);
         next;
@@ -894,7 +893,6 @@ sub lock_proc_file {
       print $LOCK $$."\n"; # who really cares if this fails?
       return $LOCK; # happiness is a locked file
     }
-    debug("sleeping between lock attempts");
     sleep((rand 10) + 5);
   }
 }
