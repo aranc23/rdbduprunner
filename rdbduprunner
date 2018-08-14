@@ -857,7 +857,6 @@ sub lock_file_compose {
 sub lock_pid_file {
   my $LOCK_FILE=lock_file_compose(@_);
   my $LOCK;
-  print $LOCK_FILE,"\n";
   unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
     error("unable to open pid file: $LOCK_FILE for writing");
     return 0; # false or fail
