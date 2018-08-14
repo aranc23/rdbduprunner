@@ -765,7 +765,7 @@ if($STATUS) {
         create_dispatcher(); # to set the pid, may not work correctly
         my ($lock1,$lock2);
         unless($TEST) {
-          unless($lock1=lock_pid_file($$bh{host}) and $lock2=lock_proc_file()) {
+          unless($lock1=lock_pid_file($$bh{host}) and sleep 1 and $lock2=lock_proc_file()) {
             dlog('error','lock failure',$bh);
             exit;
           }
