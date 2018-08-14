@@ -11,6 +11,7 @@ use Env qw( HOME USER );
 use Data::Dumper;
 use POSIX qw( strftime );
 use Pod::Usage;
+use POSIX ":sys_wait_h"; # for nonblocking read
 
 # added from CPAN or system packages
 use Config::General;
@@ -68,7 +69,7 @@ our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/r
 my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
 our $TEST=1;
 my $MAXPROCS=1;
-my @children;
+my %children;
 
 my @SKIP_FS=qw(
                 autofs
@@ -781,6 +782,7 @@ if($STATUS) {
           }
           set_env($bh);
           $$bh{runtime}=time();
+          info(join(" ",@{$$bh{com}}));
           system(@{$$bh{com}});
           $$bh{runtime}=time()-$$bh{runtime};
           my $mainret=$?;
@@ -814,12 +816,15 @@ if($STATUS) {
         exit 0; # I guess we were testing
       }
       elsif($pid > 0) {
-        push(@children,$pid);
+        $children{$pid}=1;
       }
     }
-    for my $pid (@children) {
-      debug("waiting for child ${pid}");
-      waitpid $pid, 0;
+    while(scalar(keys(%children)) > 0) {
+      while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
+        delete $children{$pid};
+      }
+      debug("still waiting on ".(scalar(keys(%children)))." to exit");
+      sleep 10;
     }
 }
 
