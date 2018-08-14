@@ -298,8 +298,8 @@ if(not defined $TEMPDIR) {
 }
 
 if(not defined $MAXPROCS) {
-    if(defined $CONFIG{duplicitybinary}) {
-	$MAXPROCS=$CONFIG{duplicitybinary};
+    if(defined $CONFIG{maxprocs}) {
+	$MAXPROCS=$CONFIG{maxprocs};
     } else {
 	$MAXPROCS=1;
     }
