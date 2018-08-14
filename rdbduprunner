@@ -68,7 +68,7 @@ my $LOCK_BASE='rdbduprunner';
 our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
 my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
 our $TEST=1;
-my $MAXPROCS=1;
+my $MAXPROCS;
 my %children;
 
 my @SKIP_FS=qw(
