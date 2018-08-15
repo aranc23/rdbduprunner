@@ -756,7 +756,6 @@ if($STATUS) {
         if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/ and $$bh{btype} ne 'rsync') {
           unshift(@com,'/usr/bin/trickle','-s','-u',$$bh{trickle});
         }
-        #info(join(" ",@com));
         push(@{$$bh{com}},@com);
         $TEST and info(join(" ",@com));
       }
