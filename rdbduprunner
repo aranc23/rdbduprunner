@@ -758,7 +758,7 @@ if($STATUS) {
         }
         #info(join(" ",@com));
         push(@{$$bh{com}},@com);
-        $TEST and info(join(" ",@com)."\n");
+        $TEST and info(join(" ",@com));
       }
     my $biglock;
     unless($TEST) {
