@@ -1396,6 +1396,8 @@ path. Defaults to not pass any temp options therefore probably uses
 =item I<DefaultBackupDestination> - Which backup destination to use if
 none is specified.
 
+=item I<MaxProcs> - Maxiumum number of backups to run simultaneously.
+
 =back
 
 =head3 BackupDestination Options
