@@ -344,6 +344,10 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     if(defined $DEST and $backupdest !~ /$DEST/) {
         next;
     }
+    unless(exists $CONFIG{backupdestination}{$backupdest}) {
+      error("there is no such backupdestination as $backupdest in the config, skipping");
+      next;
+    }
     my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
 
     my @paths;
