@@ -898,7 +898,7 @@ sub lock_proc_file {
         close($LOCK);
         next;
       }
-      debug("process lock wait time: ".(time()-$waittime));
+      debug("process lock (${proc}) wait time: ".(time()-$waittime));
       truncate($LOCK,0); # this shouldn't fail if we have the file opened and locked!
       print $LOCK $$."\n"; # who really cares if this fails?
       return $LOCK; # happiness is a locked file
