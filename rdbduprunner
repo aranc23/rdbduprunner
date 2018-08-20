@@ -838,7 +838,7 @@ if($STATUS) {
     }
 }
 
-info("exiting, total run time: ".sprintf('%.2f seconds',$RUNTIME-time()));
+info("exiting, total run time: ".sprintf('%.2f seconds',time()-$RUNTIME));
 
 sub backup_sort {
   my @sortorder=qw( tag host backupdestination );
