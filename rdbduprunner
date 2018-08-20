@@ -12,6 +12,7 @@ use Data::Dumper;
 use POSIX qw( strftime );
 use Pod::Usage;
 use POSIX ":sys_wait_h"; # for nonblocking read
+eval { use Time::HiRes qw( time ); };
 
 # added from CPAN or system packages
 use Config::General;
@@ -70,6 +71,7 @@ my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbdupr
 our $TEST=1;
 my $MAXPROCS;
 my %children;
+my $RUNTIME;
 
 my @SKIP_FS=qw(
                 autofs
@@ -220,6 +222,7 @@ my $callback_clean = sub { my %t=@_;
 
 create_dispatcher();
 info('starting');
+$RUNTIME=time();
 
 %CONFIG=new Config::General(-ConfigFile => $CONFIG_FILE,
 			    -IncludeGlob => 1,
@@ -835,7 +838,7 @@ if($STATUS) {
     }
 }
 
-info('exiting');
+info("exiting, total run time: ".sprintf('%.6f seconds',$RUNTIME-time()));
 
 sub backup_sort {
   my @sortorder=qw( tag host backupdestination );
