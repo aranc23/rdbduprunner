@@ -823,13 +823,13 @@ if($STATUS) {
         $children{$pid}=1;
       }
     }
-    while(scalar(keys(%children)) > 0) {
+    do {
       while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
         delete $children{$pid};
       }
       debug("still waiting on ".(scalar(keys(%children)))." sub-processes to exit");
-      sleep 10;
-    }
+      sleep 10 if scalar(keys(%children)) > 0;
+    } until scalar(keys(%children)) == 0
 }
 
 info("exiting, total run time: ".sprintf('%.2f seconds',time()-$RUNTIME));
