@@ -811,9 +811,10 @@ if($STATUS) {
             system($$bh{postrun});
             unless($? == 0) {
               error("unable to execute postrun command");
+              # issue final summary based on the return value of the postrun command
+              log_exit_status($bh,$?);
+              exit 0;
             }
-            # issue final summary based on the return value of the postrun command
-            log_exit_status($bh,$?);
           }
         }
         # issue final summary based on the main backup process
