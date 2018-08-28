@@ -65,7 +65,6 @@ our $FACILITY='user';
 our $LOG_LEVEL='info';
 our $LOCALHOST;
 my $LOCK_DIR;
-my $LOCK_BASE='rdbduprunner';
 our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
 my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
 our $TEST=1;
@@ -194,7 +193,6 @@ GetOptions(
            'level=s'                => \$LOG_LEVEL,
            'localhost=s'            => \$LOCALHOST,
            'lockdir=s'              => \$LOCK_DIR,
-           'lockbase=s'             => \$LOCK_BASE,
            'logfile=s'              => \$LOG_FILE,
            'test!'                  => \$TEST,
            'skipfs=s'               => \@SKIP_FS,
@@ -761,10 +759,6 @@ if($STATUS) {
         }
         push(@{$$bh{com}},@com);
       }
-    my $biglock;
-    unless($TEST) {
-      $biglock=lock_pid_file($LOCK_BASE);
-    }
     foreach my $bh (sort backup_sort (@BACKUPS)) {
       my $pid=fork();
       if($pid == 0) {
