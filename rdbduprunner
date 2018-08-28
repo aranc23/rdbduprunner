@@ -903,7 +903,7 @@ sub lock_proc_file {
 
 sub unlock_pid_file {
     flock($_[0],LOCK_UN);
-    close $_[0];
+    # close $_[0];
 }
 
 
