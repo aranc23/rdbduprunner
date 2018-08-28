@@ -506,13 +506,13 @@ if($STATUS) {
     push(@com,$$bh{dest});
     info(join(" ",@com));
     unless($TEST) {
-      lock_pid_file($$bh{host});
+      my $lock=lock_pid_file($$bh{host});
       set_env($bh);
       system(@com);
       unless($? == 0) {
         error('unable to execute '.$com[0].'!');
       }
-      unlock_pid_file($$bh{host});
+      unlock_pid_file($lock);
     }
   }
 } elsif($LISTOLDEST) {
@@ -543,23 +543,24 @@ if($STATUS) {
              $$bh{dest});
         info(join(" ",@com));
         unless($TEST) {
-            lock_pid_file($$bh{host});
+            my $lock=lock_pid_file($$bh{host});
             set_env($bh);
             system(@com);
             unless($? == 0) {
                 error("unable to execute $$bh{btype}!");
             }
-            unlock_pid_file($$bh{host});
+            unlock_pid_file($lock);
         }
     }
 } elsif ($TIDY) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
+      my $lock;
       unless($TEST) {
-	lock_pid_file($$bh{host});
+	$lock=lock_pid_file($$bh{host});
       }
         tidy($bh);
       unless($TEST) {
-	unlock_pid_file($$bh{host});
+	unlock_pid_file($lock);
       }
     }
 } elsif($AVERAGE) {
@@ -602,14 +603,14 @@ if($STATUS) {
 	
     info(join(" ",@com));
     unless($TEST) {
-      lock_pid_file($$bh{host});
+      my $lock=lock_pid_file($$bh{host});
       set_env($bh);
       system(@com);
       my $mainret=$?;
       unless($mainret == 0) {
 	error("$$bh{btype} exited with an error");
       }
-      unlock_pid_file($$bh{host});
+      unlock_pid_file($lock);
     }
   }
 } elsif($LIST) {
@@ -625,13 +626,13 @@ if($STATUS) {
     push(@com,$$bh{dest});
     info(join(" ",@com));
     unless($TEST) {
-      lock_pid_file($$bh{host});
+      my $lock=lock_pid_file($$bh{host});
       set_env($bh);
       system(@com);
       unless($? == 0) {
         error('unable to execute '.$com[0].'!');
       }
-      unlock_pid_file($$bh{host});
+      unlock_pid_file($lock);
     }
   }
 } else {			# actually do a backup, please
@@ -903,7 +904,7 @@ sub lock_proc_file {
 
 sub unlock_pid_file {
     flock($_[0],LOCK_UN);
-    # close $_[0];
+    close $_[0];
 }
 
 
