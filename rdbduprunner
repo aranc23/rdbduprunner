@@ -810,7 +810,7 @@ if($STATUS) {
             set_env($bh);
             system($$bh{postrun});
             unless($? == 0) {
-              error("unable to execute postrun command");
+              error("postrun command exited with an error");
               # issue final summary based on the return value of the postrun command
               log_exit_status($bh,$?);
               exit 0;
