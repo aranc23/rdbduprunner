@@ -1390,13 +1390,16 @@ and print those file names to stdout (for deletion, likely.)
 Removes the oldest known backup from all known rdiff-backup type
 backups.  Should remove only one backup regardless of other settings.
 Meant primarily for testing?  Ignores all other settings for cleaning
-up rdiff-backup style backups.
+up rdiff-backup style backups. This option honors the --test/--notest
+flags and will only print how rdiff-backup would be run if --notest
+isn't specified as well.
 
 =item {B<--status>}
 
 Works on all backup types.  On rsync invokes du, on duplicity uses the
 collection-status option and on rdiff-backup uses the
---list-increment-sizes option.
+--list-increment-sizes option.  This option requires --notest to
+execute, primarily because of the time it takes to run the operations.
 
 =item {B<--tidy>} (rdiff-backup/duplicity only)
 
