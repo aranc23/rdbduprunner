@@ -498,7 +498,7 @@ if($STATUS) {
       @com=($DUPLICITY_BINARY,'collection-status');
       $USEAGENT and push(@com,'--use-agent');
     } elsif($$bh{btype} eq 'rdiff-backup') {
-      @com=($RDIFF_BACKUP_BINARY,'-l');
+      @com=($RDIFF_BACKUP_BINARY,'--list-increment-sizes');
     } elsif($$bh{btype} eq 'rsync') {
       @com=('du','-cshx');
     }
