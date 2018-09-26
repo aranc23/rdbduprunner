@@ -1447,7 +1447,7 @@ Changes the facility as passed to the syslog subsystem.
 Default: info
 Syslog severity level which is passed to the logging dispatcher. Log
 messages of the specified severity or greater will be logged to
-syslog, stderr, and the rdbduprunner log file.
+syslog, stdout, and the rdbduprunner log file.
 
 =item {B<--maxinc> I<integer>}
 
