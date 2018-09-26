@@ -1299,7 +1299,7 @@ rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
 
 B<rdbduprunner> {B<-h|--help>}
 
-B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc>} {B<--maxage>} {B<--stats>|B<--nostats>} {B<--tempdir>}
+B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>} {B<--stats>|B<--nostats>} {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>}
 
 
 =head1 DESCRIPTION
@@ -1315,12 +1315,10 @@ were to run it with the --notest option. Then run it again with the
 --notest option to see the output.
 
 Other common options involve filtering which backups to run, adjusting
-the verbosity of the output, adjusting logging.
+the verbosity of the output, adjusting logging, and so on.
 
 
 =head1 OPTIONS
-
-=over 4
 
 =head2 MAJOR MODES
 
@@ -1329,6 +1327,8 @@ that; only one of the following is allowed for any invocation of
 rdbduprunner.  Many only apply to one or both of rdiff-backup or
 duplicity since they act on archives of their own creation.  For rsync
 backups tools like ls and du perform similar functions.
+
+=over 4
 
 =item {B<--calculate-average>} (rdiff-backup only)
 
@@ -1385,20 +1385,17 @@ Works on all backup types.  On rsync invokes du, on duplicity uses the
 collection-status option and on rdiff-backup uses the
 --list-increment-sizes option.
 
-=item {B<--tidy} (applies to rdiff-backup and duplicity)
+=item {B<--tidy>} (rdiff-backup/duplicity only)
 
 Attempts to apply the settings for a backup regarding the maximum
 number of increments or maximum age of an increment to all or
 specified backups.
 
-=item {B<--allow-source-mismatch>} (duplicity only)
-
-Passes the identical option to duplicity.  No affect on other backup
-types.
-
 =back
 
 =head2 SUB OPTIONS
+
+=over 4
 
 =item {B<--test>|B<--notest>}
 
@@ -1438,29 +1435,25 @@ Passes -v to rsync invocations.
 
 Passes --progress to rsync invocations.
 
-=item {B<--level}
+=item {B<--facility> I<user|daemon|...>}
 
-Syslog severity level which is passed to the logging dispatcher.  Log
+Default: user
+Changes the facility as passed to the syslog subsystem.
+
+=item {B<--level> I<debug|info|notice|warning|error|critical|alert|emergency>}
+
+Default: info
+Syslog severity level which is passed to the logging dispatcher. Log
 messages of the specified severity or greater will be logged to
-syslog, stderr, and the rdbduprunner log file. The following values
-are accepted:
+syslog, stderr, and the rdbduprunner log file.
 
-    debug
-    info
-    notice
-    warning
-    error
-    critical
-    alert
-    emergency
-
-=item {B<--maxinc}
+=item {B<--maxinc> I<integer>}
 
 Acts as if the MaxInc config option were applied to every backup in
 the configuration, but the backup specific MaxInc still takes
 precendence for any given backup.
 
-=item {B<--maxage}
+=item {B<--maxage> I<timespec>}
 
 Acts as if the MaxAge config option were applied to every backup in
 the configuration, but the backup specific MaxAge still takes
@@ -1472,10 +1465,35 @@ The default is to pass the various --stats options to the underlying
 binaries when making backups, but passing --nostats will suppress
 this.
 
-=item {B<--tempdir>}
+=item {B<--tempdir> I<path>}
 
 Pass the --tempdir or --temp-dir options to underlying binaries in the
 same manner as if the TempDir global config option had been specified.
+
+=item {B<--full>} (duplicity only)
+
+Passess the full option to duplicity backup.
+
+=item {B<--force>} (duplicity only)
+
+Passess the --force option to duplicity cleanup mode.
+
+=item {B<--config> I<path>}
+
+Change path to configuration file.
+
+=item {B<--maxprocs> I<integer>}
+
+Default: 1
+Maximum number of simultaneous backups to perform.  rdbduprunner will
+never do more than one backup from any given host at a time but if
+there are multiple hosts multiple backups should occur at once.
+See MaxProcs global config option.
+
+=item {B<--allow-source-mismatch>} (duplicity only)
+
+Passes the identical option to duplicity.  No affect on other backup
+types.
 
 =back
 
@@ -1547,6 +1565,8 @@ name of the block is referenced by the I<DefaultBackupDestination> global
 option and the I<BackupDestination> config option inside BackupSet
 blocks.
 
+=over 4
+
 =item I<PercentUsed> - Integer, optional
 
 Keep disk usage on destination below this percent:
@@ -1564,8 +1584,6 @@ byte blocks (because I could reliably get df to report this value.) It
 will do so before running backups and will not run backups if it
 cannot free this much space.
 
-=over 4
-
 =back
 
 =head3 BackupSet Options
@@ -1573,6 +1591,8 @@ cannot free this much space.
 Items enclosed in a <BackupSet X> configuration block. The name of the
 block is not referenced anywhere but should be unique or collisions
 will occur.
+
+=over 4
 
 =item I<BackupDestination> - String, optional
 
@@ -1619,8 +1639,6 @@ Used by the --tidy option to remove all increments older than
 specified age.  Ultimately this is passed to the remove-older-than
 options of rdiff-backup or duplicity so see those manpages for
 details.
-
-=over 4
 
 =back
 
