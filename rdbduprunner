@@ -530,7 +530,9 @@ if($STATUS) {
 elsif($ORPHANS) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
     if($$bh{btype} eq 'rdiff-backup') {
-      system('find',$$bh{dest},'-type','f','-name','rdiff-backup.tmp.*');
+      my @com=('find',$$bh{dest},'-type','f','-name','rdiff-backup.tmp.*');
+      info(join(" ",@com));
+      system(@com);
     }
   }
 } elsif($CLEANUP) {
