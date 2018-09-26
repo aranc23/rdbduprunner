@@ -38,6 +38,7 @@ our $REMOVE=0;
 our $STATUS=0;
 our $TIDY=0;
 our $LIST=0;
+our $ORPHANS=0;
 # the following affect what options are passed to rdiff-backup and/or duplicity
 our $FORCE=0;
 our $FULL=0;
@@ -163,6 +164,7 @@ GetOptions(
            'status'                 => \$STATUS,
            'tidy'                   => \$TIDY,
            'list'                   => \$LIST,
+           'orphans'                => \$ORPHANS,
 
            # the following affect what options are passed to rdiff-backup and/or duplicity
            'force!'                 => \$FORCE,
@@ -524,6 +526,13 @@ if($STATUS) {
 } elsif($REMOVE) {
     build_increment_list();
     remove_oldest('any');
+}
+elsif($ORPHANS) {
+  foreach my $bh (sort backup_sort (@BACKUPS)) {
+    if($$bh{btype} eq 'rdiff-backup') {
+      system('find',$$bh{dest},'-type','f','-name','rdiff-backup.tmp.*');
+    }
+  }
 } elsif($CLEANUP) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
         my @com;
