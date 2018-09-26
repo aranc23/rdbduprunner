@@ -66,8 +66,8 @@ our $FACILITY='user';
 our $LOG_LEVEL='info';
 our $LOCALHOST;
 my $LOCK_DIR;
-our $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
-my $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
+my $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rdbduprunner.log');
+my $LOG_DIR;
 our $TEST=1;
 my $MAXPROCS;
 my %children;
@@ -181,7 +181,6 @@ GetOptions(
            # rsync specific options
            'v|verbose'              => \$VERBOSE,
            'progress!'              => \$PROGRESS,
-           'logdir=s'               => \$LOG_DIR,
            # the next three options limit which backups get acted upon
            'dest=s'                 => \$DEST,
            'host=s'                 => \$HOST,
@@ -196,6 +195,7 @@ GetOptions(
            'level=s'                => \$LOG_LEVEL,
            'localhost=s'            => \$LOCALHOST,
            'lockdir=s'              => \$LOCK_DIR,
+           'logdir=s'               => \$LOG_DIR,
            'logfile=s'              => \$LOG_FILE,
            'test!'                  => \$TEST,
            'skipfs=s'               => \@SKIP_FS,
@@ -307,6 +307,17 @@ if(not defined $MAXPROCS) {
     } else {
 	$MAXPROCS=1;
     }
+}
+
+if(defined $LOG_DIR) {
+  # leave it alone, it comes from the command line
+} elsif(defined $CONFIG{logdir}) {
+  $LOG_DIR=$CONFIG{logdir};
+} else {
+  $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
+}
+if(! -d $LOG_DIR) {
+  mkdir($LOG_DIR);
 }
 
 # combine the list of filesystems to skip into a regex
