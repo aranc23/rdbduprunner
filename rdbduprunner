@@ -540,6 +540,17 @@ if($STATUS) {
           warn("cleanup function only implmented for duplicity and rdiff-backup");
           next;
         }
+        if(defined $TEMPDIR) {
+          if(-d $TEMPDIR) {
+            if($$bh{btype} eq 'rsync') {
+              push(@com,"--temp-dir=$TEMPDIR");
+            } else {
+              push(@com,'--tempdir',$TEMPDIR);
+            }
+          } else {
+            warn("specified temporary directory does not exist, not using it");
+          }
+        }
         push(@com,verbargs($bh),
              $$bh{dest});
         info(join(" ",@com));
