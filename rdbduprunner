@@ -1244,9 +1244,15 @@ sub update_bd_space {
 
 sub log_exit_status {
   my($bh,$exit)=@_;
-  dlog('notice','exit status',
-       {'exit' => $exit},
-       $bh);
+  my $msg = dlog('notice','exit status',
+                 {'exit' => $exit},
+                 $bh);
+  $msg =~ s/\"/\\\"/g;
+  if($$bh{host} ne $LOCALHOST) {
+    my $com="ssh -x -o BatchMode=yes $$bh{host} \"logger -t rdbduprunner -p ${FACILITY}.notice '${msg}'\" < /dev/null";
+    #print $com."\n";
+    system($com);
+  }
 }
 
 sub stringy {
@@ -1273,13 +1279,15 @@ sub dlog {
   my $level = shift;
   my $msg   = shift;
   my $time  = time();
+  my $str   = stringy({'msg'      => $msg,
+                       'severity' => $level,
+                       timestamp  => $time,
+                       datetime   => strftime("%F %T",localtime($time))},
+                      @_);
   $DISPATCHER->log( level   => $level,
-                    message => stringy({'msg'      => $msg,
-                                        'severity' => $level,
-                                        timestamp  => $time,
-                                        datetime   => strftime("%F %T",localtime($time))},
-                                       @_),
+                    message => $str,
                   );
+  return $str;
 }
 
 sub sort_tags {
