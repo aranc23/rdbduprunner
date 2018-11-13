@@ -70,8 +70,11 @@ my $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rd
 my $LOG_DIR;
 our $TEST=1;
 my $MAXPROCS;
+my $MAXWAIT;
 my %children;
 my $RUNTIME;
+
+my @fib; # cache some fibonacci sequences
 
 my @SKIP_FS=qw(
                 autofs
@@ -200,6 +203,7 @@ GetOptions(
            'test!'                  => \$TEST,
            'skipfs=s'               => \@SKIP_FS,
            'maxprocs=i'             => \$MAXPROCS,
+           'maxwait=i'              => \$MAXWAIT,
           );
 
 # print the SYNOPSIS section and exit
@@ -306,6 +310,14 @@ if(not defined $MAXPROCS) {
 	$MAXPROCS=$CONFIG{maxprocs};
     } else {
 	$MAXPROCS=1;
+    }
+}
+
+if(not defined $MAXWAIT) {
+    if(defined $CONFIG{maxwait}) {
+	$MAXWAIT=$CONFIG{maxwait};
+    } else {
+	$MAXWAIT=86400; # one day's worth of seconds
     }
 }
 
@@ -859,12 +871,15 @@ elsif($ORPHANS) {
         $children{$pid}=1;
       }
     }
+    my $fib_seq=0;
     do {
       while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
         delete $children{$pid};
+        $fib_seq=1;
       }
-      debug("still waiting on ".(scalar(keys(%children)))." sub-processes to exit");
-      sleep 10 if scalar(keys(%children)) > 0;
+      debug('still waiting on '.(scalar(keys(%children))).' sub-processes to exit, sleeping for '.fib($fib_seq).' seconds');
+      sleep fib($fib_seq) if scalar(keys(%children)) > 0;
+      $fib_seq++;
     } until scalar(keys(%children)) == 0
 }
 
@@ -898,24 +913,35 @@ sub lock_file_compose {
 sub lock_pid_file {
   my $LOCK_FILE=lock_file_compose(@_);
   my $LOCK;
-  unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
-    error("unable to open pid file: $LOCK_FILE for writing");
-    return 0; # false or fail
-  }
   my $waittime=time();
-  unless(flock($LOCK,LOCK_EX)) {
+  my $loop=0;
+  while(1) {
+    unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
+      error("unable to open pid file: $LOCK_FILE for writing");
+      return 0; # false or fail
+    }
+    if(flock($LOCK,LOCK_EX|LOCK_NB)) {
+      debug("lock wait time for $LOCK_FILE: ".(time()-$waittime));
+      truncate($LOCK,0); # this shouldn't fail if we have the file opened and locked!
+      print $LOCK $$."\n"; # who really cares if this fails?
+      return $LOCK; # happiness is a locked file
+    }
     close($LOCK);
-    error("unable to flock the pid file: $LOCK_FILE");
-    return 0; # false or fail
+    if(time()-$waittime > $MAXWAIT) {
+      notice("exceeded maximumum lock wait time for ${LOCK_FILE}: max/actual: ${MAXWAIT}/".(time()-$waittime) );
+      return 0; # false or fail
+    }
+    $loop++;
+    # never wait longer than an hour
+    my $sleep_for=( fib($loop) > 3600 ? 3600 : fib($loop) );
+    debug("still waiting on ${LOCK_FILE}, sleeping for ${sleep_for} seconds");
+    sleep $sleep_for;
   }
-  debug("lock wait time for $LOCK_FILE: ".(time()-$waittime));
-  truncate($LOCK,0); # this shouldn't fail if we have the file opened and locked!
-  print $LOCK $$."\n"; # who really cares if this fails?
-  return $LOCK; # happiness is a locked file
 }
 
 sub lock_proc_file {
   my $waittime=time();
+  my $loop=0;
   while(1) {
     foreach my $proc (1..$MAXPROCS) {
       my $LOCK_FILE=lock_file_compose("rdbduprunner-proc-${proc}");
@@ -933,7 +959,10 @@ sub lock_proc_file {
       print $LOCK $$."\n"; # who really cares if this fails?
       return $LOCK; # happiness is a locked file
     }
-    sleep((rand 10) + 5);
+    $loop++;
+    my $sleep_for=( fib($loop) > 3600 ? 3600 : fib($loop) );
+    debug("still waiting on process slot, sleeping for ${sleep_for} seconds");
+    sleep $sleep_for;
   }
 }
 
@@ -1312,6 +1341,14 @@ sub tag_prio {
   return 0;
 }
 
+# hacky little fib
+sub fib {
+  my $n = shift;
+  return $fib[$n] if defined $fib[$n];
+  return $fib[$n] = $n if $n < 2;
+  $fib[$n] = fib($n-1) + fib($n-2);
+}
+
 =head1 NAME
 
 rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
@@ -1320,7 +1357,7 @@ rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
 
 B<rdbduprunner> {B<-h|--help>}
 
-B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>} {B<--stats>|B<--nostats>} {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>}
+B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>} {B<--stats>|B<--nostats>} {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>} {B<--maxwait> I<integer>}
 
 
 =head1 DESCRIPTION
@@ -1514,6 +1551,13 @@ never do more than one backup from any given host at a time but if
 there are multiple hosts multiple backups should occur at once.
 See MaxProcs global config option.
 
+=item {B<--maxwait> I<integer>}
+
+Default: 86400
+Maximum number of seconds to wait for a lock on any given per-host
+lock file.
+See MaxWait global config option.
+
 =item {B<--allow-source-mismatch>} (duplicity only)
 
 Passes the identical option to duplicity.  No affect on other backup
@@ -1579,6 +1623,8 @@ path. Defaults to not pass any temp options therefore probably uses
 none is specified.
 
 =item I<MaxProcs> - Maxiumum number of backups to run simultaneously.
+
+=item I<MaxWait> - Maxiumum number of seconds to wait for a host lock.
 
 =back
 
