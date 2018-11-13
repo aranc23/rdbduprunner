@@ -936,7 +936,7 @@ sub lock_pid_file {
     }
     $loop++;
     # never wait longer than an hour
-    my $sleep_for=( fib($loop) > 3600 ? 3600 : fib($loop) );
+    my $sleep_for=( fib($loop) > 3600 ? 3600 : fib($loop) ) + int(rand 5);
     debug("still waiting on ${LOCK_FILE}, sleeping for ${sleep_for} seconds");
     sleep $sleep_for;
   }
@@ -963,7 +963,7 @@ sub lock_proc_file {
       return $LOCK; # happiness is a locked file
     }
     $loop++;
-    my $sleep_for=( fib($loop) > 3600 ? 3600 : fib($loop) );
+    my $sleep_for=( fib($loop) > 3600 ? 3600 : fib($loop) ) + int(rand 5);
     debug("still waiting on process slot, sleeping for ${sleep_for} seconds");
     sleep $sleep_for;
   }
