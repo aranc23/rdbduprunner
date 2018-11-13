@@ -877,8 +877,11 @@ elsif($ORPHANS) {
         delete $children{$pid};
         $fib_seq=1;
       }
-      debug('still waiting on '.(scalar(keys(%children))).' sub-processes to exit, sleeping for '.fib($fib_seq).' seconds');
-      sleep fib($fib_seq) if scalar(keys(%children)) > 0;
+      my $sleep_for=( fib($fib_seq) > 3600 ? 3600 : fib($fib_seq) ) + int(rand 5);
+      if(scalar(keys(%children)) > 0) {
+        debug('still waiting on '.(scalar(keys(%children)))." sub-processes to exit, sleeping for ${sleep_for} seconds");
+        sleep $sleep_for;
+      }
       $fib_seq++;
     } until scalar(keys(%children)) == 0
 }
