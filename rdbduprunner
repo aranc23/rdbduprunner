@@ -834,73 +834,8 @@ sub perform_backups {
   foreach my $host (keys %BACKUPS) {
     my $pid=fork();
     if ($pid == 0) {
-      create_dispatcher();    # to set the pid, may not work correctly
-      my ($lock1,$lock2);
-      unless($TEST) {
-        unless ($lock1=lock_pid_file($host) and sleep 1 and $lock2=lock_proc_file()) {
-          dlog('error','lock failure',$BACKUPS{$host}[0]);
-          exit;
-        }
-      }
-      foreach my $bh (sort backup_sort (@{$BACKUPS{$host}})) {
-        if(exists $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted} == 1) {
-          dlog('notice','skipping backup due to busted destination',$bh);
-          next;
-        }
-        push(@{$$bh{com}},build_backup_command($bh));
-        unless (@{$$bh{com}} > 0) {
-          dlog('debug','empty backup command',$bh);
-          next;
-        }
-        if (defined $$bh{prerun}) {
-          info($$bh{prerun});
-          unless($TEST) {
-            set_env($bh);
-            system($$bh{prerun});
-            unless($? == 0) {
-              # if we failed to run the pre-run, issue the final summary based on that
-              error("unable to execute prerun command: skipping backup!");
-              log_exit_status($bh,$?);
-              next;
-            }
-          }
-        }
-        info(join(" ",@{$$bh{com}}));
-        my $mainret=0;
-        unless($TEST) {
-          set_env($bh);
-          $$bh{runtime}=time();
-          system(@{$$bh{com}});
-          $mainret=$?;
-          $$bh{runtime}=time()-$$bh{runtime};
-          if ($$bh{btype} eq 'rsync') {
-            $mainret=($mainret/256);
-          }
-          if (defined $$EXIT_CODE{$$bh{btype}}{$mainret}) {
-            $$bh{'exit_code'}=$$EXIT_CODE{$$bh{btype}}{$mainret};
-          }
-          unless($mainret == 0) {
-            error("unable to execute $$bh{btype}!");
-          }
-        }
-        # if there is no postrun, return the log_exit_status using $mainret
-        # if there is a postrun, return that value instead regardless of failure
-        if (defined $$bh{postrun}) {
-          info($$bh{postrun});
-          unless($TEST) {
-            set_env($bh);
-            system($$bh{postrun});
-            unless($? == 0) {
-              error("postrun command exited with an error");
-              # issue final summary based on the return value of the postrun command
-              log_exit_status($bh,$?);
-              next;
-            }
-          }
-        }
-        # issue final summary based on the main backup process
-        log_exit_status($bh,$mainret) unless $TEST;
-      }
+      perform_backup($host,@{$BACKUPS{$host}});
+      critical('perform_backup should never return');
       exit;
     } elsif ($pid > 0) {
       $children{$pid}=1;
@@ -912,13 +847,92 @@ sub perform_backups {
       delete $children{$pid};
       $fib_seq=1;
     }
-    my $sleep_for=( fib($fib_seq) > 3600 ? 3600 : fib($fib_seq) ) + int(rand 5);
+    my $sleep_for=fib_max_rand($fib_seq,3600,5);
     if (scalar(keys(%children)) > 0) {
       debug('still waiting on '.(scalar(keys(%children)))." sub-processes to exit, sleeping for ${sleep_for} seconds");
       sleep $sleep_for;
     }
     $fib_seq++;
   } until scalar(keys(%children)) == 0
+}
+
+sub perform_backup {
+  my $host=shift;
+  create_dispatcher();    # to set the pid, may not work correctly
+  my ($lock1,$lock2);
+  unless($TEST) {
+    unless ($lock1=lock_pid_file($host) and sleep 1 and $lock2=lock_proc_file()) {
+      dlog('error','lock failure',$_[0]);
+      exit;
+    }
+  }
+  foreach my $bh (sort backup_sort (@_)) {
+    if(exists $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted} == 1) {
+      dlog('notice','skipping backup due to busted destination',$bh);
+      next;
+    }
+    push(@{$$bh{com}},build_backup_command($bh));
+    unless (@{$$bh{com}} > 0) {
+      dlog('debug','empty backup command',$bh);
+      next;
+    }
+    if (defined $$bh{prerun}) {
+      info($$bh{prerun});
+      unless($TEST) {
+        set_env($bh);
+        system($$bh{prerun});
+        unless($? == 0) {
+          # if we failed to run the pre-run, issue the final summary based on that
+          error("unable to execute prerun command: skipping backup!");
+          log_exit_status($bh,$?);
+          next;
+        }
+      }
+    }
+    info(join(" ",@{$$bh{com}}));
+    my $mainret=0;
+    unless($TEST) {
+      set_env($bh);
+      $$bh{runtime}=time();
+      system(@{$$bh{com}});
+      $mainret=$?;
+      $$bh{runtime}=time()-$$bh{runtime};
+      if ($$bh{btype} eq 'rsync') {
+        $mainret=($mainret/256);
+      }
+      if (defined $$EXIT_CODE{$$bh{btype}}{$mainret}) {
+        $$bh{'exit_code'}=$$EXIT_CODE{$$bh{btype}}{$mainret};
+      }
+      unless($mainret == 0) {
+        error("unable to execute $$bh{btype}!");
+      }
+    }
+    # if there is no postrun, return the log_exit_status using $mainret
+    # if there is a postrun, return that value instead regardless of failure
+    if (defined $$bh{postrun}) {
+      info($$bh{postrun});
+      unless($TEST) {
+        set_env($bh);
+        system($$bh{postrun});
+        unless($? == 0) {
+          error("postrun command exited with an error");
+          # issue final summary based on the return value of the postrun command
+          log_exit_status($bh,$?);
+          next;
+        }
+      }
+    }
+    # issue final summary based on the main backup process
+    log_exit_status($bh,$mainret) unless $TEST;
+  }
+  exit;
+}
+
+sub fib_max_rand {
+  my $fib_seq=shift;
+  my $max=shift;
+  my $rand=shift;
+  return ( fib($fib_seq) > $max ? $max : fib($fib_seq) ) + int(rand $rand);
 }
 
 sub backup_sort {
