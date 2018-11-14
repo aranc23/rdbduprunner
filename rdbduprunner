@@ -681,141 +681,176 @@ elsif($ORPHANS) {
       unlock_pid_file($lock);
     }
   }
-} else {			# actually do a backup, please
-  BACKUP:
-    foreach my $bh (sort backup_sort (@BACKUPS)) {
-        my @com;
-        if($$bh{disabled}) {
-            # skip disabled backups
-            next;
-        }
-
-        if($$bh{btype} eq 'duplicity' and not -d $$bh{path}) {
-            warning("backup path $$bh{path} does not exist for $$bh{tag}: skipping this backup");
+} else {
+  # here we will eventually just perform the backups
+  # first we check for space on rdiff-backup destinations and free some up,
+  # before forking away in perform_backups
+  foreach my $bh (@BACKUPS) {
+    if($$bh{btype} eq 'rdiff-backup') {
+      if($$bh{dest} =~ /\:\:/) {
+        info("we are assuming the destination $$bh{dest} is remote and will not attempt to manage it's disk space");
+      } else {
+        while(1) {
+          my $ans=check_space($$bh{backupdestination});
+          if($ans == -1) {
+            error("unable to determine if this backupdestination ($$bh{backupdestination}) has enough free space");
+            error("no backups to this backupdestination will be attempted and this message will be repeated only once");
+            $CONFIG{$$bh{backupdestination}}{busted}=1;
             next BACKUP;
-        }
-
-        if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
-            # I guess this is a way to mark a backupdestination as unavailable
-            next BACKUP;
-        }
-
-        if($$bh{btype} eq 'duplicity') {
-            @com=($DUPLICITY_BINARY);
-            $FULL and push(@com,'full');
-            $USEAGENT and push(@com,'--use-agent');
-	    $ALLOWSOURCEMISMATCH and push(@com,'--allow-source-mismatch');
-            if(defined $$bh{signkey}) {
-                push(@com,'--sign-key',$$bh{signkey});
+          } elsif($ans == 0) {
+            unless(remove_oldest($$bh{backupdestination})) {
+              # we failed to remove an increment from the backupdestination
+              # we cannot do backups on this bd for this run!
+              warning("unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
+              warning("no further attempts will be made to do backups to this destination");
+              $CONFIG{$$bh{backupdestination}}{busted}=1;
+              next BACKUP;
             }
-            if(defined $$bh{encryptkey}) {
-                push(@com,'--encrypt-key',$$bh{encryptkey});
-            }
-            unless($STATS) {
-                push(@com,'--no-print-statistics');
-            }
-            push(@com,'--exclude-other-filesystems');
-        } elsif($$bh{btype} eq 'rdiff-backup') { # must be rdiff-backup
-          @com=($RDIFF_BACKUP_BINARY,
-                '--exclude-device-files',
-                '--exclude-other-filesystems',
-                '--no-eas',
-               );
-            unless($$bh{sshcompress}) {
-                push(@com,'--ssh-no-compression');
-            }
-            if($STATS) {
-                push(@com,'--print-statistics');
-            }
-        } elsif($$bh{btype} eq 'rsync') {
-          @com=($RSYNC_BINARY,
-                '-axSH',
-                '--delete',
-                '--delete-excluded',
-               );
-          if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/) {
-            push(@com,"--bwlimit=$$bh{trickle}");
-          }
-          if($$bh{sshcompress}) {
-            push(@com,'-z');
-          }
-          if($STATS) {
-            push(@com,'--stats');
-          }
-          # use logging
-          push(@com,'--log-file='.$LOG_DIR.'/'.$$bh{tag}.'.log')
-        }
-        if(defined $TEMPDIR) {
-          if(-d $TEMPDIR) {
-            if($$bh{btype} eq 'rsync') {
-              push(@com,"--temp-dir=$TEMPDIR");
-            } else {
-              push(@com,'--tempdir',$TEMPDIR);
-            }
-          } else {
-            warn("specified temporary directory does not exist, not using it");
+            # we can just fall out now and let check_space() run again to see if it helped
+          } elsif($ans == 1) {
+            # we have enough space to proceed
+            last;
           }
         }
-        push(@com,verbargs($bh));
-
-        foreach my $f (@{$$bh{excludes}}) {
-          if($$bh{btype} eq 'rsync') {
-            push(@com,"--exclude-from=$f");
-          } else { # rdiff-backup and duplicity
-            push(@com,'--exclude-globbing-filelist',
-                 $f);
-          }
-        }
-        foreach my $x (@{$$bh{exclude}}) {
-          push(@com,'--exclude',$x);
-        }
-        # this is fugly:
-        push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.($$bh{btype} eq 'rsync' ? ':' : '::').$$bh{path}),$$bh{dest});
-
-        if($$bh{btype} eq 'rdiff-backup') {
-	  if($$bh{dest} =~ /\:\:/) {
-	    info("we are assuming the destination $$bh{dest} is remote and will not attempt to manage it's disk space");
-	  } else {
-            while(1) {
-                my $ans=check_space($$bh{backupdestination});
-                if($ans == -1) {
-                    error("unable to determine if this backupdestination ($$bh{backupdestination}) has enough free space");
-                    error("no backups to this backupdestination will be attempted and this message will be repeated only once");
-                    $CONFIG{$$bh{backupdestination}}{busted}=1;
-                    next BACKUP;
-                } elsif($ans == 0) {
-                    unless(remove_oldest($$bh{backupdestination})) {
-                        # we failed to remove an increment from the backupdestination
-                        # we cannot do backups on this bd for this run!
-                        warning("unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
-                        warning("no further attempts will be made to do backups to this destination");
-                        $CONFIG{$$bh{backupdestination}}{busted}=1;
-                        next BACKUP;
-                    }
-                    # we can just fall out now and let check_space() run again to see if it helped
-                } elsif($ans == 1) {
-                    # we have enough space to proceed
-                    last;
-                }
-	      }
-	  }
-        }
-        # if Trickle is set for a destination, use the trickle binary to slow upload rates to the value given
-        if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/ and $$bh{btype} ne 'rsync') {
-          unshift(@com,'/usr/bin/trickle','-s','-u',$$bh{trickle});
-        }
-        push(@{$$bh{com}},@com);
       }
-    foreach my $bh (sort backup_sort (@BACKUPS)) {
-      my $pid=fork();
-      if($pid == 0) {
-        create_dispatcher(); # to set the pid, may not work correctly
-        my ($lock1,$lock2);
-        unless($TEST) {
-          unless($lock1=lock_pid_file($$bh{host}) and sleep 1 and $lock2=lock_proc_file()) {
-            dlog('error','lock failure',$bh);
-            exit;
-          }
+    }
+  }
+  perform_backups(@BACKUPS);
+}
+
+info("exiting, total run time: ".sprintf('%.2f seconds',time()-$RUNTIME));
+
+#sub check_
+sub build_backup_command {
+  my $bh=shift;
+  my @com;
+  if($$bh{disabled}) {
+    dlog('notice','disabled backup',$bh);
+    # skip disabled backups
+    return;
+  }
+
+  if($$bh{btype} eq 'duplicity' and not -d $$bh{path}) {
+    dlog('warning','path does not exist',$bh);
+    warning("backup path $$bh{path} does not exist for $$bh{tag}: skipping this backup");
+    return;
+  }
+
+  if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
+    # I guess this is a way to mark a backupdestination as unavailable
+    dlog('notice','backupdestination busted',$$bh{backupdestination});
+    return;
+  }
+
+  if($$bh{btype} eq 'duplicity') {
+    @com=($DUPLICITY_BINARY);
+    $FULL and push(@com,'full');
+    $USEAGENT and push(@com,'--use-agent');
+    $ALLOWSOURCEMISMATCH and push(@com,'--allow-source-mismatch');
+    if(defined $$bh{signkey}) {
+      push(@com,'--sign-key',$$bh{signkey});
+    }
+    if(defined $$bh{encryptkey}) {
+      push(@com,'--encrypt-key',$$bh{encryptkey});
+    }
+    unless($STATS) {
+      push(@com,'--no-print-statistics');
+    }
+    push(@com,'--exclude-other-filesystems');
+  } elsif($$bh{btype} eq 'rdiff-backup') { # must be rdiff-backup
+    @com=($RDIFF_BACKUP_BINARY,
+          '--exclude-device-files',
+          '--exclude-other-filesystems',
+          '--no-eas',
+         );
+    unless($$bh{sshcompress}) {
+      push(@com,'--ssh-no-compression');
+    }
+    if($STATS) {
+      push(@com,'--print-statistics');
+    }
+  } elsif($$bh{btype} eq 'rsync') {
+    @com=($RSYNC_BINARY,
+          '-axSH',
+          '--delete',
+          '--delete-excluded',
+         );
+    if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/) {
+      push(@com,"--bwlimit=$$bh{trickle}");
+    }
+    if($$bh{sshcompress}) {
+      push(@com,'-z');
+    }
+    if($STATS) {
+      push(@com,'--stats');
+    }
+    # use logging
+    push(@com,'--log-file='.$LOG_DIR.'/'.$$bh{tag}.'.log')
+  }
+  if(defined $TEMPDIR) {
+    if(-d $TEMPDIR) {
+      if($$bh{btype} eq 'rsync') {
+        push(@com,"--temp-dir=$TEMPDIR");
+      } else {
+        push(@com,'--tempdir',$TEMPDIR);
+      }
+    } else {
+      warn("specified temporary directory does not exist, not using it");
+    }
+  }
+  push(@com,verbargs($bh));
+
+  foreach my $f (@{$$bh{excludes}}) {
+    if($$bh{btype} eq 'rsync') {
+      push(@com,"--exclude-from=$f");
+    } else { # rdiff-backup and duplicity
+      push(@com,'--exclude-globbing-filelist',
+           $f);
+    }
+  }
+  foreach my $x (@{$$bh{exclude}}) {
+    push(@com,'--exclude',$x);
+  }
+  # this is fugly:
+  push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.($$bh{btype} eq 'rsync' ? ':' : '::').$$bh{path}),$$bh{dest});
+
+  # if Trickle is set for a destination, use the trickle binary to slow upload rates to the value given
+  if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/ and $$bh{btype} ne 'rsync') {
+    unshift(@com,'/usr/bin/trickle','-s','-u',$$bh{trickle});
+  }
+  return @com;
+}
+
+sub hash_backups {
+  my %h;
+  foreach my $bh (@_) {
+    push(@{$h{$$bh{host}}},$bh);
+  }
+  return %h;
+}
+
+sub perform_backups {
+  my %BACKUPS = hash_backups(@_);
+  foreach my $host (keys %BACKUPS) {
+    my $pid=fork();
+    if ($pid == 0) {
+      create_dispatcher();    # to set the pid, may not work correctly
+      my ($lock1,$lock2);
+      unless($TEST) {
+        unless ($lock1=lock_pid_file($host) and sleep 1 and $lock2=lock_proc_file()) {
+          dlog('error','lock failure',$BACKUPS{$host}[0]);
+          exit;
+        }
+      }
+      foreach my $bh (sort backup_sort (@{$BACKUPS{$host}})) {
+        if(exists $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted} == 1) {
+          dlog('notice','skipping backup due to busted destination',$bh);
+          next;
+        }
+        push(@{$$bh{com}},build_backup_command($bh));
+        unless (@{$$bh{com}} > 0) {
+          dlog('debug','empty backup command',$bh);
+          next;
         }
         if (defined $$bh{prerun}) {
           info($$bh{prerun});
@@ -826,7 +861,7 @@ elsif($ORPHANS) {
               # if we failed to run the pre-run, issue the final summary based on that
               error("unable to execute prerun command: skipping backup!");
               log_exit_status($bh,$?);
-              exit;
+              next;
             }
           }
         }
@@ -838,10 +873,10 @@ elsif($ORPHANS) {
           system(@{$$bh{com}});
           $mainret=$?;
           $$bh{runtime}=time()-$$bh{runtime};
-          if($$bh{btype} eq 'rsync') {
+          if ($$bh{btype} eq 'rsync') {
             $mainret=($mainret/256);
           }
-          if(defined $$EXIT_CODE{$$bh{btype}}{$mainret}) {
+          if (defined $$EXIT_CODE{$$bh{btype}}{$mainret}) {
             $$bh{'exit_code'}=$$EXIT_CODE{$$bh{btype}}{$mainret};
           }
           unless($mainret == 0) {
@@ -850,7 +885,7 @@ elsif($ORPHANS) {
         }
         # if there is no postrun, return the log_exit_status using $mainret
         # if there is a postrun, return that value instead regardless of failure
-        if(defined $$bh{postrun}) {
+        if (defined $$bh{postrun}) {
           info($$bh{postrun});
           unless($TEST) {
             set_env($bh);
@@ -859,34 +894,32 @@ elsif($ORPHANS) {
               error("postrun command exited with an error");
               # issue final summary based on the return value of the postrun command
               log_exit_status($bh,$?);
-              exit 0;
+              next;
             }
           }
         }
         # issue final summary based on the main backup process
         log_exit_status($bh,$mainret) unless $TEST;
-        exit 0;
       }
-      elsif($pid > 0) {
-        $children{$pid}=1;
-      }
+      exit;
+    } elsif ($pid > 0) {
+      $children{$pid}=1;
     }
-    my $fib_seq=0;
-    do {
-      while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
-        delete $children{$pid};
-        $fib_seq=1;
-      }
-      my $sleep_for=( fib($fib_seq) > 3600 ? 3600 : fib($fib_seq) ) + int(rand 5);
-      if(scalar(keys(%children)) > 0) {
-        debug('still waiting on '.(scalar(keys(%children)))." sub-processes to exit, sleeping for ${sleep_for} seconds");
-        sleep $sleep_for;
-      }
-      $fib_seq++;
-    } until scalar(keys(%children)) == 0
+  }
+  my $fib_seq=0;
+  do {
+    while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
+      delete $children{$pid};
+      $fib_seq=1;
+    }
+    my $sleep_for=( fib($fib_seq) > 3600 ? 3600 : fib($fib_seq) ) + int(rand 5);
+    if (scalar(keys(%children)) > 0) {
+      debug('still waiting on '.(scalar(keys(%children)))." sub-processes to exit, sleeping for ${sleep_for} seconds");
+      sleep $sleep_for;
+    }
+    $fib_seq++;
+  } until scalar(keys(%children)) == 0
 }
-
-info("exiting, total run time: ".sprintf('%.2f seconds',time()-$RUNTIME));
 
 sub backup_sort {
   my @sortorder=qw( tag host backupdestination );
@@ -1260,11 +1293,13 @@ sub update_bd_space {
     unless($? == 0) {
 	error("unable to run \"$com\": no further backups will be attempted to this directory");
 	$$bh{busted}=1;
+        dlog('error','failed to execute df',$bh);
 	return 0;
     }
     unless($a[1] =~ /(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\%/) {
 	error("unable to parse output from \"$com\": no further backups will be attempted to this directory");
 	$$bh{busted}=1;
+        dlog('error','failed to parse df',$bh);
 	return 0;
     }
     $$bh{size}=$1;
