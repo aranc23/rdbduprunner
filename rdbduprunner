@@ -831,37 +831,43 @@ sub hash_backups {
 
 sub perform_backups {
   my %BACKUPS = hash_backups(@_);
-  foreach my $host (keys %BACKUPS) {
-    my $pid=fork();
-    if ($pid == 0) {
-      perform_backup($host,@{$BACKUPS{$host}});
-      critical('perform_backup should never return');
-      exit;
-    } elsif ($pid > 0) {
-      $children{$pid}=1;
-    }
-  }
   my $fib_seq=0;
   do {
     while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
+      debug("waitpid returned child ${pid}");
       delete $children{$pid};
       $fib_seq=1;
     }
+    while ( scalar(keys(%children)) < $MAXPROCS and scalar(keys(%BACKUPS)) > 0 ) {
+      my $host=(keys %BACKUPS)[0];
+      my $list=$BACKUPS{$host};
+      debug("about to spawn sub-process for ${host}");
+      delete $BACKUPS{$host};
+      my $pid=fork();
+      if ($pid == 0) {
+        perform_backup($host,@{$list});
+        critical('perform_backup should never return');
+        exit;
+      } elsif ($pid > 0) {
+        debug("added child to children hash: ${pid}");
+        $children{$pid}=1;
+      }
+    }
     my $sleep_for=fib_max_rand($fib_seq,3600,5);
     if (scalar(keys(%children)) > 0) {
-      debug('still waiting on '.(scalar(keys(%children)))." sub-processes to exit, sleeping for ${sleep_for} seconds");
+      debug('waiting on '.(scalar(keys(%children))).' sub-processes to exit, '.scalar(keys(%BACKUPS))." more children to spawn, sleeping for ${sleep_for} seconds");
       sleep $sleep_for;
     }
     $fib_seq++;
-  } until scalar(keys(%children)) == 0
+  } until scalar(keys(%children)) == 0 and scalar(keys(%BACKUPS)) == 0
 }
 
 sub perform_backup {
   my $host=shift;
   create_dispatcher();    # to set the pid, may not work correctly
-  my ($lock1,$lock2);
+  my $lock1;
   unless($TEST) {
-    unless ($lock1=lock_pid_file($host) and sleep 1 and $lock2=lock_proc_file()) {
+    unless ($lock1=lock_pid_file($host)) {
       dlog('error','lock failure',$_[0]);
       exit;
     }
