@@ -74,8 +74,6 @@ my $MAXWAIT; # sleep no longer than this value (in seconds)
 my %children; # store children for master backup loop
 my $RUNTIME; # storing the start time so we can calculate run time
 
-my @fib; # cache some fibonacci sequences
-
 my @SKIP_FS=qw(
                 autofs
                 binfmt_misc
@@ -951,13 +949,6 @@ sub perform_backup {
   exit;
 }
 
-sub fib_max_rand {
-  my $fib_seq=shift;
-  my $max=shift;
-  my $rand=shift;
-  return ( fib($fib_seq) > $max ? $max : fib($fib_seq) ) + int(rand $rand);
-}
-
 sub backup_sort {
   my @sortorder=qw( tag host backupdestination );
 
@@ -1021,33 +1012,6 @@ sub lock_pid_file {
   # or we failed to lock the file without receiving a signal
   close $LOCK;
   return 0;
-}
-
-sub lock_proc_file {
-  my $waittime=time();
-  my $loop=0;
-  while(1) {
-    foreach my $proc (1..$MAXPROCS) {
-      my $LOCK_FILE=lock_file_compose("rdbduprunner-proc-${proc}");
-      my $LOCK;
-      unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
-        error("unable to open pid file: $LOCK_FILE for writing");
-        return 0; # false or fail
-      }
-      unless(flock($LOCK,LOCK_EX|LOCK_NB)) {
-        close($LOCK);
-        next;
-      }
-      debug("process lock (${proc}) wait time: ".(time()-$waittime));
-      truncate($LOCK,0); # this shouldn't fail if we have the file opened and locked!
-      print $LOCK $$."\n"; # who really cares if this fails?
-      return $LOCK; # happiness is a locked file
-    }
-    $loop++;
-    my $sleep_for=( fib($loop) > 3600 ? 3600 : fib($loop) ) + int(rand 5);
-    debug("still waiting on process slot, sleeping for ${sleep_for} seconds");
-    sleep $sleep_for;
-  }
 }
 
 sub unlock_pid_file {
@@ -1425,14 +1389,6 @@ sub tag_prio {
   my $t=lc $_[0];
   return $prios{$t} if defined $prios{$t};
   return 0;
-}
-
-# hacky little fib
-sub fib {
-  my $n = shift;
-  return $fib[$n] if defined $fib[$n];
-  return $fib[$n] = $n if $n < 2;
-  $fib[$n] = fib($n-1) + fib($n-2);
 }
 
 =head1 NAME
