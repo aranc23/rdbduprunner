@@ -1004,7 +1004,7 @@ sub lock_pid_file {
   };
   if ($@) {
     die unless $@ eq "alarm\n";   # propagate unexpected errors
-    notice("receieved ALRM waiting to lock ${LOCK_FILE}: max/actual: ${MAXWAIT}/".(time()-$waittime) );
+    notice("receieved ALRM waiting to lock ${LOCK_FILE}: alarm: ${MAXWAIT} elapsed time:".(time()-$waittime) );
   }
   else {
     if($locked) {
