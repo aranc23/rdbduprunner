@@ -987,29 +987,40 @@ sub lock_pid_file {
   my $LOCK_FILE=lock_file_compose(@_);
   my $LOCK;
   my $waittime=time();
-  my $loop=0;
-  while(1) {
-    unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
-      error("unable to open pid file: $LOCK_FILE for writing");
-      return 0; # false or fail
+  my $locked=0;
+
+  unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
+    error("unable to open pid file: $LOCK_FILE for writing");
+    return 0; # false or fail
+  }
+  debug("setting alarm for ${MAXWAIT} seconds and locking ${LOCK_FILE}");
+  eval {
+    local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
+    alarm $MAXWAIT;
+    if(flock($LOCK,LOCK_EX)) {
+      $locked=1;
     }
-    if(flock($LOCK,LOCK_EX|LOCK_NB)) {
+    alarm 0;
+  };
+  if ($@) {
+    die unless $@ eq "alarm\n";   # propagate unexpected errors
+    notice("receieved ALRM waiting to lock ${LOCK_FILE}: max/actual: ${MAXWAIT}/".(time()-$waittime) );
+  }
+  else {
+    if($locked) {
       debug("lock wait time for $LOCK_FILE: ".(time()-$waittime));
       truncate($LOCK,0); # this shouldn't fail if we have the file opened and locked!
       print $LOCK $$."\n"; # who really cares if this fails?
       return $LOCK; # happiness is a locked file
     }
-    close($LOCK);
-    if(time()-$waittime > $MAXWAIT) {
-      notice("exceeded maximumum lock wait time for ${LOCK_FILE}: max/actual: ${MAXWAIT}/".(time()-$waittime) );
-      return 0; # false or fail
+    else {
+      error("failed to lock ${LOCK_FILE} without receiving alarm");
     }
-    $loop++;
-    # never wait longer than an hour
-    my $sleep_for=( fib($loop) > 3600 ? 3600 : fib($loop) ) + int(rand 5);
-    debug("still waiting on ${LOCK_FILE}, sleeping for ${sleep_for} seconds");
-    sleep $sleep_for;
   }
+  # this is the fall through for the cases where we have received an alarm
+  # or we failed to lock the file without receiving a signal
+  close $LOCK;
+  return 0;
 }
 
 sub lock_proc_file {
