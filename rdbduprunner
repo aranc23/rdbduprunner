@@ -88,6 +88,7 @@ my @SKIP_FS=qw(
                 devpts
                 devtmpfs
                 exfat
+                fuse
                 fuse.encfs
                 fuse.gvfs-fuse-daemon
                 fuse.gvfsd-fuse
