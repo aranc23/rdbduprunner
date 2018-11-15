@@ -9,7 +9,7 @@ use Getopt::Long;
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Env qw( HOME USER );
 use Data::Dumper;
-use POSIX qw( strftime );
+use POSIX qw( strftime pause );
 use Pod::Usage;
 use POSIX ":sys_wait_h"; # for nonblocking read
 eval { use Time::HiRes qw( time ); };
@@ -70,9 +70,9 @@ my $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log' : $HOME.'/var/log/rd
 my $LOG_DIR;
 our $TEST=1;
 my $MAXPROCS;
-my $MAXWAIT;
-my %children;
-my $RUNTIME;
+my $MAXWAIT; # sleep no longer than this value (in seconds)
+my %children; # store children for master backup loop
+my $RUNTIME; # storing the start time so we can calculate run time
 
 my @fib; # cache some fibonacci sequences
 
@@ -831,12 +831,25 @@ sub hash_backups {
 
 sub perform_backups {
   my %BACKUPS = hash_backups(@_);
-  my $fib_seq=0;
+  # $SIG{USR1} = sub {
+  #   debug(Dumper \%BACKUPS);
+  #   debug(Dumper \%children);
+  # };
+  #delete $SIG{USR1};
+  #delete $SIG{USR2};
+  #delete $SIG{HUP};
+  $SIG{CHLD} = sub {
+    # don't change $! and $? outside handler
+    local ($!, $?);
+    while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
+      debug("waitpid returned child ${pid}");
+      delete $children{$pid};
+    }
+  };
   do {
     while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
       debug("waitpid returned child ${pid}");
       delete $children{$pid};
-      $fib_seq=1;
     }
     while ( scalar(keys(%children)) < $MAXPROCS and scalar(keys(%BACKUPS)) > 0 ) {
       my $host=(keys %BACKUPS)[0];
@@ -845,20 +858,22 @@ sub perform_backups {
       delete $BACKUPS{$host};
       my $pid=fork();
       if ($pid == 0) {
+        #delete $SIG{USR1};
+        delete $SIG{CHLD};
         perform_backup($host,@{$list});
         critical('perform_backup should never return');
         exit;
       } elsif ($pid > 0) {
         debug("added child to children hash: ${pid}");
-        $children{$pid}=1;
+        $children{$pid}=$list;
       }
     }
-    my $sleep_for=fib_max_rand($fib_seq,3600,5);
     if (scalar(keys(%children)) > 0) {
-      debug('waiting on '.(scalar(keys(%children))).' sub-processes to exit, '.scalar(keys(%BACKUPS))." more children to spawn, sleeping for ${sleep_for} seconds");
-      sleep $sleep_for;
+      debug('waiting on '.(scalar(keys(%children))).' sub-processes to exit, '.scalar(keys(%BACKUPS)).' more children to spawn, pausing');
+      my $pause_start=time();
+      pause;
+      debug("paused for: ".sprintf('%.2f seconds',time()-$pause_start));
     }
-    $fib_seq++;
   } until scalar(keys(%children)) == 0 and scalar(keys(%BACKUPS)) == 0
 }
 
