@@ -388,6 +388,12 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
       if($host ne $LOCALHOST) {
         $inventory_command="ssh -x -o BatchMode=yes ${host} ${inventory_command} < /dev/null";
       }
+      if(-x '/usr/bin/waitmax') {
+        $inventory_command="/usr/bin/waitmax 30 ${inventory_command}";
+      }
+      elsif( -x '/bin/waitmax') {
+        $inventory_command="/bin/waitmax 30 ${inventory_command}";
+      }
       my @a=`${inventory_command}`;
       if($? == 0) {
         my @seen;
