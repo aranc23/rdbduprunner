@@ -1129,6 +1129,13 @@ sub emergency {
 
 sub set_env {
     my $bh=$_[0];
+    my @keys=qw( btype dest path host tag gtag );
+    foreach my $key (@keys) {
+      if(exists $$bh{$key}) {
+        $ENV{"RDBDUPRUNNER_${key}"}=$$bh{$key};
+      }
+    }
+    $ENV{'RDBDUPRUNNER_zfs'} = substr $$bh{'dest'}, 1;
     # grab more stuff from the config and put them into ENV for use by duplicity
     if(defined $$bh{gpgpassphrase}) {
 	$ENV{PASSPHRASE}=$$bh{gpgpassphrase};
