@@ -227,7 +227,7 @@ my $callback_clean = sub { my %t=@_;
 
 create_dispatcher();
 $RUNTIME=time();
-dlog('info','starting',{'start_time' => $RUNTIME});
+dlog('info','starting',{});
 
 %CONFIG=new Config::General(-ConfigFile => $CONFIG_FILE,
 			    -IncludeGlob => 1,
@@ -726,7 +726,7 @@ elsif($ORPHANS) {
 
 dlog('info',
      'exiting',
-     {'total_run_time' => sprintf('%.2f seconds',time()-$RUNTIME)});
+     {'total_run_time_seconds' => time()-$RUNTIME});
 
 #sub check_
 sub build_backup_command {
