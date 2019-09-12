@@ -1380,7 +1380,7 @@ sub dlog {
   my $str   = stringy({'msg'      => $msg,
                        'severity' => $level,
                        timestamp  => $time,
-                       datetime   => strftime("%F %T",localtime($time))},
+                       datetime   => strftime("%FT%T%z",localtime($time))},
                       @_);
   $DISPATCHER->log( level   => $level,
                     message => $str,
