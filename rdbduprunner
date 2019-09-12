@@ -1359,7 +1359,11 @@ sub stringy {
       my $val=${$h}{$key};
       $val =~ s/\n/NL/g; # remove newlines
       $val =~ s/"/\\"/g; # replace " with \"
-      $a{$key}=$val;
+      if($key eq 'tag' or $key eq 'host') {
+        $a{"rdbduprunner_${key}"}=$val;
+      } else {
+        $a{$key}=$val;
+      }
     }
   }
   my @f;
