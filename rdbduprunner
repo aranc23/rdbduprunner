@@ -335,6 +335,8 @@ if(! -d $LOG_DIR) {
 # combine the list of filesystems to skip into a regex
 $SKIP_FS_REGEX='^('.join('|',map(quotemeta,@SKIP_FS)).')$';
 
+dlog('debug','config',\%CONFIG,{'config_file' => $CONFIG_FILE});
+
 foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my $bs=$CONFIG{backupset}{$bstag};
     my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
