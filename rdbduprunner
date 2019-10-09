@@ -91,6 +91,7 @@ my @SKIP_FS=qw(
                 fuse.encfs
                 fuse.gvfs-fuse-daemon
                 fuse.gvfsd-fuse
+                fuse.lxcfs
                 fuse.vmware-vmblock
                 fuse.xrdp-chansrv
                 fusectl
@@ -112,6 +113,7 @@ my @SKIP_FS=qw(
                 squashfs
                 sysfs
                 tmpfs
+                tracefs
                 usbfs
                 vfat
                 zfs
