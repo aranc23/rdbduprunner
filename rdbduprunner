@@ -103,7 +103,7 @@ my @SKIP_FS=qw(
                 nfs
                 nfs4
                 nfsd
-				nsfs
+                nsfs
                 ntfs
                 proc
                 pstore
