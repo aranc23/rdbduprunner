@@ -502,7 +502,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
             $$bh{maxinc}=$CONFIG{maxinc};
         }
         # if this is defined in a backupset, allow that to override the global definition, if it exists
-        foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle PostRunSnap ZfsCreate )))) {
+        foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot )))) {
             unless(defined $$bh{$var}) {
                 if(defined $CONFIG{$var}) {
                     $$bh{$var}=$CONFIG{$var};
@@ -978,7 +978,7 @@ sub perform_backup {
         }
       }
     }
-    if (defined $$bh{postrunsnap} and $$bh{postrunsnap} =~ /(true|t|yes|on|1)/i) {
+    if (defined $$bh{zfssnapshot} and $$bh{zfssnapshot} =~ /(true|t|yes|on|1)/i) {
       my @com=('zfs',
                'snapshot',
                substr($$bh{'dest'}, 1).
@@ -990,7 +990,7 @@ sub perform_backup {
         set_env($bh);
         system(@com);
         unless($? == 0) {
-          error("postrunsnap command exited with an error, this is not fatal");
+          error("zfs snapshot command exited with an error, this is not fatal");
           # issue final summary based on the return value of the postrun command
         }
       }
@@ -1793,11 +1793,6 @@ Look at the remote machine for a list of directories to back up:
 Excludes a long list of non-filesystem type filesystems (fuse, etc.)
 Creates a new backup from each one not excluded.
 
-=item I<PostRunSnap> - Boolean, optional
-
-Create a zfs snapshot of the destination path, if possible.
-Can be set at the BackupDestination level as well.
-
 =item I<Tag> - String, optional
 
 Overrides the generated tag used to construct the output directory path.
@@ -1823,6 +1818,11 @@ details.
 =item I<ZfsCreate> - Boolean, optional
 
 Create a zfs for the path, if the directory doesn't already exist.
+Can be set at the BackupDestination level as well.
+
+=item I<ZfsSnapshot> - Boolean, optional
+
+Create a zfs snapshot of the destination path, if possible.
 Can be set at the BackupDestination level as well.
 
 =back
