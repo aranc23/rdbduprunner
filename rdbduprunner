@@ -502,7 +502,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
             $$bh{maxinc}=$CONFIG{maxinc};
         }
         # if this is defined in a backupset, allow that to override the global definition, if it exists
-        foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle )))) {
+        foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle PostRunSnap ZfsCreate )))) {
             unless(defined $$bh{$var}) {
                 if(defined $CONFIG{$var}) {
                     $$bh{$var}=$CONFIG{$var};
