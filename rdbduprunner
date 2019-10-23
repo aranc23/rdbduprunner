@@ -956,6 +956,23 @@ sub perform_backup {
         }
       }
     }
+    if (defined $$bh{postrunsnap} and $$bh{postrunsnap} =~ /(true|t|yes|on|1)/i) {
+      my @com=('zfs',
+               'snapshot',
+               substr($$bh{'dest'}, 1).
+               '@'.
+               strftime("%FT%H:%M%z",localtime()),
+              );
+      info(join(' ',@com));
+      unless($TEST) {
+        set_env($bh);
+        system(@com);
+        unless($? == 0) {
+          error("postrunsnap command exited with an error, this is not fatal");
+          # issue final summary based on the return value of the postrun command
+        }
+      }
+    }
     # issue final summary based on the main backup process
     log_exit_status($bh,$mainret) unless $TEST;
   }
@@ -1753,6 +1770,10 @@ Host to be backed up; if not specified assumes localhost
 Look at the remote machine for a list of directories to back up:
 Excludes a long list of non-filesystem type filesystems (fuse, etc.)
 Creates a new backup from each one not excluded.
+
+=item I<PostRunSnap> - Boolean, optional
+
+Create a zfs snapshot of the destination path, if possible.
 
 =item I<Tag> - String, optional
 
