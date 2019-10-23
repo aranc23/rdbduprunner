@@ -910,6 +910,28 @@ sub perform_backup {
       dlog('debug','empty backup command',$bh);
       next;
     }
+    if (defined $$bh{zfscreate} and $$bh{zfscreate} =~ /(true|t|yes|on|1)/i) {
+      if(-d $$bh{'dest'}) {
+        debug("skipping zfs creation, directory exists: ".$$bh{'dest'});
+      }
+      else {
+        my @com=('zfs',
+                 'create',
+                 substr($$bh{'dest'}, 1),
+                );
+        info(join(' ',@com));
+        unless($TEST) {
+          set_env($bh);
+          system(@com);
+          unless($? == 0) {
+            # if we failed to run the pre-run, issue the final summary based on that
+            error("unable to execute zfs create command as requested: skipping backup!");
+            log_exit_status($bh,$?);
+            next;
+          }
+        }
+      }
+    }
     if (defined $$bh{prerun}) {
       info($$bh{prerun});
       unless($TEST) {
