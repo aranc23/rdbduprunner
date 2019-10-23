@@ -1796,6 +1796,7 @@ Creates a new backup from each one not excluded.
 =item I<PostRunSnap> - Boolean, optional
 
 Create a zfs snapshot of the destination path, if possible.
+Can be set at the BackupDestination level as well.
 
 =item I<Tag> - String, optional
 
@@ -1818,6 +1819,11 @@ Used by the --tidy option to remove all increments older than
 specified age.  Ultimately this is passed to the remove-older-than
 options of rdiff-backup or duplicity so see those manpages for
 details.
+
+=item I<ZfsCreate> - Boolean, optional
+
+Create a zfs for the path, if the directory doesn't already exist.
+Can be set at the BackupDestination level as well.
 
 =back
 
