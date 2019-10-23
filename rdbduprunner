@@ -982,7 +982,7 @@ sub perform_backup {
       my @com=('zfs',
                'snapshot',
                substr($$bh{'dest'}, 1).
-               '@'.
+               '@rdbduprunner-'.
                strftime("%FT%H:%M%z",localtime()),
               );
       info(join(' ',@com));
