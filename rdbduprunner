@@ -983,7 +983,7 @@ sub perform_backup {
                'snapshot',
                substr($$bh{'dest'}, 1).
                '@rdbduprunner-'.
-               strftime("%FT%H:%M%z",localtime()),
+               strftime("%FT%H%M%z",localtime()),
               );
       info(join(' ',@com));
       unless($TEST) {
