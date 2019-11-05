@@ -990,7 +990,7 @@ sub perform_backup {
         set_env($bh);
         system(@com);
         unless($? == 0) {
-          error("zfs snapshot command exited with an error, this is not fatal");
+          error("zfs snapshot command exited with an error, this is not fatal: $?");
           # issue final summary based on the return value of the postrun command
         }
       }
