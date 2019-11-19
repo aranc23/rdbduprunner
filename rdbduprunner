@@ -345,6 +345,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
     my $btype;
     my $backupdest;
+    my $inplace;
 
     if(defined $HOST and $host !~ /$HOST/) {
       next;
@@ -361,6 +362,23 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         error("there is no BackupDestination defined for the BackupSet ($bstag): so it cannot be processed");
         next;
     }
+    if(defined $$bs{'inplace'}) {
+      $inplace = $$bs{'inplace'};
+    }
+    elsif(defined $CONFIG{backupdestination}{$backupdest}{'inplace'}) {
+      $inplace = $CONFIG{backupdestination}{$backupdest}{'inplace'};
+    }
+    if($inplace =~ /^(true|t|yes|on|1)$/i ) {
+      $inplace = 1;
+    }
+    elsif ($inplace =~ /^(false|f|no|off|0)$/i ) {
+      $inplace = 0;
+    }
+    else {
+      error("${bstag} has an unparsable value for the inplace option, skipping");
+      next;
+    }
+
     if(defined $CONFIG{backupdestination}{$backupdest}{type} and
            $CONFIG{backupdestination}{$backupdest}{type} =~ /^(rdiff\-backup|duplicity|rsync)$/) {
       # check to make sure that if the type isn't set, we set it to rsync
@@ -464,6 +482,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         $$bh{backupdestination}=$backupdest;
         $$bh{gtag}=$gtag;
         $$bh{btype}=$btype;
+        $$bh{inplace}=$inplace;
         if($$bh{btype} eq 'rsync') {
           $$bh{path}=$$bh{path}.'/';
           $$bh{path} =~ s/\/\/$/\//; # remove double slashes
@@ -783,11 +802,18 @@ sub build_backup_command {
       push(@com,'--print-statistics');
     }
   } elsif($$bh{btype} eq 'rsync') {
-    @com=($RSYNC_BINARY,
-          '-axSH',
+    @com=('--archive',
+          '--one-file-system',
+          '--hard-links',
           '--delete',
           '--delete-excluded',
          );
+    if($$bh{'inplace'}) {
+      push(@com,'--inplace','--partial');
+    }
+    else {
+      push(@com,'--sparse');
+    }
     if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/) {
       push(@com,"--bwlimit=$$bh{trickle}");
     }
@@ -811,7 +837,7 @@ sub build_backup_command {
       warn("specified temporary directory does not exist, not using it");
     }
   }
-  push(@com,verbargs($bh));
+  unshift(@com,$RSYNC_BINARY,verbargs($bh));
 
   foreach my $f (@{$$bh{excludes}}) {
     if($$bh{btype} eq 'rsync') {
@@ -1238,7 +1264,7 @@ sub verbargs {
       push(@a,'--progress');
     }
     if($VERBOSE) {
-      push(@a,'-v');
+      push(@a,'--verbose');
     }
   }
   @a;
@@ -1759,6 +1785,12 @@ byte blocks (because I could reliably get df to report this value.) It
 will do so before running backups and will not run backups if it
 cannot free this much space.
 
+=item I<Inplace> - Boolean (true|t|yes|on|1), optional
+
+Passes the --inplace and --partial options to rsync for this
+destination.  Assumed to be false unless Inplace is set to one of the
+above parameters. Defaults to false.
+
 =back
 
 =head3 BackupSet Options
@@ -1823,6 +1855,13 @@ Can be set at the BackupDestination level as well.
 =item I<ZfsSnapshot> - Boolean, optional
 
 Create a zfs snapshot of the destination path, if possible.
+Can be set at the BackupDestination level as well.
+
+=item I<Inplace> - Boolean (true|t|yes|on|1|false|f|no|off|0), optional
+
+Passes the --inplace and --partial options to rsync for this
+destination.  Assumed to be false unless Inplace is set to one of the
+above parameters. Defaults to false.
 Can be set at the BackupDestination level as well.
 
 =back
