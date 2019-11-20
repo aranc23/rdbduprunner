@@ -1474,10 +1474,10 @@ sub bool_parse {
   my @true = qw( true t yes on 1 );
   my @false = qw( false f no off 0 );
 
-  if(grep { $_[0] eq $_ } (@true)) {
+  if(grep { lc $_[0] eq $_ } (@true)) {
     return 1;
   }
-  elsif(grep { $_[0] eq $_ } (@false)) {
+  elsif(grep { lc $_[0] eq $_ } (@false)) {
     return 0;
   }
   else {
