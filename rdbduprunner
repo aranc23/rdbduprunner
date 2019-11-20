@@ -345,7 +345,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
     my $btype;
     my $backupdest;
-    my $inplace;
+    my $inplace=0;
 
     if(defined $HOST and $host !~ /$HOST/) {
       next;
@@ -363,20 +363,10 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         next;
     }
     if(defined $$bs{'inplace'}) {
-      $inplace = $$bs{'inplace'};
+      $inplace = bool_parse($$bs{'inplace'});
     }
     elsif(defined $CONFIG{backupdestination}{$backupdest}{'inplace'}) {
-      $inplace = $CONFIG{backupdestination}{$backupdest}{'inplace'};
-    }
-    if($inplace =~ /^(true|t|yes|on|1)$/i ) {
-      $inplace = 1;
-    }
-    elsif ($inplace =~ /^(false|f|no|off|0)$/i ) {
-      $inplace = 0;
-    }
-    else {
-      error("${bstag} has an unparsable value for the inplace option, skipping");
-      next;
+      $inplace = bool_parse($CONFIG{backupdestination}{$backupdest}{'inplace'});
     }
 
     if(defined $CONFIG{backupdestination}{$backupdest}{type} and
@@ -1478,6 +1468,22 @@ sub tag_prio {
   my $t=lc $_[0];
   return $prios{$t} if defined $prios{$t};
   return 0;
+}
+
+sub bool_parse {
+  my @true = qw( true t yes on 1 );
+  my @false = qw( false f no off 0 );
+
+  if(grep { $_[0] eq $_ } (@true)) {
+    return 1;
+  }
+  elsif(grep { $_[0] eq $_ } (@false)) {
+    return 0;
+  }
+  else {
+    warn "unable to parse provided value for inplace option, assuming false";
+    return 0;
+  }
 }
 
 =head1 NAME
