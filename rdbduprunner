@@ -926,7 +926,7 @@ sub perform_backup {
       dlog('debug','empty backup command',$bh);
       next;
     }
-    if (defined $$bh{zfscreate} and $$bh{zfscreate} =~ /(true|t|yes|on|1)/i) {
+    if (defined $$bh{zfscreate} and bool_parse($$bh{zfscreate}) == 1) {
       if(-d $$bh{'dest'}) {
         debug("skipping zfs creation, directory exists: ".$$bh{'dest'});
       }
@@ -994,7 +994,7 @@ sub perform_backup {
         }
       }
     }
-    if (defined $$bh{zfssnapshot} and $$bh{zfssnapshot} =~ /(true|t|yes|on|1)/i) {
+    if (defined $$bh{zfssnapshot} and bool_parse($$bh{zfssnapshot}) == 1) {
       my @com=('zfs',
                'snapshot',
                substr($$bh{'dest'}, 1).
