@@ -792,7 +792,8 @@ sub build_backup_command {
       push(@com,'--print-statistics');
     }
   } elsif($$bh{btype} eq 'rsync') {
-    @com=('--archive',
+    @com=($RSYNC_BINARY,
+          '--archive',
           '--one-file-system',
           '--hard-links',
           '--delete',
@@ -827,7 +828,7 @@ sub build_backup_command {
       warn("specified temporary directory does not exist, not using it");
     }
   }
-  unshift(@com,$RSYNC_BINARY,verbargs($bh));
+  unshift(@com,shift @com,verbargs($bh));
 
   foreach my $f (@{$$bh{excludes}}) {
     if($$bh{btype} eq 'rsync') {
