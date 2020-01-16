@@ -94,6 +94,7 @@ my @SKIP_FS=qw(
                 fuse.lxcfs
                 fuse.vmware-vmblock
                 fuse.xrdp-chansrv
+                fuseblk
                 fusectl
                 htfs
                 hugetlbfs
