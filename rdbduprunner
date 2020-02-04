@@ -522,7 +522,8 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
                     $$bh{$var}=$CONFIG{backupdestination}{$$bh{backupdestination}}{$var};
                 }
             }
-        }
+          }
+        $$bh{'src'} = $$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.($$bh{btype} eq 'rsync' ? ':' : '::').$$bh{path};
         dlog('debug','backup',$bh);
         push(@BACKUPS,$bh);
     }
@@ -665,7 +666,7 @@ elsif($ORPHANS) {
       unless($$bh{sshcompress}) {
 	push(@com,'--ssh-no-compression');
       }
-      push(@com,'--exclude-device-files',($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.'::'.$$bh{path}),$$bh{dest});
+      push(@com,'--exclude-device-files',$$bh{src},$$bh{dest});
     }
 	
     info(join(" ",@com));
@@ -843,7 +844,7 @@ sub build_backup_command {
     push(@com,'--exclude',$x);
   }
   # this is fugly:
-  push(@com,($$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.($$bh{btype} eq 'rsync' ? ':' : '::').$$bh{path}),$$bh{dest});
+  push(@com,$$bh{src},$$bh{dest});
 
   # if Trickle is set for a destination, use the trickle binary to slow upload rates to the value given
   if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/ and $$bh{btype} ne 'rsync') {
