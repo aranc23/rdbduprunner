@@ -843,7 +843,6 @@ sub build_backup_command {
   foreach my $x (@{$$bh{exclude}}) {
     push(@com,'--exclude',$x);
   }
-  # this is fugly:
   push(@com,$$bh{src},$$bh{dest});
 
   # if Trickle is set for a destination, use the trickle binary to slow upload rates to the value given
