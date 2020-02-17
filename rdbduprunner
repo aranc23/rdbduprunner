@@ -61,6 +61,7 @@ our $PATH;
 our $DUPLICITY_BINARY;
 our $RDIFF_BACKUP_BINARY;
 our $RSYNC_BINARY;
+our $ZFS_BINARY;
 our $EXCLUDE_PATH;
 our $FACILITY='user';
 our $LOG_LEVEL='info';
@@ -197,6 +198,7 @@ GetOptions(
            'duplicity-binary=s'     => \$DUPLICITY_BINARY,
            'rdiff-backup-binary=s'  => \$RDIFF_BACKUP_BINARY,
            'rsync-binary=s'         => \$RSYNC_BINARY,
+           'zfs-binary=s'           => \$ZFS_BINARY,
            'exclude-path=s'         => \$EXCLUDE_PATH,
            'facility=s'             => \$FACILITY,
            'level=s'                => \$LOG_LEVEL,
@@ -259,6 +261,14 @@ if(not defined $RSYNC_BINARY) {
 	$RSYNC_BINARY=$CONFIG{rsyncbinary};
   } else {
 	$RSYNC_BINARY='rsync'; # in our path we hope
+  }
+}
+
+if(not defined $ZFS_BINARY) {
+  if(defined $CONFIG{zfsbinary}) {
+	$ZFS_BINARY=$CONFIG{zfsbinary};
+  } else {
+	$ZFS_BINARY='zfs'; # in our path we hope
   }
 }
 
@@ -933,7 +943,7 @@ sub perform_backup {
         debug("skipping zfs creation, directory exists: ".$$bh{'dest'});
       }
       else {
-        my @com=('zfs',
+        my @com=($ZFS_BINARY,
                  'create',
                  substr($$bh{'dest'}, 1),
                 );
@@ -996,20 +1006,33 @@ sub perform_backup {
         }
       }
     }
+    # attempt to create a snapshot of the destination filesystem
     if (defined $$bh{zfssnapshot} and bool_parse($$bh{zfssnapshot}) == 1) {
-      my @com=('zfs',
+      # zfs is path minus leading /
+      my $zfs=substr($$bh{'dest'}, 1);
+      # snapshot is zfs plus a name
+      my $snap=$zfs.'@rdbduprunner-'.strftime("%FT%H%M%z",localtime());
+      # test command is running a get against the potential zfs
+      my @test=($ZFS_BINARY,'get','-H','mountpoint',$zfs);
+      info(join(' ',@test));
+      # snapshot commmand is straightforward
+      my @com=($ZFS_BINARY,
                'snapshot',
-               substr($$bh{'dest'}, 1).
-               '@rdbduprunner-'.
-               strftime("%FT%H%M%z",localtime()),
-              );
+               $snap);
       info(join(' ',@com));
       unless($TEST) {
         set_env($bh);
-        system(@com);
-        unless($? == 0) {
-          error("zfs snapshot command exited with an error, this is not fatal: $?");
-          # issue final summary based on the return value of the postrun command
+        # first test to see if it is a zfs, by running a harmless get
+        system(@test);
+        if($? == 0) {
+          # execute snapshot command
+          system(@com);
+          unless($? == 0) {
+            error("zfs snapshot command exited with an error, this is not fatal: $?");
+          }
+        }
+        else {
+          debug('skipping zfs snapshot, destination is not a zfs');
         }
       }
     }
@@ -1745,6 +1768,8 @@ insensitive. Options are generally honored in this order:
 =item I<RdiffBackupBinary> - path to rdiff-backup
 
 =item I<RsyncBinary> - path to rsync
+
+=item I<ZfsBinary> - path to zfs
 
 =item I<LockFile> - change the default lock/pid file from
 F<$HOME/rdbduprunner.pid>
