@@ -1011,7 +1011,7 @@ sub perform_backup {
       # zfs is path minus leading /
       my $zfs=substr($$bh{'dest'}, 1);
       # snapshot is zfs plus a name
-      my $snap=$zfs.'@rdbduprunner-'.strftime("%FT%H%M%z",localtime());
+      my $snap=$zfs.'@rdbduprunner-'.strftime("%FT%T%z",localtime());
       # test command is running a get against the potential zfs
       my @test=($ZFS_BINARY,'get','-H','mountpoint',$zfs);
       info(join(' ',@test));
