@@ -1022,31 +1022,25 @@ sub perform_backup {
     # attempt to create a snapshot of the destination filesystem
     if (defined $$bh{zfssnapshot} and bool_parse($$bh{zfssnapshot}) == 1) {
       # zfs is path minus leading /
-      my $zfs=substr($$bh{'dest'}, 1);
-      # snapshot is zfs plus a name
-      my $snap=$zfs.'@rdbduprunner-'.strftime("%FT%T%z",localtime());
-      # test command is running a get against the potential zfs
-      my @test=($ZFS_BINARY,'get','-H','mountpoint',$zfs);
-      info(join(' ',@test));
-      # snapshot commmand is straightforward
-      my @com=($ZFS_BINARY,
-               'snapshot',
-               $snap);
-      info(join(' ',@com));
-      unless($TEST) {
-        set_env($bh);
-        # first test to see if it is a zfs, by running a harmless get
-        system(@test);
-        if($? == 0) {
+      if(my $zfs = is_zfs($$bh{'dest'})) {
+        # snapshot is zfs plus a name
+        my $snap=$zfs.'@rdbduprunner-'.strftime("%FT%T%z",localtime());
+        # snapshot commmand is straightforward
+        my @com=($ZFS_BINARY,
+                 'snapshot',
+                 $snap);
+        info(join(' ',@com));
+        unless($TEST) {
+          set_env($bh);
           # execute snapshot command
           system(@com);
           unless($? == 0) {
             error("zfs snapshot command exited with an error, this is not fatal: $?");
           }
         }
-        else {
-          debug('skipping zfs snapshot, destination is not a zfs');
-        }
+      }
+      else {
+        debug('skipping zfs snapshot, destination is not a zfs');
       }
     }
     # issue final summary based on the main backup process
@@ -1520,6 +1514,29 @@ sub bool_parse {
   }
   else {
     warn "unable to parse provided value for inplace option, assuming false";
+    return 0;
+  }
+}
+
+# if the path given is on a zfs filesystem, return the zfs it lives on
+sub is_zfs {
+  unless ( -d $_[0] ) {
+    warn("the path ${_[0]} doesn't exist, so we cannot determine if it is zfs, assuming not");
+    return 0;
+  }
+  my $fstype = `stat -f -c '%T' ${_[0]} | head -1`; chomp $fstype;
+  if($fstype eq 'zfs') {
+    my $fs = `stat -c '%m' ${_[0]}`;chomp $fs;
+    debug("found zfs filesystem at: ${fs}");
+    open P, '</proc/mounts' or die "unable to read /proc/mounts";
+    foreach(<P>) {
+      my @s = split(/\s+/);
+      if ( $s[1] eq $fs and $s[2] eq 'zfs' ) {
+        debug("found zfs at $s[0]");
+        return $s[0];
+      }
+    }
+    close P;
     return 0;
   }
 }
