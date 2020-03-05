@@ -26,6 +26,7 @@ use POSIX qw( strftime pause );
 use Pod::Usage;
 use POSIX ":sys_wait_h"; # for nonblocking read
 eval { use Time::HiRes qw( time ); };
+use File::Spec;
 
 # added from CPAN or system packages
 use Config::General;
@@ -952,13 +953,17 @@ sub perform_backup {
       next;
     }
     if (defined $$bh{zfscreate} and bool_parse($$bh{zfscreate}) == 1) {
+      # this seems messy, but we want the parent dir of the real destination
+      my @all_dirs = File::Spec->splitdir( $$bh{'dest'} );
+      my $zfs_child = pop @all_dirs;
+      my $zfs_parent = File::Spec->catdir( @all_dirs );
       if(-d $$bh{'dest'}) {
         debug("skipping zfs creation, directory exists: ".$$bh{'dest'});
       }
-      else {
+      elsif(my $zfs=which_zfs($zfs_parent)) {
         my @com=($ZFS_BINARY,
                  'create',
-                 substr($$bh{'dest'}, 1),
+                 "${zfs}/${zfs_child}",
                 );
         info(join(' ',@com));
         unless($TEST) {
@@ -971,6 +976,11 @@ sub perform_backup {
             next;
           }
         }
+      }
+      else {
+        error("unable to execute zfs create command as requested: skipping backup!");
+        log_exit_status($bh,$?);
+        next;
       }
     }
     if (defined $$bh{prerun}) {
@@ -1022,7 +1032,7 @@ sub perform_backup {
     # attempt to create a snapshot of the destination filesystem
     if (defined $$bh{zfssnapshot} and bool_parse($$bh{zfssnapshot}) == 1) {
       # zfs is path minus leading /
-      if(my $zfs = is_zfs($$bh{'dest'})) {
+      if(my $zfs = find_zfs($$bh{'dest'})) {
         # snapshot is zfs plus a name
         my $snap=$zfs.'@rdbduprunner-'.strftime("%FT%T%z",localtime());
         # snapshot commmand is straightforward
@@ -1519,7 +1529,7 @@ sub bool_parse {
 }
 
 # if the path given is on a zfs filesystem, return the zfs it lives on
-sub is_zfs {
+sub find_zfs {
   unless ( -d $_[0] ) {
     warn("the path ${_[0]} doesn't exist, so we cannot determine if it is zfs, assuming not");
     return 0;
@@ -1537,8 +1547,40 @@ sub is_zfs {
       }
     }
     close P;
+  }
+  return 0;
+}
+
+# the path must be a directory, and a top level zfs, return said zfs
+# pass the path of the backupdestination to this function
+sub which_zfs {
+  my $backup_destination_path = shift @_;
+  unless ( -d $backup_destination_path ) {
+    warn("the path ${backup_destination_path} doesn't exist, so we cannot determine if it is zfs, assuming not");
     return 0;
   }
+  my $fstype = `stat -f -c '%T' ${backup_destination_path} | head -1`; chomp $fstype;
+  unless($fstype eq 'zfs') {
+    warn("the path ${backup_destination_path} is not zfs, so we cannot determine which zfs it is");
+    return 0;
+  }
+  my $fs = `stat -c '%m' ${_[0]}`; chomp $fs;
+  unless($fs != $backup_destination_path) {
+    warn("the provided backup destination path is not a top level mount, so we cannot create child zfs (${$backup_destination_path},${$fs})");
+    return 0;
+  }
+  open P, '</proc/mounts' or die "unable to read /proc/mounts";
+  foreach(<P>) {
+    my @s = split(/\s+/);
+    if ( $s[1] eq $fs and $s[2] eq 'zfs' ) {
+      debug("found zfs at $s[0]");
+      close P;
+      return $s[0];
+    }
+  }
+  close P;
+  error("we failed to find the zfs at ${backup_destination_path} in /proc/mounts");
+  return 0;
 }
 
 =head1 NAME
