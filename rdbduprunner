@@ -1564,9 +1564,9 @@ sub which_zfs {
     warn("the path ${backup_destination_path} is not zfs, so we cannot determine which zfs it is");
     return 0;
   }
-  my $fs = `stat -c '%m' ${_[0]}`; chomp $fs;
-  unless($fs != $backup_destination_path) {
-    warn("the provided backup destination path is not a top level mount, so we cannot create child zfs (${$backup_destination_path},${$fs})");
+  my $fs = `stat -c '%m' ${backup_destination_path} | head -1`; chomp $fs;
+  unless($fs eq $backup_destination_path) {
+    warn("the provided backup destination path is not a top level mount, so we cannot create child zfs (${backup_destination_path},${fs})");
     return 0;
   }
   open P, '</proc/mounts' or die "unable to read /proc/mounts";
