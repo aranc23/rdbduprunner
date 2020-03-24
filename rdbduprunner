@@ -20,7 +20,7 @@ use warnings;
 #from a standard perl distribution, on UNIX at least
 use Getopt::Long;
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
-use Env qw( HOME USER );
+use Env qw( HOME );
 use Data::Dumper;
 use POSIX qw( strftime pause );
 use Pod::Usage;
@@ -40,6 +40,7 @@ my $HELP=0;
 
 # can be overridden from the command line, but not the config
 our $CONFIG_FILE="$HOME/.rdbduprunner.rc";
+our $USER = $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(getpwuid($<));
 
 # these are command line options, and in some cases config file options
 # the following changes the major mode of operation for rdbduprunner:
