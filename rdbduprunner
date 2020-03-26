@@ -1894,9 +1894,11 @@ cannot free this much space.
 
 =item I<Inplace> - Boolean (true|t|yes|on|1), optional
 
-Passes the --inplace and --partial options to rsync for this
-destination.  Assumed to be false unless Inplace is set to one of the
-above parameters. Defaults to false.
+Passes the --inplace and --partial options to rsync (instead of
+--sparse) for this destination.  Assumed to be true every day of the
+week except Sunday unless explicitly set.  If you always want
+--inplace, set this to true, if you always want --sparse set this to
+false.
 
 =back
 
