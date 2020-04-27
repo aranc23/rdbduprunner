@@ -182,7 +182,6 @@ GetOptions(
            'check'                  => \$CLEANUP,
            'compare'                => \$COMPARE,
            'verify'                 => \$COMPARE,
-           'n|dry-run'              => \$DRYRUN,
            'dump'                   => \$DUMP,
            'list-oldest'            => \$LISTOLDEST,
            'remove-oldest'          => \$REMOVE,
@@ -202,6 +201,7 @@ GetOptions(
            'u|use-agent!'           => \$USEAGENT,
            'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
            'tempdir=s'              => \$TEMPDIR,
+           'n|dry-run'              => \$DRYRUN,
 
            # rsync specific options
            'v|verbose'              => \$VERBOSE,
