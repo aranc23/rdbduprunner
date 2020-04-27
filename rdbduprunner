@@ -1651,12 +1651,6 @@ rdiff-backup which both have the purpose of printing what has changed
 since the last backup, in other words what would be backed up on the
 next run.
 
-=item {B<-n|--dry-run>} (rsync only)
-
-Passes the --dry-run (-n) option to rsync.  rdbduprunner will not run
-the prerun, postrun or zfs create and zfs snapshot commands (when
-applicable.)
-
 =item {B<--dump>}
 
 Simply dumps the internal data structures for backups and
@@ -1809,6 +1803,12 @@ See MaxWait global config option.
 
 Passes the identical option to duplicity.  No affect on other backup
 types.
+
+=item {B<-n|--dry-run>} (rsync only)
+
+Passes the --dry-run (-n) option to rsync.  rdbduprunner will not run
+the prerun, postrun or zfs create and zfs snapshot commands (when
+applicable.)
 
 =back
 
