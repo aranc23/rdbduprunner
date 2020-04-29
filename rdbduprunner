@@ -48,6 +48,7 @@ our $AVERAGE=0;
 our $CLEANUP=0;
 our $COMPARE=0;
 our $DRYRUN=0;
+our $CHECKSUM=0;
 our $DUMP=0;
 our $LISTOLDEST=0;
 our $REMOVE=0;
@@ -201,11 +202,12 @@ GetOptions(
            'u|use-agent!'           => \$USEAGENT,
            'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
            'tempdir=s'              => \$TEMPDIR,
-           'n|dry-run'              => \$DRYRUN,
 
            # rsync specific options
            'v|verbose'              => \$VERBOSE,
            'progress!'              => \$PROGRESS,
+           'n|dry-run'              => \$DRYRUN,
+           'c|checksum'             => \$CHECKSUM,
            # the next three options limit which backups get acted upon
            'dest=s'                 => \$DEST,
            'host=s'                 => \$HOST,
@@ -831,6 +833,9 @@ sub build_backup_command {
          );
     if($DRYRUN) {
       push(@com,'--dry-run');
+    }
+    if($CHECKSUM) {
+      push(@com,'--checksum');
     }
     if($$bh{'inplace'}) {
       push(@com,'--inplace','--partial');
@@ -1598,7 +1603,7 @@ rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
 
 B<rdbduprunner> {B<-h|--help>}
 
-B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dry-run>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>} {B<--stats>|B<--nostats>} {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>} {B<--maxwait> I<integer>}
+B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dry-run>|B<--checksum>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>} {B<--stats>|B<--nostats>} {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>} {B<--maxwait> I<integer>}
 
 
 =head1 DESCRIPTION
@@ -1809,6 +1814,10 @@ types.
 Passes the --dry-run (-n) option to rsync.  rdbduprunner will not run
 the prerun, postrun or zfs create and zfs snapshot commands (when
 applicable.)
+
+=item {B<-c|--checksum>} (rsync only)
+
+Passes the --checksum (-c) option to rsync.
 
 =back
 
