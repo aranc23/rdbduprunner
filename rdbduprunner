@@ -27,6 +27,7 @@ use Pod::Usage;
 use POSIX ":sys_wait_h"; # for nonblocking read
 eval { use Time::HiRes qw( time ); };
 use File::Spec;
+use Scalar::Util qw/reftype/;
 
 # added from CPAN or system packages
 use Config::General;
@@ -371,7 +372,13 @@ $SKIP_FS_REGEX='^('.join('|',map(quotemeta,@SKIP_FS)).')$';
 dlog('debug','config',\%CONFIG,{'config_file' => $CONFIG_FILE});
 
 foreach my $bstag (keys(%{$CONFIG{backupset}})) {
-    my $bs=$CONFIG{backupset}{$bstag};
+  # allow bstags to have the same name, just process them distinctly
+    my @bslist=($CONFIG{backupset}{$bstag});
+    if( reftype $CONFIG{backupset}{$bstag} eq reftype [] ) {
+      @bslist=@{$CONFIG{backupset}{$bstag}};
+      warn("presumed multiple backupsets with the same name: $bslist[0]");
+    }
+    foreach my $bs (@bslist) {
     my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
     my $btype;
     my $backupdest;
@@ -557,6 +564,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
         dlog('debug','backup',$bh);
         push(@BACKUPS,$bh);
     }
+}
 }
 
 if($DUMP) {
