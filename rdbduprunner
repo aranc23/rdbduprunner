@@ -376,7 +376,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     my @bslist=($CONFIG{backupset}{$bstag});
     if( reftype $CONFIG{backupset}{$bstag} eq reftype [] ) {
       @bslist=@{$CONFIG{backupset}{$bstag}};
-      warn("presumed multiple backupsets with the same name: $bslist[0]");
+      warn("multiple backupsets with the same name: ${bstag}");
     }
     foreach my $bs (@bslist) {
     my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
