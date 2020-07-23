@@ -1025,7 +1025,7 @@ sub perform_backup {
       system(@{$$bh{com}});
       $mainret=$?;
       $$bh{runtime}=time()-$$bh{runtime};
-      if ($$bh{btype} eq 'rsync') {
+      if ($$bh{btype} eq 'rsync' and $mainret % 256 == 0) {
         $mainret=($mainret/256);
       }
       if (defined $$EXIT_CODE{$$bh{btype}}{$mainret}) {
