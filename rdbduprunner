@@ -1980,6 +1980,35 @@ Pass these paths to the --exclude or similar options of the underlying
 invocation of rdiff-backup, duplicity, or rsync.  Does not attempt to
 normalize the paths for any given method of specifiying exclusions.
 
+=item I<Skip> - String, optional (multiples ok)
+
+If a path added via the inventory process matches exactly the string
+or strings specified by a Skip option, do not back up that
+filesystem/mountpoint. The following configuration fragment will cause
+rdbduprunner to backup all filesystems except /tmp F<if> and only if /tmp
+is a seperate filesystem.  It does not work as an exclude directive
+above, it only matches filesystem mount points:
+
+ Inventory true
+ Skip /tmp
+
+=item I<SkipRE> - String, optional (multiples ok)
+
+If a path added via the inventory process matches the string specified
+by a SkipRE option when treated as a regular expression, rdbduprunner
+will not not back up that filesystem/mountpoint. The following
+configuration fragment will cause rdbduprunner to back up all
+filesystems except filesystems mounted under /mnt, but only if they
+are a seperate unique filesystem added via inventory:
+
+ Inventory true
+ SkipRE /mnt/.+
+
+If there is a directory, in this example, like /mnt/test it will still
+be backed up unless it it's own mountpoint.  It does not work as an
+exclude directive as documented above above, it only matches
+filesystem mount points:
+
 =item I<MaxInc> - Integer, optional
 
 Used by the --tidy option to remove all but the most recent X
