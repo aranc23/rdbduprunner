@@ -1611,8 +1611,7 @@ rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
 
 B<rdbduprunner> {B<-h|--help>}
 
-B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dry-run>|B<--checksum>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>} {B<--stats>|B<--nostats>} {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>} {B<--maxwait> I<integer>}
-
+B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dry-run>|B<--checksum>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>} {B<--stats>|B<--nostats>} {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>} {B<--maxwait> I<integer>} =item {B<--allow-source-mismatch>} {B<-n|--dry-run>} {B<-c|--checksum>} {B<--skipfs> I<filesystem>}
 
 =head1 DESCRIPTION
 
@@ -1826,6 +1825,12 @@ applicable.)
 =item {B<-c|--checksum>} (rsync only)
 
 Passes the --checksum (-c) option to rsync.
+
+=item {B<--skipfs> I<filesystem>}
+
+Adds the specified filesystem to the list of filesystms to be ignored, ie:
+
+--skipfs reiserfs
 
 =back
 
