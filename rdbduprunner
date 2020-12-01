@@ -111,9 +111,10 @@ my @SKIP_FS=qw(
                 fuse.gvfs-fuse-daemon
                 fuse.gvfsd-fuse
                 fuse.lxcfs
+                fuse.portal
+                fuse.sshfs
                 fuse.vmware-vmblock
                 fuse.xrdp-chansrv
-                fuse.portal
                 fuseblk
                 fusectl
                 htfs
