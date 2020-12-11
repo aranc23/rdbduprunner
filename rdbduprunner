@@ -437,7 +437,7 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     if(defined $$bs{path}) {
       @paths=ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path});
     }
-    if(defined $$bs{inventory} and $$bs{inventory}) {
+    if((defined $$bs{inventory} and $$bs{inventory}) and not (defined $$bs{'disabled'} and $$bs{'disabled'})) {
       # perform inventory
       debug("performing inventory on $host");
       my $inventory_command='cat /proc/mounts';
