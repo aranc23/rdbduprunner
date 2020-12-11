@@ -262,7 +262,9 @@ dlog('info','starting',{});
 			    -IncludeGlob => 1,
 			    -AutoTrue => 1,
 			    -LowerCaseNames => 1)->getall() or die "unable to parse $CONFIG_FILE";
-
+if($DUMP) {
+  print Dumper \%CONFIG;
+}
 if(not defined $DUPLICITY_BINARY) {
     if(defined $CONFIG{duplicitybinary}) {
 	$DUPLICITY_BINARY=$CONFIG{duplicitybinary};
@@ -571,7 +573,6 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
 }
 
 if($DUMP) {
-  print Dumper \%CONFIG;
   print Dumper \@BACKUPS;
   notice("you asked me to dump and exit!");
   exit(0);
