@@ -565,7 +565,8 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
                 }
             }
           }
-        $$bh{'src'} = $$bh{host} eq $LOCALHOST ? $$bh{path} : $$bh{host}.($$bh{btype} eq 'rsync' ? ':' : '::').$$bh{path};
+        my @split_host = split(/\./,$$bh{host});
+        $$bh{'src'} = ($$bh{host} eq $LOCALHOST or $split_host[0] eq $LOCALHOST ) ? $$bh{path} : $$bh{host}.($$bh{btype} eq 'rsync' ? ':' : '::').$$bh{path};
         dlog('debug','backup',$bh);
         push(@BACKUPS,$bh);
     }
