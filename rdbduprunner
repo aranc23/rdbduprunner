@@ -1890,7 +1890,8 @@ F<$HOME/rdbduprunner.pid>
 =item I<ExcludePath> - What directory to look for exclude
 files. Defaults to F</etc/rdbduprunner-excludes>
 
-=item I<UseAgent>
+=item I<UseAgent> - Boolean, optional
+Passes the --use-agent option to duplicity.
 
 =item I<TempDir> - Passed to some binaries as an alternate temp dir
 path. Defaults to not pass any temp options therefore probably uses
