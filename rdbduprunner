@@ -968,6 +968,14 @@ sub perform_backup {
     }
   }
   foreach my $bh (sort backup_sort (@_)) {
+    foreach my $key (qw( src dest tag path host ) ) {
+      if ( exists $$bh{$key} ) {
+        $ENV{'RDBDUPRUNNER_BACKUP_'.uc($key)}=$$bh{$key};
+      }
+      elsif ( exists $ENV{'RDBDUPRUNNER_BACKUP_'.uc($key)} ) {
+        delete $ENV{'RDBDUPRUNNER_BACKUP_'.uc($key)};
+      }
+    }
     if(exists $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted} == 1) {
       dlog('notice','skipping backup due to busted destination',$bh);
       next;
