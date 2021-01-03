@@ -1,0 +1,88 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+
+import re
+import sys
+
+factory_settings["rdbduprunner_default_levels"] = {
+    "age": (86400, 172800)  # 1d/2d
+}
+
+def parse_message(line):
+    # this came directrly from stackoverflow:
+    # https://stackoverflow.com/questions/4764547/creating-dictionary-from-space-separated-key-value-string-in-python
+    p = {k:v.strip('"') for k,v in re.findall(r'(\S+)=(".*?"|\S+)', line)}
+    for ints in ['priority','exit']:
+        if ints in p.keys():
+            try:
+                p[ints] = int(p[ints])
+            except ValueError:
+                p[ints] = -50000
+    for floats in ['runtime','timestamp']:
+        if floats in p.keys():
+            try:
+                p[floats] = float(p[floats])
+            except ValueError:
+                p[floats] = 50000000
+    return p
+
+def inventory_rdbduprunner(info):
+    inventory = {}
+    #warn,crit = rdbduprunner_default_levels
+    for line in info:
+        p = parse_message(' '.join(line))
+        if 'src' in p.keys() and (p['src'], "rdbduprunner_default_levels") not in inventory.keys():
+            inventory[(p['src'], "rdbduprunner_default_levels")]=1
+    return inventory.keys()
+
+def check_rdbduprunner(item, params, info):
+    last = {}
+    #sys.stderr.write("%s %d\n" % (item,len(info)))
+    warn,crit = params['age']
+    #counter = 0
+    for line in info:
+        joined = ' '.join(line)
+        # hopefully a substring search is faster than parsing the line
+        if joined.find('src="' + item + '"') == -1:
+            continue
+
+        #counter+=1
+        p = parse_message(joined)
+        if 'src' in p.keys() and item == p['src'] and (len(last.keys()) == 0 or p['timestamp'] > last['timestamp']):
+            last=p
+            #sys.stderr.write("found most recent message %s after parsing %d lines\n" % (item,counter))
+
+    return_code = 3
+    msg = 'rdbduprunner log entry for this backup not found in plugin output'
+    if len(last.keys()) > 0:
+        return_code = 0
+        msg = 'successful backup found completed at %s' % (last['datetime'])
+        if last['exit'] == 24:
+            msg = 'successful backup found completed at %s (some source files vanished)' % (last['datetime'])
+        elif last['exit'] != 0:
+            return_code = 2
+            if 'exit_code' in last.keys():
+                msg = 'backup exited with a non-zero status %d: %s at %s' % (last['exit'],last['exit_code'],last['datetime'])
+            else:
+                msg = 'backup exited with a non-zero status %d at %s' % (last['exit'],last['datetime'])
+        elif last['timestamp'] + crit <= time.time():
+            return_code = 2
+            msg = 'backup is older than %.1f days, last backup at %s' % (crit/86400,last['datetime'])
+        elif last['timestamp'] + warn <= time.time():
+            return_code = 1
+            msg = 'backup is older than %.1f days, last backup at %s' % (warn/86400,last['datetime'])
+        if 'runtime' in last.keys():
+            perfdata=['runtime',last['runtime']]
+        else:
+            perfdata=['runtime',None]
+    yield return_code, msg
+
+
+check_info['rdbduprunner'] = {
+    "check_function"          : check_rdbduprunner,
+    "inventory_function"      : inventory_rdbduprunner,
+    "default_levels_variable" : "rdbduprunner_default_levels",
+    "service_description"     : "Backup %s",
+    "has_perfdata"            : False,
+    'group'                   : 'backup_rdbduprunner',
+}
