@@ -311,6 +311,10 @@ unless(defined $TVERBOSITY) { # from the command line
   }
 }
 
+if(defined $CONFIG{allowfs}) {
+  @ALLOW_FS = ref($CONFIG{allowfs}) eq "ARRAY" ? @{$CONFIG{allowfs}} : ($CONFIG{allowfs} );
+}
+
 if(defined $LOCK_DIR) {
   # leave it alone, it comes from the command line
 } elsif(defined $CONFIG{lockdir}) {
@@ -439,6 +443,11 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
     if(defined $$bs{path}) {
       @paths=ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path});
     }
+    if(defined $$bs{allowfs}) {
+      debug("setting the list of allowed filesystems in the backup set, which will override the global options");
+      @ALLOW_FS=ref($$bs{allowfs}) eq "ARRAY" ? @{$$bs{allowfs}} : ($$bs{allowfs});
+    }
+
     if((defined $$bs{inventory} and $$bs{inventory}) and not (defined $$bs{'disabled'} and $$bs{'disabled'})) {
       # perform inventory
       debug("performing inventory on $host");
@@ -458,9 +467,11 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
       M:
         foreach my $m (sort(@a)) {
           my @e=split(/\s+/,$m);
-          if( scalar @ALLOW_FS > 0 and not grep(/^$e[2]$/,@ALLOW_FS) ) {
-            debug("filesystem type is not allowd via the allow list: ${e[2]}");
-            next;
+          if( scalar @ALLOW_FS > 0 ) {
+            if ( not grep(/^$e[2]$/,@ALLOW_FS) ) {
+              debug("filesystem type is not allowd via the allow list: ${e[2]}");
+              next;
+            }
           }
           elsif ( $e[2] =~ /$SKIP_FS_REGEX/ ) {
             debug("filesystem type is not allowd via the skip list: ${e[2]}");
@@ -1930,6 +1941,12 @@ none is specified.
 
 =item I<MaxWait> - Maxiumum number of seconds to wait for a host lock.
 
+=item I<AllowFS> - String, Optional
+
+Only inventory filesystems matching filesystem types specified via
+this option.  Can be specified multiple times.  Can also be specified
+at the BackupSet level.
+
 =back
 
 =head3 BackupDestination Options
@@ -2067,6 +2084,13 @@ Passes the --inplace and --partial options to rsync for this
 destination.  Assumed to be false unless Inplace is set to one of the
 above parameters. Defaults to false.
 Can be set at the BackupDestination level as well.
+
+=item I<AllowFS> - String, optional
+
+Only inventory filesystems matching filesystem types specified via
+this option.  Can be specified multiple times.  Specified at the
+BackupSet level will completely override the list of filesystem types
+specified at the global level.
 
 =back
 
