@@ -143,6 +143,7 @@ my @SKIP_FS=qw(
                 zfs
              );
 my $SKIP_FS_REGEX;
+my @ALLOW_FS;
 
 # from the man page for rsync 3.1.1
 my $EXIT_CODE={
@@ -231,6 +232,7 @@ GetOptions(
            'logfile=s'              => \$LOG_FILE,
            'test!'                  => \$TEST,
            'skipfs=s'               => \@SKIP_FS,
+           'allowfs=s'              => \@ALLOW_FS,
            'maxprocs=i'             => \$MAXPROCS,
            'maxwait=i'              => \$MAXWAIT,
           );
@@ -456,26 +458,32 @@ foreach my $bstag (keys(%{$CONFIG{backupset}})) {
       M:
         foreach my $m (sort(@a)) {
           my @e=split(/\s+/,$m);
-          unless($e[2] =~ /$SKIP_FS_REGEX/) {
-            if(defined $$bs{skip}) {
-              foreach my $skip (ref($$bs{skip}) eq "ARRAY" ? @{$$bs{skip}} : ($$bs{skip})) {
-                if($e[1] eq $skip) {
-                  next M;
-                }
-              }
-            }
-            if(defined $$bs{skipre}) {
-              foreach my $skipre (ref($$bs{skipre}) eq "ARRAY" ? @{$$bs{skipre}} : ($$bs{skipre})) {
-                if($e[1] =~ /$skipre/) {
-                  next M;
-                }
-              }
-            }
-            # skip seen devices
-            grep(/^$e[0]$/,@seen) and next;
-            push(@seen,$e[0]);
-            push(@paths,$e[1]);
+          if( scalar @ALLOW_FS > 0 and not grep(/^$e[2]$/,@ALLOW_FS) ) {
+            debug("filesystem type is not allowd via the allow list: ${e[2]}");
+            next;
           }
+          elsif ( $e[2] =~ /$SKIP_FS_REGEX/ ) {
+            debug("filesystem type is not allowd via the skip list: ${e[2]}");
+            next;
+          }
+          if(defined $$bs{skip}) {
+            foreach my $skip (ref($$bs{skip}) eq "ARRAY" ? @{$$bs{skip}} : ($$bs{skip})) {
+              if($e[1] eq $skip) {
+                next M;
+              }
+            }
+          }
+          if(defined $$bs{skipre}) {
+            foreach my $skipre (ref($$bs{skipre}) eq "ARRAY" ? @{$$bs{skipre}} : ($$bs{skipre})) {
+              if($e[1] =~ /$skipre/) {
+                next M;
+              }
+            }
+          }
+          # skip seen devices
+          grep(/^$e[0]$/,@seen) and next;
+          push(@seen,$e[0]);
+          push(@paths,$e[1]);
         }
       }
       else {
@@ -1626,7 +1634,7 @@ rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
 
 B<rdbduprunner> {B<-h|--help>}
 
-B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dry-run>|B<--checksum>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>} {B<--stats>|B<--nostats>} {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>} {B<--maxwait> I<integer>} =item {B<--allow-source-mismatch>} {B<-n|--dry-run>} {B<-c|--checksum>} {B<--skipfs> I<filesystem>}
+B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dry-run>|B<--checksum>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>} {B<--stats>|B<--nostats>} {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>} {B<--maxwait> I<integer>} =item {B<--allow-source-mismatch>} {B<-n|--dry-run>} {B<-c|--checksum>} {B<--skipfs> I<filesystem>} {B<--allowfs> I<filesystem>}
 
 =head1 DESCRIPTION
 
@@ -1843,9 +1851,18 @@ Passes the --checksum (-c) option to rsync.
 
 =item {B<--skipfs> I<filesystem>}
 
-Adds the specified filesystem to the list of filesystms to be ignored, ie:
+Adds the specified filesystem to the list of filesystems to be ignored
+during inventory.
 
 --skipfs reiserfs
+
+=item {B<--allowfs> I<filesystem>}
+
+Allows this filesystem to be included during inventory.  When
+--allowfs is used, the skipfs list is disregarded.  Only filesystem
+types specified this way will be included during inventory.
+
+--allowfs reiserfs --allowfs ext4
 
 =back
 
