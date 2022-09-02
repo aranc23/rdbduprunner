@@ -860,6 +860,7 @@ sub build_backup_command {
           '--archive',
           '--one-file-system',
           '--hard-links',
+          '--no-whole-file',
           '--delete',
           '--delete-excluded',
          );
