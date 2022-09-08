@@ -177,6 +177,15 @@ our @BACKUPS;
 our $DISPATCHER;
 our @INCREMENTS;
 
+my %option_mappings=
+  (
+   # config file string
+   'wholefile' =>
+   {
+    'cli' => 'whole-file|wholefile!',
+    'var' => \$WHOLE_FILE,
+   },
+  );
 my %get_options=
   (
    # show usage
@@ -239,6 +248,12 @@ my %get_options=
    'maxprocs=i'             => \$MAXPROCS,
    'maxwait=i'              => \$MAXWAIT,
   );
+
+# push the options onto the big get_options hash for passing to GetOptions
+foreach my $key (keys(%option_mappings)) {
+  my $o=$option_mappings{$key};
+  $get_options{$$o{'cli'}} = $$o{'var'};
+}
 
 GetOptions(%get_options);
 
