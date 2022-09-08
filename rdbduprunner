@@ -50,6 +50,7 @@ our $CLEANUP=0;
 our $COMPARE=0;
 our $DRYRUN=0;
 our $CHECKSUM=0;
+our $WHOLE_FILE; # contains the boolean result --no-whole-file or --whole-file
 our $DUMP=0;
 our $LISTOLDEST=0;
 our $REMOVE=0;
@@ -176,66 +177,70 @@ our @BACKUPS;
 our $DISPATCHER;
 our @INCREMENTS;
 
-GetOptions(
-           # show usage
-           'h|help'                 => \$HELP,
-           # can be overridden from the command line, but not the config
-           'config=s'               => \$CONFIG_FILE, # config file
+my %get_options=
+  (
+   # show usage
+   'h|help'                 => \$HELP,
+   # can be overridden from the command line, but not the config
+   'config=s'               => \$CONFIG_FILE, # config file
 
-           # the following changes the major mode of operation for rdbduprunner:
-           'calculate-average'      => \$AVERAGE,
-           'cleanup'                => \$CLEANUP,
-           'check'                  => \$CLEANUP,
-           'compare'                => \$COMPARE,
-           'verify'                 => \$COMPARE,
-           'dump'                   => \$DUMP,
-           'list-oldest'            => \$LISTOLDEST,
-           'remove-oldest'          => \$REMOVE,
-           'status'                 => \$STATUS,
-           'tidy'                   => \$TIDY,
-           'list'                   => \$LIST,
-           'orphans'                => \$ORPHANS,
+   # the following changes the major mode of operation for rdbduprunner:
+   'calculate-average'      => \$AVERAGE,
+   'cleanup'                => \$CLEANUP,
+   'check'                  => \$CLEANUP,
+   'compare'                => \$COMPARE,
+   'verify'                 => \$COMPARE,
+   'dump'                   => \$DUMP,
+   'list-oldest'            => \$LISTOLDEST,
+   'remove-oldest'          => \$REMOVE,
+   'status'                 => \$STATUS,
+   'tidy'                   => \$TIDY,
+   'list'                   => \$LIST,
+   'orphans'                => \$ORPHANS,
 
-           # the following affect what options are passed to rdiff-backup and/or duplicity
-           'force!'                 => \$FORCE,
-           'full'                   => \$FULL,
-           'maxage=s'               => \$MAXAGE,
-           'maxinc=s'               => \$MAXINC,
-           'stats!'                 => \$STATS,
-           'verbosity=i'            => \$VERBOSITY,
-           't|terminal-verbosity=i' => \$TVERBOSITY,
-           'u|use-agent!'           => \$USEAGENT,
-           'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
-           'tempdir=s'              => \$TEMPDIR,
+   # the following affect what options are passed to rdiff-backup and/or duplicity
+   'force!'                 => \$FORCE,
+   'full'                   => \$FULL,
+   'maxage=s'               => \$MAXAGE,
+   'maxinc=s'               => \$MAXINC,
+   'stats!'                 => \$STATS,
+   'verbosity=i'            => \$VERBOSITY,
+   't|terminal-verbosity=i' => \$TVERBOSITY,
+   'u|use-agent!'           => \$USEAGENT,
+   'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
+   'tempdir=s'              => \$TEMPDIR,
 
-           # rsync specific options
-           'v|verbose'              => \$VERBOSE,
-           'progress!'              => \$PROGRESS,
-           'n|dry-run'              => \$DRYRUN,
-           'c|checksum'             => \$CHECKSUM,
-           # the next three options limit which backups get acted upon
-           'dest=s'                 => \$DEST,
-           'host=s'                 => \$HOST,
-           'path=s'                 => \$PATH,
+   # rsync specific options
+   'v|verbose'              => \$VERBOSE,
+   'progress!'              => \$PROGRESS,
+   'n|dry-run'              => \$DRYRUN,
+   'c|checksum'             => \$CHECKSUM,
+   'whole-file|wholefile!'  => \$WHOLE_FILE,
+   # the next three options limit which backups get acted upon
+   'dest=s'                 => \$DEST,
+   'host=s'                 => \$HOST,
+   'path=s'                 => \$PATH,
 
-           # configuring rdbduprunner:
-           'duplicity-binary=s'     => \$DUPLICITY_BINARY,
-           'rdiff-backup-binary=s'  => \$RDIFF_BACKUP_BINARY,
-           'rsync-binary=s'         => \$RSYNC_BINARY,
-           'zfs-binary=s'           => \$ZFS_BINARY,
-           'exclude-path=s'         => \$EXCLUDE_PATH,
-           'facility=s'             => \$FACILITY,
-           'level=s'                => \$LOG_LEVEL,
-           'localhost=s'            => \$LOCALHOST,
-           'lockdir=s'              => \$LOCK_DIR,
-           'logdir=s'               => \$LOG_DIR,
-           'logfile=s'              => \$LOG_FILE,
-           'test!'                  => \$TEST,
-           'skipfs=s'               => \@SKIP_FS,
-           'allowfs=s'              => \@ALLOW_FS,
-           'maxprocs=i'             => \$MAXPROCS,
-           'maxwait=i'              => \$MAXWAIT,
-          );
+   # configuring rdbduprunner:
+   'duplicity-binary=s'     => \$DUPLICITY_BINARY,
+   'rdiff-backup-binary=s'  => \$RDIFF_BACKUP_BINARY,
+   'rsync-binary=s'         => \$RSYNC_BINARY,
+   'zfs-binary=s'           => \$ZFS_BINARY,
+   'exclude-path=s'         => \$EXCLUDE_PATH,
+   'facility=s'             => \$FACILITY,
+   'level=s'                => \$LOG_LEVEL,
+   'localhost=s'            => \$LOCALHOST,
+   'lockdir=s'              => \$LOCK_DIR,
+   'logdir=s'               => \$LOG_DIR,
+   'logfile=s'              => \$LOG_FILE,
+   'test!'                  => \$TEST,
+   'skipfs=s'               => \@SKIP_FS,
+   'allowfs=s'              => \@ALLOW_FS,
+   'maxprocs=i'             => \$MAXPROCS,
+   'maxwait=i'              => \$MAXWAIT,
+  );
+
+GetOptions(%get_options);
 
 # print the SYNOPSIS section and exit
 pod2usage(-1) if $HELP;
@@ -267,6 +272,7 @@ dlog('info','starting',{});
 if($DUMP) {
   print Dumper \%CONFIG;
 }
+# set some global options using the config file global options???
 if(not defined $DUPLICITY_BINARY) {
     if(defined $CONFIG{duplicitybinary}) {
 	$DUPLICITY_BINARY=$CONFIG{duplicitybinary};
@@ -363,6 +369,16 @@ if(not defined $MAXWAIT) {
 	$MAXWAIT=$CONFIG{maxwait};
     } else {
 	$MAXWAIT=86400; # one day's worth of seconds
+    }
+}
+
+# if specified by command line, do not override
+if(not defined $WHOLE_FILE) {
+    if(defined $CONFIG{wholefile}) {
+        $WHOLE_FILE=parse_bool($CONFIG{wholefile});
+    }
+    else {
+        $WHOLE_FILE=0;
     }
 }
 
@@ -860,10 +876,10 @@ sub build_backup_command {
           '--archive',
           '--one-file-system',
           '--hard-links',
-          '--no-whole-file',
           '--delete',
           '--delete-excluded',
          );
+    push(@com,$WHOLE_FILE ? '--whole-file' : '--no-whole-file');
     if($DRYRUN) {
       push(@com,'--dry-run');
     }
@@ -1857,6 +1873,12 @@ Passes the --dry-run (-n) option to rsync.  rdbduprunner will not run
 the prerun, postrun or zfs create and zfs snapshot commands (when
 applicable.)
 
+=item {B<--whole-file|--wholefile|--no-whole-file|--no-wholefile>} (rsync only)
+
+Passes the --whole-file or --no-whole-file options to rsync.  This
+supersedes the WholeFile configuration boolean specified in the config
+file.
+
 =item {B<-c|--checksum>} (rsync only)
 
 Passes the --checksum (-c) option to rsync.
@@ -1947,6 +1969,14 @@ none is specified.
 Only inventory filesystems matching filesystem types specified via
 this option.  Can be specified multiple times.  Can also be specified
 at the BackupSet level.
+
+=item I<WholeFile> - Boolean (default: false)
+
+When true, pass --whole-file to rsync.
+When false, pass --no-whole-file to rsync.
+
+Can be specified at the BackupDestination and BackupSet levels as
+well, which will override the global setting.
 
 =back
 
@@ -2106,6 +2136,19 @@ Default PID/lock file.
 =head1 RESTRICTIONS
 
 =head1 NOTES
+
+rdbduprunner *should* prefer to use configuration items in this order,
+with later entries superseding the prior level. This assumes that the
+option itself is applicable all the way down to the individual
+invocations of the backup software.
+
+=item Global Configuration
+
+=item BackupDestination
+
+=item BackupSet
+
+=item Command Line Options
 
 =head1 AUTHOR
 
