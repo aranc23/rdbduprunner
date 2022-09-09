@@ -51,6 +51,7 @@ our $COMPARE=0;
 our $DRYRUN=0;
 our $CHECKSUM=0;
 our $WHOLE_FILE; # contains the boolean result --no-whole-file or --whole-file
+our $INPLACE; # hold cli value for inplace
 our $DUMP=0;
 our $LISTOLDEST=0;
 our $REMOVE=0;
@@ -186,8 +187,17 @@ my %option_mappings=
    # config file string
    'wholefile' =>
    {
-    'cli' => 'whole-file|wholefile!',
-    'var' => \$WHOLE_FILE,
+    'cli'       => 'whole-file|wholefile!',
+    'var'       => \$WHOLE_FILE,
+    'normalize' => \&bool_parse,
+   },
+   # on Sundays, the default for inplace is false, and true the rest of the week
+   'inplace' =>
+   {
+    'cli'       => 'inplace!',
+    'var'       => \$INPLACE,
+    'def'       => strftime('%w',localtime(time())) == 0 ? 0 : 1,
+    'normalize' => \&bool_parse,
    },
   );
 my %get_options=
@@ -1386,6 +1396,7 @@ sub tag_prio {
   return 0;
 }
 
+# given a string, interpret it as 0 or 1 (false or true)
 sub bool_parse {
   my @true = qw( true t yes on 1 );
   my @false = qw( false f no off 0 );
@@ -1472,8 +1483,6 @@ sub parse_config_backups {
       my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
       my $btype;
       my $backupdest;
-      # on Sundays, the default for inplace is false, and true the rest of the week
-      my $inplace = strftime('%w',localtime($RUNTIME)) == 0 ? 0 : 1 ;
 
       if (defined $HOST and $host !~ /$HOST/) {
         next;
@@ -1489,11 +1498,6 @@ sub parse_config_backups {
       unless(defined $backupdest) {
         error("there is no BackupDestination defined for the BackupSet ($bstag): so it cannot be processed");
         next;
-      }
-      if (defined $$bs{'inplace'}) {
-        $inplace = bool_parse($$bs{'inplace'});
-      } elsif (defined $CONFIG{backupdestination}{$backupdest}{'inplace'}) {
-        $inplace = bool_parse($CONFIG{backupdestination}{$backupdest}{'inplace'});
       }
 
       if (defined $CONFIG{backupdestination}{$backupdest}{type} and
@@ -1609,7 +1613,6 @@ sub parse_config_backups {
         $$bh{backupdestination}=$backupdest;
         $$bh{gtag}=$gtag;
         $$bh{btype}=$btype;
-        $$bh{inplace}=$inplace;
         if ($$bh{btype} eq 'rsync') {
           $$bh{path}=$$bh{path}.'/';
           $$bh{path} =~ s/\/\/$/\//; # remove double slashes
@@ -1670,6 +1673,9 @@ sub parse_config_backups {
           }
           elsif( defined $option_mappings{$key}{'def'} ){
             $$bh{$key} = $option_mappings{$key}{'def'};
+          }
+          if( defined $option_mappings{$key}{'normalize'} ) {
+            $$bh{$key} = &{$option_mappings{$key}{'normalize'}}($$bh{$key});
           }
         }
         # if this is defined in a backupset, allow that to override the global definition, if it exists
@@ -1920,6 +1926,10 @@ Passes the --whole-file or --no-whole-file options to rsync.  This
 supersedes the WholeFile configuration boolean specified in the config
 file.
 
+=item {B<--inplace|--no-inplace|--noinplace> - Boolean (true|t|yes|on|1), optional, rsync only
+
+Corresponds to the Inplace configuration item, see below.
+
 =item {B<-c|--checksum>} (rsync only)
 
 Passes the --checksum (-c) option to rsync.
@@ -2047,7 +2057,7 @@ byte blocks (because I could reliably get df to report this value.) It
 will do so before running backups and will not run backups if it
 cannot free this much space.
 
-=item I<Inplace> - Boolean (true|t|yes|on|1), optional
+=item I<Inplace> - Boolean (true|t|yes|on|1), optional, rsync only
 
 Passes the --inplace and --partial options to rsync (instead of
 --sparse) for this destination.  Assumed to be true every day of the
