@@ -49,7 +49,7 @@ our $AVERAGE=0;
 our $CLEANUP=0;
 our $COMPARE=0;
 our $DRYRUN=0;
-our $CHECKSUM=0;
+our $CHECKSUM;
 our $WHOLE_FILE; # contains the boolean result --no-whole-file or --whole-file
 our $INPLACE; # hold cli value for inplace
 our $DUMP=0;
@@ -199,6 +199,14 @@ my %option_mappings=
     'def'       => strftime('%w',localtime(time())) == 0 ? 0 : 1,
     'normalize' => \&bool_parse,
    },
+   # use checksum, but don't please
+   'checksum' =>
+   {
+    'cli'       => 'c|checksum!',
+    'var'       => \$CHECKSUM,
+    'def'       => 0,
+    'normalize' => \&bool_parse,
+   },
   );
 my %get_options=
   (
@@ -237,8 +245,6 @@ my %get_options=
    'v|verbose'              => \$VERBOSE,
    'progress!'              => \$PROGRESS,
    'n|dry-run'              => \$DRYRUN,
-   'c|checksum'             => \$CHECKSUM,
-   'whole-file|wholefile!'  => \$WHOLE_FILE,
    # the next three options limit which backups get acted upon
    'dest=s'                 => \$DEST,
    'host=s'                 => \$HOST,
@@ -696,10 +702,10 @@ sub build_backup_command {
     if($DRYRUN) {
       push(@com,'--dry-run');
     }
-    if($CHECKSUM) {
+    if($$bh{checksum}) {
       push(@com,'--checksum');
     }
-    if($$bh{'inplace'}) {
+    if(defined $$bh{'inplace'} and $$bh{'inplace'}) {
       push(@com,'--inplace','--partial');
     }
     else {
@@ -1674,7 +1680,7 @@ sub parse_config_backups {
           elsif( defined $option_mappings{$key}{'def'} ){
             $$bh{$key} = $option_mappings{$key}{'def'};
           }
-          if( defined $option_mappings{$key}{'normalize'} ) {
+          if( defined $$bh{$key} and defined $option_mappings{$key}{'normalize'} ) {
             $$bh{$key} = &{$option_mappings{$key}{'normalize'}}($$bh{$key});
           }
         }
