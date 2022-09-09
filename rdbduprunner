@@ -391,16 +391,6 @@ if(not defined $MAXWAIT) {
     }
 }
 
-# if specified by command line, do not override
-if(not defined $WHOLE_FILE) {
-    if(defined $CONFIG{wholefile}) {
-        $WHOLE_FILE=parse_bool($CONFIG{wholefile});
-    }
-    else {
-        $WHOLE_FILE=0;
-    }
-}
-
 if(defined $LOG_DIR) {
   # leave it alone, it comes from the command line
 } elsif(defined $CONFIG{logdir}) {
@@ -689,7 +679,10 @@ sub build_backup_command {
           '--delete',
           '--delete-excluded',
          );
-    push(@com,$WHOLE_FILE ? '--whole-file' : '--no-whole-file');
+    # here is the where the rubbger meets the robe:
+    if( defined $$bh{wholefile} ) {
+      push(@com, $$bh{wholefile} ? '--whole-file' : '--no-whole-file');
+    }
     if($DRYRUN) {
       push(@com,'--dry-run');
     }
@@ -1653,6 +1646,31 @@ sub parse_config_backups {
         } elsif (not defined $$bh{maxinc} and
                  defined $CONFIG{maxinc}) {
           $$bh{maxinc}=$CONFIG{maxinc};
+        }
+        # interpret variables from cli, global, bd and bs levels and finally use the default if specified
+        foreach my $key (keys(%option_mappings)) {
+          my $var = $option_mappings{$key}{'var'};
+          if(defined $$var) {
+            # override, no matter what, as it was specified on the
+            # command line:
+            $$bh{$key} = $$var;
+          }
+          elsif( defined $$bs{$key} ) {
+            # should already have been copied!
+            # however to make it clear the is the second top/lowest priority:
+            $$bh{$key} = $$bs{$key};
+          }
+          elsif( defined $CONFIG{backupdestination}{$$bh{backupdestination}}{$key} ) {
+            # defined at the backdestination level
+            $$bh{$key} = $CONFIG{backupdestination}{$$bh{backupdestination}}{$key};
+          }
+          elsif( defined $CONFIG{$key} ) {
+            # defined at the global config level
+            $$bh{$key} = $CONFIG{$key};
+          }
+          elsif( defined $option_mappings{$key}{'def'} ){
+            $$bh{$key} = $option_mappings{$key}{'def'};
+          }
         }
         # if this is defined in a backupset, allow that to override the global definition, if it exists
         foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot )))) {
