@@ -65,7 +65,7 @@ our $FORCE=0;
 our $FULL=0;
 our $MAXAGE;
 our $MAXINC;
-our $STATS=1;
+our $STATS; # use to set --stats and other print-stats options
 our $VERBOSITY;
 our $TVERBOSITY;
 our $USEAGENT;
@@ -211,6 +211,14 @@ my %option_mappings=
     'def'       => 0,
     'normalize' => \&bool_parse,
    },
+   # print stats, probably always want this if possible
+   'stats' =>
+   {
+    'cli'       => 'stats!',
+    'var'       => \$STATS,
+    'def'       => 1,
+    'normalize' => \&bool_parse,
+   },
   );
 my %get_options=
   (
@@ -238,7 +246,6 @@ my %get_options=
    'full'                   => \$FULL,
    'maxage=s'               => \$MAXAGE,
    'maxinc=s'               => \$MAXINC,
-   'stats!'                 => \$STATS,
    'verbosity=i'            => \$VERBOSITY,
    't|terminal-verbosity=i' => \$TVERBOSITY,
    'u|use-agent!'           => \$USEAGENT,
@@ -249,6 +256,9 @@ my %get_options=
    'v|verbose'              => \$VERBOSE,
    'progress!'              => \$PROGRESS,
    'n|dry-run'              => \$DRYRUN,
+   # options with applicbility to rdiff-backup, duplicity and rsync
+   'stats!'                 => \$STATS,
+
    # the next three options limit which backups get acted upon
    'dest=s'                 => \$DEST,
    'host=s'                 => \$HOST,
@@ -675,7 +685,7 @@ sub build_backup_command {
     if(defined $$bh{encryptkey}) {
       push(@com,'--encrypt-key',$$bh{encryptkey});
     }
-    unless($STATS) {
+    unless($$bh{stats}) {
       push(@com,'--no-print-statistics');
     }
     push(@com,'--exclude-other-filesystems');
@@ -688,7 +698,7 @@ sub build_backup_command {
     unless($$bh{sshcompress}) {
       push(@com,'--ssh-no-compression');
     }
-    if($STATS) {
+    if($$bh{stats}) {
       push(@com,'--print-statistics');
     }
   } elsif($$bh{btype} eq 'rsync') {
@@ -721,7 +731,7 @@ sub build_backup_command {
     if($$bh{sshcompress}) {
       push(@com,'-z');
     }
-    if($STATS) {
+    if($$bh{stats}) {
       push(@com,'--stats');
     }
     # use logging
@@ -1923,11 +1933,9 @@ Acts as if the MaxAge config option were applied to every backup in
 the configuration, but the backup specific MaxAge still takes
 precendence for any given backup.
 
-=item {B<--stats>|B<--nostats>}
+=item {B<--stats>|B<--nostats>|B<--no-stats>}
 
-The default is to pass the various --stats options to the underlying
-binaries when making backups, but passing --nostats will suppress
-this.
+Corresponds to and supersedes the Stats configuration item, see below.
 
 =item {B<--tempdir> I<path>}
 
@@ -2080,6 +2088,12 @@ When false, pass --no-whole-file to rsync.
 
 Can be specified at the BackupDestination and BackupSet levels as
 well, which will override the global setting.
+
+=item I<Stats> - Boolean (default: true)
+
+Most backup binaries supported by rdbduprunner have the option to
+produce some kind of statistics after a run.  Setting this to false
+will turn those options off.
 
 =back
 
