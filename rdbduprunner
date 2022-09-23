@@ -28,6 +28,7 @@ use POSIX ":sys_wait_h"; # for nonblocking read
 eval { use Time::HiRes qw( time ); };
 use File::Spec;
 use Scalar::Util qw/reftype/;
+use Storable qw( lock_retrieve lock_store );
 
 # added from CPAN or system packages
 use Config::General;
@@ -94,6 +95,9 @@ my $MAXPROCS;
 my $MAXWAIT; # sleep no longer than this value (in seconds)
 my %children; # store children for master backup loop
 my $RUNTIME; # storing the start time so we can calculate run time
+
+my $STATUS_FILE = $USER eq 'root' ? '/etc/rdbduprunner/status'
+    : "${HOME}/.local/state/rdbduprunner/status";
 
 my @SKIP_FS=qw(
                 autofs
@@ -816,12 +820,16 @@ sub perform_backup {
   my $host=shift;
   create_dispatcher();    # to set the pid, may not work correctly
   my $lock1;
+  # store the results of each backup in this hash:
+  # like { '/var', 'failure', 1684884888 )
+  my @host_status;
   unless($TEST) {
     unless ($lock1=lock_pid_file($host)) {
       dlog('error','lock failure',$_[0]);
       exit;
     }
   }
+ BACKUP:
   foreach my $bh (sort backup_sort (@_)) {
     foreach my $key (qw( src dest tag path host ) ) {
       if ( exists $$bh{$key} ) {
@@ -838,7 +846,7 @@ sub perform_backup {
     push(@{$$bh{com}},build_backup_command($bh));
     unless (@{$$bh{com}} > 0) {
       dlog('debug','empty backup command',$bh);
-      next;
+      next BACKUP;
     }
     if (defined $$bh{zfscreate} and bool_parse($$bh{zfscreate}) == 1 and not $DRYRUN) {
       # this seems messy, but we want the parent dir of the real destination
@@ -860,13 +868,15 @@ sub perform_backup {
           unless($? == 0) {
             # if we failed to run the pre-run, issue the final summary based on that
             error("unable to execute zfs create command as requested: skipping backup!");
+            push(@host_status, [ $$bh{path}, 'failure', time() ]);
             log_exit_status($bh,$?);
-            next;
+            next BACKUP;
           }
         }
       }
       else {
         error("unable to execute zfs create command as requested: skipping backup!");
+        push(@host_status, [ $$bh{path}, 'failure', time() ]);
         log_exit_status($bh,$?);
         next;
       }
@@ -879,6 +889,7 @@ sub perform_backup {
         unless($? == 0) {
           # if we failed to run the pre-run, issue the final summary based on that
           error("unable to execute prerun command: skipping backup!");
+          push(@host_status, [ $$bh{path}, 'failure', time() ]);
           log_exit_status($bh,$?);
           next;
         }
@@ -914,6 +925,7 @@ sub perform_backup {
         unless($? == 0) {
           error("postrun command exited with an error");
           # issue final summary based on the return value of the postrun command
+          push(@host_status, [ $$bh{path}, 'failure', $$bh{runtime} ]);
           log_exit_status($bh,$?);
           next;
         }
@@ -944,9 +956,43 @@ sub perform_backup {
       }
     }
     # issue final summary based on the main backup process
+    push(@host_status, [ $$bh{path}, ($mainret == 0 ? 'success' : 'failure'), time() ]);
     log_exit_status($bh,$mainret) unless $TEST;
   }
+  update_status_file($host,\@host_status) unless $TEST;
   exit;
+}
+
+sub update_status_file {
+    my $host        = shift;
+    my $host_status = shift;
+    my $status;
+    my $lock;
+    unless ( open( $lock, '+<' . "${STATUS_FILE}.lock" )
+        or open( $lock, '>' . "${STATUS_FILE}.lock" ) )
+    {
+        error("unable to open lock file: ${STATUS_FILE}.lock for writing");
+        return;
+    }
+    unless ( flock( $lock, LOCK_EX ) ) {
+        error("unable to lock ${STATUS_FILE}.lock");
+        return;
+    }
+    unless ( -f $STATUS_FILE and $status = lock_retrieve($STATUS_FILE) and ref $status eq 'HASH' )
+    {
+        $status = {};
+        error(
+            "unable to retrieve status data from ${STATUS_FILE}, starting over"
+        );
+    }
+    for my $u ( @{$host_status} ) {
+        $$status{$host}{ $$u[0] }{ $$u[1] } = $$u[2];
+    }
+    unless ( lock_store( $status, $STATUS_FILE ) ) {
+        error("unable to store status data in ${STATUS_FILE}");
+    }
+    flock( $lock, LOCK_UN );
+    close $lock;
 }
 
 sub backup_sort {
