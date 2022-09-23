@@ -87,17 +87,23 @@ our $EXCLUDE_PATH;
 our $FACILITY='user';
 our $LOG_LEVEL='info';
 our $LOCALHOST;
-my $LOCK_DIR;
-my $LOG_FILE=($USER eq 'root' ? '/var/log/rdbduprunner.log-'.strftime('%Y%m%d',localtime(time())) : $HOME.'/var/log/rdbduprunner.log-'.strftime('%Y%m%d',localtime(time())));
-my $LOG_DIR;
+my $STATE_DIR =
+    $USER eq 'root'                 ? '/etc/rdbduprunner'
+    : exists $ENV{'XDG_STATE_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, 'rdbduprunner')
+    : exists $ENV{'HOME'}           ? File::Spec->catfile($ENV{'HOME'}, '.local', 'state', 'rdbduprunner')
+    : undef;
+my $LOCK_DIR = $USER eq 'root' ? '/var/run/rdbduprunner' : $STATE_DIR;
+my $LOG_DIR = $USER eq 'root' ? '/var/log/rdbduprunner' : $STATE_DIR;
+my $LOG_FILE = File::Spec->catfile($LOG_DIR,
+                                   'rdbduprunner.log-'.strftime('%Y%m%d',
+                                                                localtime( time() )));
+my $STATUS_FILE = File::Spec->catfile($STATE_DIR, 'status');
 our $TEST=1;
 my $MAXPROCS;
 my $MAXWAIT; # sleep no longer than this value (in seconds)
 my %children; # store children for master backup loop
 my $RUNTIME; # storing the start time so we can calculate run time
 
-my $STATUS_FILE = $USER eq 'root' ? '/etc/rdbduprunner/status'
-    : "${HOME}/.local/state/rdbduprunner/status";
 
 my @SKIP_FS=qw(
                 autofs
@@ -274,8 +280,6 @@ my %get_options=
    'level=s'                => \$LOG_LEVEL,
    'localhost=s'            => \$LOCALHOST,
    'lockdir=s'              => \$LOCK_DIR,
-   'logdir=s'               => \$LOG_DIR,
-   'logfile=s'              => \$LOG_FILE,
    'test!'                  => \$TEST,
    'skipfs=s'               => \@SKIP_FS,
    'allowfs=s'              => \@ALLOW_FS,
@@ -370,17 +374,10 @@ if(defined $CONFIG{allowfs}) {
   @ALLOW_FS = ref($CONFIG{allowfs}) eq "ARRAY" ? @{$CONFIG{allowfs}} : ($CONFIG{allowfs} );
 }
 
-if(defined $LOCK_DIR) {
-  # leave it alone, it comes from the command line
-} elsif(defined $CONFIG{lockdir}) {
-  $LOCK_DIR=$CONFIG{lockdir};
-} else {
-  $LOCK_DIR=($USER eq 'root' ? '/var/run/rdbduprunner' : $HOME.'/var/run/rdbduprunner');
-}
-if(! -d $LOCK_DIR) {
-  mkdir($LOCK_DIR);
-  # this is racy but seriously
-  chmod(0700,$LOCK_DIR);
+foreach my $d ($STATE_DIR, $LOCK_DIR, $LOG_DIR) {
+    next if -d $d;
+    mkdir $d or die "unable to create ${d}";
+    chmod( 0700, $d ) or warn "unable to chmod ${d}";
 }
 
 if(defined $EXCLUDE_PATH) {
@@ -419,17 +416,6 @@ if(not defined $MAXWAIT) {
     } else {
 	$MAXWAIT=86400; # one day's worth of seconds
     }
-}
-
-if(defined $LOG_DIR) {
-  # leave it alone, it comes from the command line
-} elsif(defined $CONFIG{logdir}) {
-  $LOG_DIR=$CONFIG{logdir};
-} else {
-  $LOG_DIR=($USER eq 'root' ? '/var/log/rdbduprunner' : $HOME.'/var/log/rdbduprunner');
-}
-if(! -d $LOG_DIR) {
-  mkdir($LOG_DIR);
 }
 
 # combine the list of filesystems to skip into a regex
@@ -978,8 +964,8 @@ sub update_status_file {
     my $host_status = shift;
     my $status;
     my $lock;
-    unless ( open( $lock, '+<' . "${STATUS_FILE}.lock" )
-        or open( $lock, '>' . "${STATUS_FILE}.lock" ) )
+    unless ( open( $lock, '+<' , "${STATUS_FILE}.lock" )
+        or open( $lock, '>' , "${STATUS_FILE}.lock" ) )
     {
         error("unable to open lock file: ${STATUS_FILE}.lock for writing");
         return;
@@ -1771,7 +1757,7 @@ rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
 
 B<rdbduprunner> {B<-h|--help>}
 
-B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dry-run>|B<--checksum>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<--logfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>}  {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>} {B<--maxwait> I<integer>} =item {B<--allow-source-mismatch>} {B<-n|--dry-run>} {B<-c|--checksum|--no-checksum>} {B<--inplace>|B<--no-inplace>} {B<--whole-file>|B<--no-whole-file>} {B<--stats>|B<--nostats>} {B<--skipfs> I<filesystem>} {B<--allowfs> I<filesystem>}
+B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dry-run>|B<--checksum>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>}  {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>} {B<--maxwait> I<integer>} =item {B<--allow-source-mismatch>} {B<-n|--dry-run>} {B<-c|--checksum|--no-checksum>} {B<--inplace>|B<--no-inplace>} {B<--whole-file>|B<--no-whole-file>} {B<--stats>|B<--nostats>} {B<--skipfs> I<filesystem>} {B<--allowfs> I<filesystem>}
 
 =head1 DESCRIPTION
 
