@@ -895,7 +895,7 @@ sub perform_backup {
           unless($? == 0) {
             # if we failed to run the pre-run, issue the final summary based on that
             error("unable to execute zfs create command as requested: skipping backup!");
-            push(@host_status, [ $$bh{path}, 'failure', time() ]);
+            push(@host_status, [ $$bh{src}, 'failure', time() ]);
             log_exit_status($bh,$?);
             next BACKUP;
           }
@@ -903,7 +903,7 @@ sub perform_backup {
       }
       else {
         error("unable to execute zfs create command as requested: skipping backup!");
-        push(@host_status, [ $$bh{path}, 'failure', time() ]);
+        push(@host_status, [ $$bh{src}, 'failure', time() ]);
         log_exit_status($bh,$?);
         next;
       }
@@ -916,7 +916,7 @@ sub perform_backup {
         unless($? == 0) {
           # if we failed to run the pre-run, issue the final summary based on that
           error("unable to execute prerun command: skipping backup!");
-          push(@host_status, [ $$bh{path}, 'failure', time() ]);
+          push(@host_status, [ $$bh{src}, 'failure', time() ]);
           log_exit_status($bh,$?);
           next;
         }
@@ -952,7 +952,7 @@ sub perform_backup {
         unless($? == 0) {
           error("postrun command exited with an error");
           # issue final summary based on the return value of the postrun command
-          push(@host_status, [ $$bh{path}, 'failure', $$bh{runtime} ]);
+          push(@host_status, [ $$bh{src}, 'failure', $$bh{runtime} ]);
           log_exit_status($bh,$?);
           next;
         }
@@ -983,16 +983,14 @@ sub perform_backup {
       }
     }
     # issue final summary based on the main backup process
-    push(@host_status, [ $$bh{path}, ($mainret == 0 ? 'success' : 'failure'), time() ]);
+    push(@host_status, [ $$bh{src}, ($mainret == 0 ? 'success' : 'failure'), time() ]);
     log_exit_status($bh,$mainret) unless $TEST;
   }
-  update_status_file($host,\@host_status) unless $TEST;
+  update_status_file(@host_status) unless $TEST;
   exit;
 }
 
 sub update_status_file {
-    my $host        = shift;
-    my $host_status = shift;
     my $status;
     my $lock;
     unless ( open( $lock, '+<' , "${STATUS_FILE}.lock" )
@@ -1012,8 +1010,8 @@ sub update_status_file {
             "unable to retrieve status data from ${STATUS_FILE}, starting over"
         );
     }
-    for my $u ( @{$host_status} ) {
-        $$status{$host}{ $$u[0] }{ $$u[1] } = $$u[2];
+    for my $u ( @_ ) {
+        $$status{ $$u[0] }{ $$u[1] } = $$u[2];
     }
     unless ( lock_store( $status, $STATUS_FILE ) ) {
         error("unable to store status data in ${STATUS_FILE}");
