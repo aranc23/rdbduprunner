@@ -40,8 +40,6 @@ use Log::Dispatch::File;
 # print usage and exit
 my $HELP=0;
 
-# can be overridden from the command line, but not the config
-our $CONFIG_FILE="$HOME/.rdbduprunner.rc";
 our $USER = $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(getpwuid($<));
 
 # these are command line options, and in some cases config file options
@@ -98,6 +96,23 @@ my $LOG_FILE = File::Spec->catfile($LOG_DIR,
                                    'rdbduprunner.log-'.strftime('%Y%m%d',
                                                                 localtime( time() )));
 my $STATUS_FILE = File::Spec->catfile($STATE_DIR, 'status');
+# can be overridden from the command line, but not the config
+my $CONFIG_DIR =
+    $USER eq 'root'                  ? '/etc/rdbduprunner'
+    : exists $ENV{'XDG_CONFIG_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, 'rdbduprunner')
+    : exists $ENV{'HOME'}            ? File::Spec->catfile($ENV{'HOME'}, '.config', 'rdbduprunner')
+    : undef;
+
+my $CONFIG_FILE;
+my @CONFIG_FILES =
+    $USER eq 'root'
+    ? ( "/etc/rdbduprunner.rc",
+        "${CONFIG_DIR}/rdbduprunner.conf",
+    )
+    : ( "${HOME}/.rdbduprunner.rc",
+        "${CONFIG_DIR}/config",
+    );
+
 our $TEST=1;
 my $MAXPROCS;
 my $MAXWAIT; # sleep no longer than this value (in seconds)
@@ -318,6 +333,21 @@ create_dispatcher();
 $RUNTIME=time();
 dlog('info','starting',{});
 
+unless ( $CONFIG_FILE ) {
+ FILE:
+    foreach my $c (@CONFIG_FILES) {
+        # loop through the candidates, choose the first existing one
+        if ( -f $c ) {
+            $CONFIG_FILE = $c;
+            last FILE;
+        }
+    }
+}
+unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
+    my $msg= "no config files found in any locations, unable to continue!";
+    critical($msg);
+    die $msg;
+}
 %CONFIG=new Config::General(-ConfigFile => $CONFIG_FILE,
 			    -IncludeGlob => 1,
 			    -AutoTrue => 1,
@@ -2009,13 +2039,17 @@ types specified this way will be included during inventory.
 
 =head1 FILES
 
-=head2 F<$HOME/.rdbduprunner.rc>
+=head2 F<$HOME/.config/rdbduprunner/config> F</etc/rdbduprunner/rdbduprunner.conf>
 
 rdbduprunner's config file is an Apache style config file parsed by
 the Config::General perl module. It consists of global options,
 options enclosed in a BackupDestination config section and options
 enclosed in a BackupSet section.  The options names are case
 insensitive. Options are generally honored in this order:
+
+=head2 F<$HOME/.local/state/rdbduprunner.pid> F</var/run/rdbduprunner.pid>
+
+Default PID/lock file.
 
 =over 4
 
@@ -2227,10 +2261,6 @@ BackupSet level will completely override the list of filesystem types
 specified at the global level.
 
 =back
-
-=head2 F<$HOME/rdbduprunner.pid>
-
-Default PID/lock file.
 
 =head1 CAVEATS
 
