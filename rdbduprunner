@@ -106,7 +106,8 @@ my $CONFIG_DIR =
 my $CONFIG_FILE;
 my @CONFIG_FILES =
     $USER eq 'root'
-    ? ( "/etc/rdbduprunner.rc",
+    ? ( "${HOME}/.rdbduprunner.rc",
+        "/etc/rdbduprunner.rc",
         "${CONFIG_DIR}/rdbduprunner.conf",
     )
     : ( "${HOME}/.rdbduprunner.rc",
