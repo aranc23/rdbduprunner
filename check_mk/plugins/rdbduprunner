@@ -5,13 +5,14 @@ use warnings;
 use Data::Dumper;
 use POSIX qw(strftime);
 
-my $LOGFILE='/var/log/rdbduprunner.log';
-my $LOGPATTERN="${LOGFILE}[.-]%Y%m%d*";
+my @LOGFILES=qw( /var/log/rdbduprunner.log /var/log/rdbduprunner/rdbduprunner.log );
 my $MAXDAYS=31;
 
-my @LOGFILES;
+my @files;
 foreach my $day (0..$MAXDAYS) {
-  push(@LOGFILES,glob(strftime($LOGPATTERN,localtime(time()-($day*24*60*60)))));
+    for my $lg (@LOGFILES) {
+        push(@files,glob(strftime("${lg}[.-]%Y%m%d*",localtime(time()-($day*24*60*60)))));
+    }
 }
 
 my %a;
