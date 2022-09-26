@@ -103,8 +103,8 @@ my $STATE_DIR =
     : exists $ENV{'XDG_STATE_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
     : exists $ENV{'HOME'}           ? File::Spec->catfile($ENV{'HOME'}, '.local', 'state', $APP_NAME)
     : undef;
-my $LOCK_DIR = $USER eq 'root' ? '/var/run/rdbduprunner' : $STATE_DIR;
-my $LOG_DIR = $USER eq 'root' ? '/var/log/rdbduprunner' : $STATE_DIR;
+my $LOCK_DIR = $USER eq 'root' ? File::Spec->catfile('/var/run',$APP_NAME) : $STATE_DIR;
+my $LOG_DIR = $USER eq 'root' ? File::Spec->catfile('/var/log',$APP_NAME) : $STATE_DIR;
 my $DB_FILE = File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
 my $DB_LOCK = join('.', $DB_FILE, 'lock');
 my $LOG_FILE = File::Spec->catfile($LOG_DIR,
@@ -117,7 +117,7 @@ my $CONFIG_DIR =
     : exists $ENV{'HOME'}            ? File::Spec->catfile($ENV{'HOME'}, '.config', $APP_NAME)
     : undef;
 
-for my $dir ($STATE_DIR,$CONFIG_DIR) {
+for my $dir ($STATE_DIR,$CONFIG_DIR,$LOCK_DIR,$LOG_DIR) {
     unless ( -d $dir ) {
         my @created;
         unless ( @created = make_path($dir, { mode => 0700 }) ) {
@@ -432,12 +432,6 @@ unless(defined $TVERBOSITY) { # from the command line
 
 if(defined $CONFIG{allowfs}) {
   @ALLOW_FS = ref($CONFIG{allowfs}) eq "ARRAY" ? @{$CONFIG{allowfs}} : ($CONFIG{allowfs} );
-}
-
-foreach my $d ($STATE_DIR, $LOCK_DIR, $LOG_DIR) {
-    next if -d $d;
-    mkdir $d or die "unable to create ${d}";
-    chmod( 0700, $d ) or warn "unable to chmod ${d}";
 }
 
 if(defined $EXCLUDE_PATH) {
