@@ -483,13 +483,6 @@ $SKIP_FS_REGEX='^('.join('|',map(quotemeta,@SKIP_FS)).')$';
 
 dlog('debug','config',\%CONFIG,{'config_file' => $CONFIG_FILE});
 
-@BACKUPS = parse_config_backups();
-if($DUMP) {
-  print Dumper \@BACKUPS;
-  notice("you asked me to dump and exit!");
-  exit(0);
-}
-
 if ( @STATUS_DELETE and scalar @STATUS_DELETE > 0 ) {
     status_delete(@STATUS_DELETE);
     exit;
@@ -498,7 +491,15 @@ elsif ( basename($PROGRAM_NAME) eq 'check_rdbduprunner' or $STATUS_JSON ) {
     status_json();
     exit;
 }
-elsif($STATUS) {
+
+@BACKUPS = parse_config_backups();
+if($DUMP) {
+  print Dumper \@BACKUPS;
+  notice("you asked me to dump and exit!");
+  exit(0);
+}
+
+if($STATUS) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
     my @com;
     if($$bh{btype} eq 'duplicity') {
