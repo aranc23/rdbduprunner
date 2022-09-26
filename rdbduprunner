@@ -18,6 +18,8 @@ use strict;
 use warnings;
 
 #from a standard perl distribution, on UNIX at least
+use English qw( -no_match_vars );
+use File::Basename;
 use Getopt::Long;
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Env qw( HOME );
@@ -27,6 +29,7 @@ use Pod::Usage;
 use POSIX ":sys_wait_h"; # for nonblocking read
 eval { use Time::HiRes qw( time ); };
 use File::Spec;
+use File::Path qw( make_path );
 use Scalar::Util qw/reftype/;
 BEGIN {
     @AnyDBM_File::ISA = qw(GDBM_File SDBM_File);
@@ -92,6 +95,8 @@ our $ZFS_BINARY;
 our $EXCLUDE_PATH;
 our $FACILITY='user';
 our $LOG_LEVEL='info';
+my $STATUS_JSON;
+my @STATUS_DELETE;
 our $LOCALHOST;
 my $STATE_DIR =
     $USER eq 'root'                 ? File::Spec->catfile('/var/lib', $APP_NAME)
@@ -111,6 +116,19 @@ my $CONFIG_DIR =
     : exists $ENV{'XDG_CONFIG_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, 'rdbduprunner')
     : exists $ENV{'HOME'}            ? File::Spec->catfile($ENV{'HOME'}, '.config', 'rdbduprunner')
     : undef;
+
+for my $dir ($STATE_DIR,$CONFIG_DIR) {
+    unless ( -d $dir ) {
+        my @created;
+        unless ( @created = make_path($dir, { mode => 0700 }) ) {
+            die "unable to create directory: ${dir}";
+        }
+        unless (string_any($dir,@created)) {
+            warn @created;
+            die "make_path did not return the expected result trying to create ${dir}";
+        }
+    }
+}
 
 my $CONFIG_FILE;
 my @CONFIG_FILES =
@@ -271,7 +289,9 @@ my %get_options=
    'tidy'                   => \$TIDY,
    'list'                   => \$LIST,
    'orphans'                => \$ORPHANS,
-
+   # maintain the status database:
+   'status_json|status-json!'       => \$STATUS_JSON,
+   'status_delete|status-delete=s@' => \@STATUS_DELETE,
    # the following affect what options are passed to rdiff-backup and/or duplicity
    'force!'                 => \$FORCE,
    'full'                   => \$FULL,
@@ -470,7 +490,15 @@ if($DUMP) {
   exit(0);
 }
 
-if($STATUS) {
+if ( @STATUS_DELETE and scalar @STATUS_DELETE > 0 ) {
+    status_delete(@STATUS_DELETE);
+    exit;
+}
+elsif ( basename($PROGRAM_NAME) eq 'check_rdbduprunner' or $STATUS_JSON ) {
+    status_json();
+    exit;
+}
+elsif($STATUS) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
     my @com;
     if($$bh{btype} eq 'duplicity') {
@@ -1002,11 +1030,11 @@ sub lock_db {
     my $db_lock_handle;
 
     unless ( open($db_lock_handle, '>', $DB_LOCK) ) {
-        dlog('error', "unable to open database file ${DB_LOCK}", \%logparams);
+        error("unable to open database file ${DB_LOCK}");
         return;
     }
     unless ( flock( $db_lock_handle, LOCK_EX ) ) {
-        dlog('error', "unable to lock database file ${DB_LOCK}", \%logparams);
+        error("unable to lock database file ${DB_LOCK}");
         return;
     }
     return $db_lock_handle;
@@ -1027,7 +1055,7 @@ sub update_status_db {
 
     my %status;
     unless(tie %status, 'AnyDBM_File', $db_file, O_CREAT|O_RDWR, 0666) {
-        dlog('error', "unable to open database file ${db_file}", \%logparams);
+        error("unable to open database file ${db_file}");
         return;
     }
 
@@ -1051,7 +1079,7 @@ sub status_delete {
         return;
     }
     unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDWR, 0666) {
-        dlog('error', "unable to open database file ${DB_FILE} for deletions", \%logparams);
+        error("unable to open database file ${DB_FILE} for deletions");
         return;
     }
 
@@ -1071,7 +1099,7 @@ sub status_json {
         return;
     }
     unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
-        dlog('error', "unable to open database file ${DB_FILE} for reading", \%logparams);
+        error("unable to open database file ${DB_FILE} for reading");
         return;
     }
 
@@ -1842,6 +1870,15 @@ sub parse_config_backups {
   return @BACKUPS;
 }
 # end of parse_backup_configs
+
+# copied from the old version of List::Util:
+sub string_any {
+    my $s = shift;
+    foreach (@_) {
+        return 1 if $s eq $_;
+    }
+    return 0;
+}
 
 =head1 NAME
 
