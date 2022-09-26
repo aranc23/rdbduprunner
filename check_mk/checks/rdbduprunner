@@ -43,10 +43,12 @@ def check_rdbduprunner(item, params, info):
 
     if item not in r_status.keys():
         yield 3, 'rdbduprunner status entry not found in plugin output'
+        return
 
     for k in ('time', 'exit', 'errno', 'phase'):
         if k not in r_status[item]:
             yield 3, "missing elements in status database"
+            return
 
     return_code = 0
     ts = r_status[item]['time']
