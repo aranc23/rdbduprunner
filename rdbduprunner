@@ -112,9 +112,9 @@ my $LOG_FILE = File::Spec->catfile($LOG_DIR,
                                                                 localtime( time() )));
 # can be overridden from the command line, but not the config
 my $CONFIG_DIR =
-    $USER eq 'root'                  ? '/etc/rdbduprunner'
-    : exists $ENV{'XDG_CONFIG_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, 'rdbduprunner')
-    : exists $ENV{'HOME'}            ? File::Spec->catfile($ENV{'HOME'}, '.config', 'rdbduprunner')
+    $USER eq 'root'                  ? File::Spec->catfile('/etc',$APP_NAME)
+    : exists $ENV{'XDG_CONFIG_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
+    : exists $ENV{'HOME'}            ? File::Spec->catfile($ENV{'HOME'}, '.config', $APP_NAME)
     : undef;
 
 for my $dir ($STATE_DIR,$CONFIG_DIR) {
