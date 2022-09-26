@@ -1052,10 +1052,11 @@ sub perform_backup {
     # issue final summary based on the main backup process
     update_status_db(
         $$bh{src},
-        {   'phase' => 'backup',
-            'exit'  => $mainret,
-            'errno' => exists $$bh{exit_code} ? $$bh{exit_code} : 'backup failed',
-            'time' => time(),
+        {   'phase'   => 'backup',
+            'exit'    => $mainret,
+            'errno'   => exists $$bh{exit_code} ? $$bh{exit_code} : 'backup failed',
+            'time'    => time(),
+            'runtime' => $$bh{runtime},
         }
     ) unless $TEST;
     log_exit_status($bh,$mainret) unless $TEST;
