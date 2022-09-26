@@ -1,37 +1,12 @@
-#! /usr/bin/perl
+#! /bin/bash
 
-use strict;
-use warnings;
-use Data::Dumper;
-use POSIX qw(strftime);
-
-my @LOGFILES=qw( /var/log/rdbduprunner.log /var/log/rdbduprunner/rdbduprunner.log );
-my $MAXDAYS=31;
-
-my @files;
-foreach my $day (0..$MAXDAYS) {
-    for my $lg (@LOGFILES) {
-        push(@files,glob(strftime("${lg}[.-]%Y%m%d*",localtime(time()-($day*24*60*60)))));
-    }
-}
-
-my %a;
-
-foreach my $log (reverse(@LOGFILES)) {
-  if($log =~ /\.gz/) {
-    open(L,'gzip -d -c '.$log.'|') or warn "file ${log} exists but cannot be opened" and next;
-  }
-  else {
-    open(L,'<'.$log) or warn "file ${log} exists but cannot be opened" and next;
-  }
-  while(<L>) {
-    if (/msg=\"exit status\"/ and /rdbduprunner_tag=\"(.+?)\"/) {
-      $a{$1} = $_;
-    }
-  }
-  close(L);
-}
-if(scalar keys %a > 0) {
-  print '<<<rdbduprunner>>>'."\n";
-  print values %a;
-}
+if ! which rdbduprunner 2>/dev/null >/dev/null ; then
+    exit 0;
+fi
+t=$(mktemp)
+rdbduprunner --level critical --status-json > $t
+if (( $( cat $t | wc -l ) > 0 )); then
+    echo '<<<rdbduprunner>>>'
+    cat $t
+fi
+rm -f $t
