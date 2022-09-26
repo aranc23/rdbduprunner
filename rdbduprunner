@@ -931,16 +931,30 @@ sub perform_backup {
           unless($? == 0) {
             # if we failed to run the pre-run, issue the final summary based on that
             error("unable to execute zfs create command as requested: skipping backup!");
-            update_status_db($$bh{src}, 'failure', time() ) unless $TEST;
+            update_status_db(
+                $$bh{src},
+                {   'phase' => 'zfscreate',
+                    'exit'  => POSIX::WEXITSTATUS($CHILD_ERROR),
+                    'time'  => time(),
+                }
+            ) unless $TEST;
             log_exit_status($bh,$?);
             next BACKUP;
           }
         }
       }
       else {
-        error("unable to execute zfs create command as requested: skipping backup!");
-        update_status_db($$bh{src}, 'failure', time() ) unless $TEST;
-        log_exit_status($bh,$?);
+        my $msg = "unable to execute zfs create command as requested: skipping backup!";
+        error( $msg );
+        update_status_db(
+            $$bh{src},
+            {   'phase' => 'zfscreate',
+                'exit'  => -1,
+                'errno' => $msg,
+                'time'  => time(),
+            }
+        ) unless $TEST;
+        log_exit_status( $bh, $? );
         next;
       }
     }
@@ -949,12 +963,20 @@ sub perform_backup {
       unless($TEST) {
         set_env($bh);
         system($$bh{prerun});
-        unless($? == 0) {
-          # if we failed to run the pre-run, issue the final summary based on that
-          error("unable to execute prerun command: skipping backup!");
-          update_status_db($$bh{src}, 'failure', time() ) unless $TEST;
-          log_exit_status($bh,$?);
-          next;
+        unless ( $? == 0 ) {
+            # if we failed to run the pre-run, issue the final summary based on that
+            my $msg = "unable to execute prerun command: skipping backup!";
+            error($msg);
+            update_status_db(
+                $$bh{src},
+                {   'phase' => 'prerun',
+                    'exit'  => POSIX::WEXITSTATUS($CHILD_ERROR),
+                    'errno' => $msg,
+                    'time'  => time(),
+                }
+            ) unless $TEST;
+            log_exit_status( $bh, $? );
+            next;
         }
       }
     }
@@ -984,13 +1006,22 @@ sub perform_backup {
       info($$bh{postrun});
       unless($TEST) {
         set_env($bh);
-        system($$bh{postrun});
-        unless($? == 0) {
-          error("postrun command exited with an error");
-          # issue final summary based on the return value of the postrun command
-          update_status_db($$bh{src}, 'failure', time() ) unless $TEST;
-          log_exit_status($bh,$?);
-          next;
+        system( $$bh{postrun} );
+        unless ( $? == 0 ) {
+            my $msg = "postrun command exited with an error";
+            error($msg);
+
+            # issue final summary based on the return value of the postrun command
+            update_status_db(
+                $$bh{src},
+                {   'phase' => 'postrun',
+                    'exit'  => POSIX::WEXITSTATUS($CHILD_ERROR),
+                    'errno' => $msg,
+                    'time'  => time(),
+                }
+            ) unless $TEST;
+            log_exit_status( $bh, $? );
+            next;
         }
       }
     }
@@ -1019,7 +1050,14 @@ sub perform_backup {
       }
     }
     # issue final summary based on the main backup process
-    update_status_db($$bh{src}, ($mainret == 0 ? 'success' : 'failure'), time() ) unless $TEST;
+    update_status_db(
+        $$bh{src},
+        {   'phase' => 'backup',
+            'exit'  => $mainret,
+            'errno' => exists $$bh{exit_code} ? $$bh{exit_code} : 'backup failed',
+            'time' => time(),
+        }
+    ) unless $TEST;
     log_exit_status($bh,$mainret) unless $TEST;
   }
   exit;
@@ -1047,7 +1085,7 @@ sub unlock_db {
 
 # update the state database
 sub update_status_db {
-    my ($src, $status, $time) = @_;
+    my ($src, $hash) = @_;
     my $db_file = File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
     my $db_lock_file = "${db_file}.lock";
 
@@ -1061,11 +1099,13 @@ sub update_status_db {
 
     if ( exists $status{$src} and ref thaw($status{$src}) eq 'HASH') {
         my $h = thaw($status{$src});
-        $$h{$status} = $time;
+        while( my ($k,$v) = each(%$hash) ) {
+            $$h{$k} = $v;
+        }
         $status{$src} = freeze($h);
     }
     else {
-        $status{$src} = freeze({$status => $time});
+        $status{$src} = freeze($hash);
     }
     untie %status;
     unlock_db($db_lock_handle);
