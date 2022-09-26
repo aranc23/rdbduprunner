@@ -28,7 +28,12 @@ use POSIX ":sys_wait_h"; # for nonblocking read
 eval { use Time::HiRes qw( time ); };
 use File::Spec;
 use Scalar::Util qw/reftype/;
-use Storable qw( lock_retrieve lock_store );
+BEGIN {
+    @AnyDBM_File::ISA = qw(GDBM_File SDBM_File);
+}
+use JSON;
+use AnyDBM_File;
+use Storable qw( freeze thaw );
 
 # added from CPAN or system packages
 use Config::General;
@@ -36,6 +41,9 @@ use Log::Dispatch;
 use Log::Dispatch::Syslog;
 use Log::Dispatch::Screen;
 use Log::Dispatch::File;
+
+# constant name of the application
+my $APP_NAME = 'rdbduprunner';
 
 # print usage and exit
 my $HELP=0;
@@ -86,16 +94,17 @@ our $FACILITY='user';
 our $LOG_LEVEL='info';
 our $LOCALHOST;
 my $STATE_DIR =
-    $USER eq 'root'                 ? '/etc/rdbduprunner'
-    : exists $ENV{'XDG_STATE_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, 'rdbduprunner')
-    : exists $ENV{'HOME'}           ? File::Spec->catfile($ENV{'HOME'}, '.local', 'state', 'rdbduprunner')
+    $USER eq 'root'                 ? File::Spec->catfile('/var/lib', $APP_NAME)
+    : exists $ENV{'XDG_STATE_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
+    : exists $ENV{'HOME'}           ? File::Spec->catfile($ENV{'HOME'}, '.local', 'state', $APP_NAME)
     : undef;
 my $LOCK_DIR = $USER eq 'root' ? '/var/run/rdbduprunner' : $STATE_DIR;
 my $LOG_DIR = $USER eq 'root' ? '/var/log/rdbduprunner' : $STATE_DIR;
+my $DB_FILE = File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
+my $DB_LOCK = join('.', $DB_FILE, 'lock');
 my $LOG_FILE = File::Spec->catfile($LOG_DIR,
                                    'rdbduprunner.log-'.strftime('%Y%m%d',
                                                                 localtime( time() )));
-my $STATUS_FILE = File::Spec->catfile($STATE_DIR, 'status');
 # can be overridden from the command line, but not the config
 my $CONFIG_DIR =
     $USER eq 'root'                  ? '/etc/rdbduprunner'
@@ -849,7 +858,6 @@ sub perform_backup {
   my $lock1;
   # store the results of each backup in this hash:
   # like { '/var', 'failure', 1684884888 )
-  my @host_status;
   unless($TEST) {
     unless ($lock1=lock_pid_file($host)) {
       dlog('error','lock failure',$_[0]);
@@ -895,7 +903,7 @@ sub perform_backup {
           unless($? == 0) {
             # if we failed to run the pre-run, issue the final summary based on that
             error("unable to execute zfs create command as requested: skipping backup!");
-            push(@host_status, [ $$bh{src}, 'failure', time() ]);
+            update_status_db($$bh{src}, 'failure'), time() ) unless $TEST;
             log_exit_status($bh,$?);
             next BACKUP;
           }
@@ -903,7 +911,7 @@ sub perform_backup {
       }
       else {
         error("unable to execute zfs create command as requested: skipping backup!");
-        push(@host_status, [ $$bh{src}, 'failure', time() ]);
+        update_status_db($$bh{src}, 'failure'), time() ) unless $TEST;
         log_exit_status($bh,$?);
         next;
       }
@@ -916,7 +924,7 @@ sub perform_backup {
         unless($? == 0) {
           # if we failed to run the pre-run, issue the final summary based on that
           error("unable to execute prerun command: skipping backup!");
-          push(@host_status, [ $$bh{src}, 'failure', time() ]);
+          update_status_db($$bh{src}, 'failure'), $$bh{runtime} ) unless $TEST;
           log_exit_status($bh,$?);
           next;
         }
@@ -952,7 +960,7 @@ sub perform_backup {
         unless($? == 0) {
           error("postrun command exited with an error");
           # issue final summary based on the return value of the postrun command
-          push(@host_status, [ $$bh{src}, 'failure', $$bh{runtime} ]);
+          update_status_db($$bh{src}, 'failure'), $$bh{runtime} ) unless $TEST;
           log_exit_status($bh,$?);
           next;
         }
@@ -983,41 +991,98 @@ sub perform_backup {
       }
     }
     # issue final summary based on the main backup process
-    push(@host_status, [ $$bh{src}, ($mainret == 0 ? 'success' : 'failure'), time() ]);
+    update_status_db($$bh{src}, ($mainret == 0 ? 'success' : 'failure'), $$bh{runtime} ) unless $TEST;
     log_exit_status($bh,$mainret) unless $TEST;
   }
-  update_status_file(@host_status) unless $TEST;
   exit;
 }
+sub lock_db {
+    my $flags = shift;
+    $flags = LOCK_EX unless $flags;
+    my $db_lock_handle;
 
-sub update_status_file {
-    my $status;
-    my $lock;
-    unless ( open( $lock, '+<' , "${STATUS_FILE}.lock" )
-        or open( $lock, '>' , "${STATUS_FILE}.lock" ) )
-    {
-        error("unable to open lock file: ${STATUS_FILE}.lock for writing");
+    unless ( open($db_lock_handle, '>', $DB_LOCK) ) {
+        dlog('error', "unable to open database file ${DB_LOCK}", \%logparams);
         return;
     }
-    unless ( flock( $lock, LOCK_EX ) ) {
-        error("unable to lock ${STATUS_FILE}.lock");
+    unless ( flock( $db_lock_handle, LOCK_EX ) ) {
+        dlog('error', "unable to lock database file ${DB_LOCK}", \%logparams);
         return;
     }
-    unless ( -f $STATUS_FILE and $status = lock_retrieve($STATUS_FILE) and ref $status eq 'HASH' )
-    {
-        $status = {};
-        error(
-            "unable to retrieve status data from ${STATUS_FILE}, starting over"
-        );
+    return $db_lock_handle;
+}
+
+sub unlock_db {
+    flock($_[0],LOCK_UN);
+    close($_[0]);
+}
+
+# update the state database
+sub update_status_db {
+    my ($src, $status, $time) = @_;
+    my $db_file = File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
+    my $db_lock_file = "${db_file}.lock";
+
+    my $db_lock_handle = lock_db();
+
+    my %status;
+    unless(tie %status, 'AnyDBM_File', $db_file, O_CREAT|O_RDWR, 0666) {
+        dlog('error', "unable to open database file ${db_file}", \%logparams);
+        return;
     }
-    for my $u ( @_ ) {
-        $$status{ $$u[0] }{ $$u[1] } = $$u[2];
+
+    if ( exists $status{$src} and ref thaw($status{$src}) eq 'HASH') {
+        my $h = thaw($status{$src});
+        $$h{$status} = $time;
+        $status{$src} = freeze($h);
     }
-    unless ( lock_store( $status, $STATUS_FILE ) ) {
-        error("unable to store status data in ${STATUS_FILE}");
+    else {
+        $status{$src} = freeze({$status => $time});
     }
-    flock( $lock, LOCK_UN );
-    close $lock;
+    untie %status;
+    unlock_db($db_lock_handle);
+}
+
+sub status_delete {
+    my $h = lock_db(LOCK_EX);
+
+    my %status;
+    unless( -f $DB_FILE ) {
+        return;
+    }
+    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDWR, 0666) {
+        dlog('error', "unable to open database file ${DB_FILE} for deletions", \%logparams);
+        return;
+    }
+
+    for my $k (@_) {
+        delete $status{$k} if exists $status{$k};
+    }
+
+    untie %status;
+    unlock_db($h);
+}
+
+sub status_json {
+    my $h = lock_db(LOCK_SH);
+
+    my %status;
+    unless( -f $DB_FILE ) {
+        return;
+    }
+    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
+        dlog('error', "unable to open database file ${DB_FILE} for reading", \%logparams);
+        return;
+    }
+
+    my %json;
+    while(my ($k,$v)=each(%status)) {
+        $json{$k}=thaw($v);
+    }
+    my $json = JSON->new->pretty();
+    print $json->encode(\%json);
+    untie %status;
+    unlock_db($h);
 }
 
 sub backup_sort {
