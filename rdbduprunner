@@ -1956,6 +1956,22 @@ backups tools like ls and du perform similar functions.
 
 =over 4
 
+=item {B<--status-json>}
+
+Prints the status DBM as a json hash for parsing by other tools.
+
+=item {B<--status-delete>=I<backup_src>}
+
+Deletes the specified keys from the status DBM thus making
+rdbduprunner "forget" about them.  Does not change in any way what
+rdbduprunner will back up in the future, only alters the status
+database used by monitoring tools (cmk).
+
+IE: rdbduprunner --status-delete /local/
+
+Can be specified multiple times.
+
+
 =item {B<--calculate-average>} (rdiff-backup only)
 
 Parses run files from rdiff-backup to calculate average increment
