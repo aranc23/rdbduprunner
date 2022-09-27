@@ -1113,9 +1113,6 @@ sub status_delete {
     my $h = lock_db(LOCK_EX);
 
     my %status;
-    unless( -f $DB_FILE ) {
-        return;
-    }
     unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDWR, 0666) {
         error("unable to open database file ${DB_FILE} for deletions");
         return;
@@ -1133,9 +1130,6 @@ sub status_json {
     my $h = lock_db(LOCK_SH);
 
     my %status;
-    unless( -f $DB_FILE ) {
-        return;
-    }
     unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
         error("unable to open database file ${DB_FILE} for reading");
         return;
