@@ -1100,6 +1100,9 @@ sub update_status_db {
         while( my ($k,$v) = each(%$hash) ) {
             $$h{$k} = $v;
         }
+        for my $kk (qw( success failure )) {
+            delete $$h{$kk} if exists $$h{$kk};
+        }
         $status{$src} = freeze($h);
     }
     else {
