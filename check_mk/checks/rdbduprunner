@@ -70,11 +70,12 @@ def check_rdbduprunner(item, params, info):
     ts = r_status[item]['time']
     dt = datetime.datetime.fromtimestamp(ts)
     msg = 'successful backup found completed at %s' % (dt)
-    if r_status[item]['exit'] == 24:
+    exit_val = int(r_status[item]['exit'])
+    if exit_val == 24:
         msg = msg + ' (%s)' % (r_status[item]['errno'])
-    elif r_status[item]['exit'] != 0:
+    elif exit_val != 0:
         return_code = 2
-        msg = 'exited with error in %s phase %d: %s at %s' % (r_status[item]['phase'], r_status[item]['exit'], r_status[item]['errno'], dt)
+        msg = 'exited with error in %s phase %d: %s at %s' % (r_status[item]['phase'], exit_val, r_status[item]['errno'], dt)
     elif ts + crit <= time.time():
         return_code = 2
         msg = 'backup is older than %.1f days, last backup at %s' % (crit/86400, dt)

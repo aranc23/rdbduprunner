@@ -931,7 +931,7 @@ sub perform_backup {
             update_status_db(
                 $$bh{src},
                 {   'phase' => 'zfscreate',
-                    'exit'  => POSIX::WEXITSTATUS($CHILD_ERROR),
+                    'exit'  => int(POSIX::WEXITSTATUS($CHILD_ERROR)),
                     'time'  => time(),
                 }
             ) unless $TEST;
@@ -946,7 +946,7 @@ sub perform_backup {
         update_status_db(
             $$bh{src},
             {   'phase' => 'zfscreate',
-                'exit'  => -1,
+                'exit'  => int(-1),
                 'errno' => $msg,
                 'time'  => time(),
             }
@@ -967,7 +967,7 @@ sub perform_backup {
             update_status_db(
                 $$bh{src},
                 {   'phase' => 'prerun',
-                    'exit'  => POSIX::WEXITSTATUS($CHILD_ERROR),
+                    'exit'  => int(POSIX::WEXITSTATUS($CHILD_ERROR)),
                     'errno' => $msg,
                     'time'  => time(),
                 }
@@ -1012,7 +1012,7 @@ sub perform_backup {
             update_status_db(
                 $$bh{src},
                 {   'phase' => 'postrun',
-                    'exit'  => POSIX::WEXITSTATUS($CHILD_ERROR),
+                    'exit'  => int(POSIX::WEXITSTATUS($CHILD_ERROR)),
                     'errno' => $msg,
                     'time'  => time(),
                 }
@@ -1050,7 +1050,7 @@ sub perform_backup {
     update_status_db(
         $$bh{src},
         {   'phase'   => 'backup',
-            'exit'    => $mainret,
+            'exit'    => int($mainret),
             'errno'   => exists $$bh{exit_code} ? $$bh{exit_code} : 'backup failed',
             'time'    => time(),
             'runtime' => $$bh{runtime},
