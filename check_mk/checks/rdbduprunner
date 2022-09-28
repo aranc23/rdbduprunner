@@ -23,7 +23,11 @@ def inventory_rdbduprunner(info):
     big_string = ''
     for line in info:
         big_string += " ".join(line)
-    r_status = json.loads(big_string)
+    try:
+        r_status = json.loads(big_string)
+    except json.JSONDecodeError:
+        yield 3, 'rdbduprunner status data is not valid json'
+        return
 
     for src in r_status.keys():
         inventory[(src, "rdbduprunner_default_levels")] = 1
@@ -35,7 +39,12 @@ def check_rdbduprunner(item, params, info):
     for line in info:
         big_string += " ".join(line)
 
-    r_status = json.loads(big_string)
+    try:
+        r_status = json.loads(big_string)
+    except json.JSONDecodeError:
+        yield 3, 'rdbduprunner status data is not valid json'
+        return
+
     last = {}
     # sys.stderr.write("%s %d\n" % (item,len(info)))
     warn, crit = params['age']
