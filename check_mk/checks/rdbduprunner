@@ -23,9 +23,14 @@ def inventory_rdbduprunner(info):
     big_string = ''
     for line in info:
         big_string += " ".join(line)
+
+    parsed = True
     try:
         r_status = json.loads(big_string)
     except json.JSONDecodeError:
+        parsed = False
+
+    if parsed == False:
         yield 3, 'rdbduprunner status data is not valid json'
         return
 
@@ -39,9 +44,12 @@ def check_rdbduprunner(item, params, info):
     for line in info:
         big_string += " ".join(line)
 
+    parsed = True
     try:
         r_status = json.loads(big_string)
     except json.JSONDecodeError:
+        parsed = False
+    if parsed == False:
         yield 3, 'rdbduprunner status data is not valid json'
         return
 
