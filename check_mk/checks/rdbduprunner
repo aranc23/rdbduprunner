@@ -31,8 +31,7 @@ def inventory_rdbduprunner(info):
         parsed = False
 
     if parsed == False:
-        yield 3, 'rdbduprunner status data is not valid json'
-        return
+        return inventory.keys()
 
     for src in r_status.keys():
         inventory[(src, "rdbduprunner_default_levels")] = 1
