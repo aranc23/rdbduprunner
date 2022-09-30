@@ -107,11 +107,7 @@ my $LOCK_DIR = $USER eq 'root' ? File::Spec->catfile('/var/run',$APP_NAME) : $ST
 my $LOG_DIR = $USER eq 'root' ? File::Spec->catfile('/var/log',$APP_NAME) : $STATE_DIR;
 my $DB_FILE = File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
 my $DB_LOCK = join('.', $DB_FILE, 'lock');
-# for root log to /var/log directly (for now) for the main log file
-my $LOG_FILE = File::Spec->catfile(
-    ( $USER eq 'root' ? '/var/log' : $LOG_DIR ),
-    'rdbduprunner.log-'
-    . strftime( '%Y%m%d', localtime( time() )));
+my $LOG_FILE = File::Spec->catfile( $LOG_DIR, 'rdbduprunner.log' );
 # can be overridden from the command line, but not the config
 my $CONFIG_DIR =
     $USER eq 'root'                  ? File::Spec->catfile('/etc',$APP_NAME)
