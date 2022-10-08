@@ -16,6 +16,7 @@
 
 use strict;
 use warnings;
+use sigtrap qw(die normal-signals);
 
 #from a standard perl distribution, on UNIX at least
 use English qw( -no_match_vars );
