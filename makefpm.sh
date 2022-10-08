@@ -2,10 +2,10 @@
 #
 pkg=rdbduprunner
 rm -rf ./Build/*
-mkdir -p ./Build/{usr/bin,"usr/lib/$pkg}","etc/${pkg}/conf.d","var/run/${pkg}","var/log/${pkg}"} 
+mkdir -p ./Build/{usr/bin,"usr/lib/${pkg}","etc/${pkg}/conf.d","var/run/${pkg}","var/log/${pkg}"} 
 
 cp rdbduprunner ./Build/usr/bin/
-rsync -av check_mk "./Build/usr/lib/${pgk}"
+rsync -av check_mk "./Build/usr/lib/${pkg}"
 
 version=$(git tag -l | tail -1 | sed 's/^v//' )
 summary="script for making backups with rsync, rdiff-backup, and duplicity"
