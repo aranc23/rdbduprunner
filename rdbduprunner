@@ -38,6 +38,7 @@ BEGIN {
 use JSON;
 use AnyDBM_File;
 use Storable qw( freeze thaw );
+use Readonly;
 
 # added from CPAN or system packages
 use Config::General;
@@ -47,12 +48,12 @@ use Log::Dispatch::Screen;
 use Log::Dispatch::File;
 
 # constant name of the application
-my $APP_NAME = 'rdbduprunner';
+Readonly my $APP_NAME => 'rdbduprunner';
 
 # print usage and exit
 my $HELP=0;
 
-our $USER = $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(getpwuid($<));
+Readonly my $USER => $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(getpwuid($<));
 
 # these are command line options, and in some cases config file options
 # the following changes the major mode of operation for rdbduprunner:
@@ -99,23 +100,24 @@ our $LOG_LEVEL='info';
 my $STATUS_JSON;
 my @STATUS_DELETE;
 our $LOCALHOST;
-my $STATE_DIR =
+Readonly my $STATE_DIR =>
     $USER eq 'root'                 ? File::Spec->catfile('/var/lib', $APP_NAME)
     : exists $ENV{'XDG_STATE_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
     : exists $ENV{'HOME'}           ? File::Spec->catfile($ENV{'HOME'}, '.local', 'state', $APP_NAME)
     : undef;
-my $LOCK_DIR = $USER eq 'root' ? File::Spec->catfile('/var/run',$APP_NAME) : $STATE_DIR;
-my $LOG_DIR = $USER eq 'root' ? File::Spec->catfile('/var/log',$APP_NAME) : $STATE_DIR;
-my $DB_FILE = File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
-my $DB_LOCK = join('.', $DB_FILE, 'lock');
-my $LOG_FILE = File::Spec->catfile( $LOG_DIR, 'rdbduprunner.log' );
+Readonly my $LOCK_DIR => $USER eq 'root' ? File::Spec->catfile('/run',$APP_NAME) : $STATE_DIR;
+Readonly my $LOG_DIR => $USER eq 'root' ? File::Spec->catfile('/var/log',$APP_NAME) : $STATE_DIR;
+Readonly my $DB_FILE => File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
+Readonly my $DB_LOCK => join('.', File::Spec->catfile($LOCK_DIR,basename($DB_FILE)), 'lock');
+Readonly my $LOG_FILE => File::Spec->catfile( $LOG_DIR, 'rdbduprunner.log' );
 # can be overridden from the command line, but not the config
-my $CONFIG_DIR =
+Readonly my $CONFIG_DIR =>
     $USER eq 'root'                  ? File::Spec->catfile('/etc',$APP_NAME)
     : exists $ENV{'XDG_CONFIG_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
     : exists $ENV{'HOME'}            ? File::Spec->catfile($ENV{'HOME'}, '.config', $APP_NAME)
     : undef;
 
+# we can create our own directories if needed:
 for my $dir ($STATE_DIR,$CONFIG_DIR,$LOCK_DIR,$LOG_DIR) {
     unless ( -d $dir ) {
         my @created;
@@ -130,6 +132,7 @@ for my $dir ($STATE_DIR,$CONFIG_DIR,$LOCK_DIR,$LOG_DIR) {
 }
 
 my $CONFIG_FILE;
+# potential config files, based on historical and current defaults:
 my @CONFIG_FILES =
     $USER eq 'root'
     ? ( "${HOME}/.rdbduprunner.rc",
@@ -323,7 +326,6 @@ my %get_options=
    'facility=s'             => \$FACILITY,
    'level=s'                => \$LOG_LEVEL,
    'localhost=s'            => \$LOCALHOST,
-   'lockdir=s'              => \$LOCK_DIR,
    'test!'                  => \$TEST,
    'skipfs=s'               => \@SKIP_FS,
    'allowfs=s'              => \@ALLOW_FS,
