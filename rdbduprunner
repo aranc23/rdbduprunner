@@ -240,7 +240,7 @@ our @BACKUPS;
 our $DISPATCHER;
 our @INCREMENTS;
 
-my %option_mappings=
+Readonly my %cfg_def =>
   (
    # config file string
    'wholefile' =>
@@ -248,6 +248,7 @@ my %option_mappings=
     'cli'       => 'whole-file|wholefile!',
     'var'       => \$WHOLE_FILE,
     'normalize' => \&bool_parse,
+    'valid'     => qw( global backupset backupdestination ),
    },
    # on Sundays, the default for inplace is false, and true the rest of the week
    'inplace' =>
@@ -256,6 +257,7 @@ my %option_mappings=
     'var'       => \$INPLACE,
     'def'       => strftime('%w',localtime(time())) == 0 ? 0 : 1,
     'normalize' => \&bool_parse,
+    'valid'     => qw( global backupset backupdestination ),
    },
    # use checksum, but don't please
    'checksum' =>
@@ -264,6 +266,7 @@ my %option_mappings=
     'var'       => \$CHECKSUM,
     'def'       => 0,
     'normalize' => \&bool_parse,
+    'valid'     => qw( global backupset backupdestination ),
    },
    # print stats, probably always want this if possible
    'stats' =>
@@ -272,6 +275,7 @@ my %option_mappings=
     'var'       => \$STATS,
     'def'       => 1,
     'normalize' => \&bool_parse,
+    'valid'     => qw( global backupset backupdestination ),
    },
   );
 my %get_options=
@@ -337,8 +341,8 @@ my %get_options=
   );
 
 # push the options onto the big get_options hash for passing to GetOptions
-foreach my $key (keys(%option_mappings)) {
-  my $o=$option_mappings{$key};
+foreach my $key (keys(%cfg_def)) {
+  my $o = $cfg_def{$key};
   $get_options{$$o{'cli'}} = $$o{'var'};
 }
 
