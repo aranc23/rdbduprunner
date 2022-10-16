@@ -1862,8 +1862,8 @@ sub parse_config_backups {
           $$bh{maxinc}=$CONFIG{maxinc};
         }
         # interpret variables from cli, global, bd and bs levels and finally use the default if specified
-        foreach my $key (keys(%option_mappings)) {
-          my $var = $option_mappings{$key}{'var'};
+        foreach my $key (keys(%cfg_def)) {
+          my $var = $cfg_def{$key}{'var'};
           if(defined $$var) {
             # override, no matter what, as it was specified on the
             # command line:
@@ -1882,11 +1882,11 @@ sub parse_config_backups {
             # defined at the global config level
             $$bh{$key} = $CONFIG{$key};
           }
-          elsif( defined $option_mappings{$key}{'def'} ){
-            $$bh{$key} = $option_mappings{$key}{'def'};
+          elsif( defined $cfg_def{$key}{'def'} ){
+            $$bh{$key} = $cfg_def{$key}{'def'};
           }
-          if( defined $$bh{$key} and defined $option_mappings{$key}{'normalize'} ) {
-            $$bh{$key} = &{$option_mappings{$key}{'normalize'}}($$bh{$key});
+          if( defined $$bh{$key} and defined $cfg_def{$key}{'normalize'} ) {
+            $$bh{$key} = &{$cfg_def{$key}{'normalize'}}($$bh{$key});
           }
         }
         # if this is defined in a backupset, allow that to override the global definition, if it exists
