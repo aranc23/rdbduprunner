@@ -45,6 +45,8 @@ use Readonly;
 
 # added from CPAN or system packages
 use Config::General;
+use Config::Validator;
+use Config::Any;
 use Log::Dispatch;
 use Log::Dispatch::Syslog;
 use Log::Dispatch::Screen;
