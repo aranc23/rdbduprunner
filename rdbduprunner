@@ -40,7 +40,7 @@ BEGIN {
 }
 use JSON;
 use AnyDBM_File;
-use Storable qw( freeze thaw );
+use Storable qw( freeze thaw dclone );
 use Readonly;
 
 # added from CPAN or system packages
@@ -242,7 +242,7 @@ our @BACKUPS;
 our $DISPATCHER;
 our @INCREMENTS;
 
-Readonly my %config_definition => (
+my %config_definition = (
     service => {
         type   => "struct",
         fields => {
@@ -255,6 +255,31 @@ Readonly my %config_definition => (
         fields => {
             name    => { type => "string", match => qr/^\w+$/ },
             service => { type => "list?(valid(service))" },
+        },
+    },
+    backupset => {
+        type   => 'struct',
+        fields =>
+        {
+            tag => {
+                type => "string",
+                optional => "true",
+                # validate this... it must be able to be used as a
+                # directory name and possibly the name of a zfs as
+                # well
+            },
+            host => {
+                type => ["hostname","ipv4","ipv6"],
+                optional => "true",
+            },
+            backupdestination => {
+                type => "string",
+                optional => "true",
+            },
+            wholefile =>
+            { type => "valid(truefalse)", optional => "true" },
+            path =>
+            { type => "list?(string)", optional => "true" },
         },
     },
     backupdestination => {
@@ -270,6 +295,10 @@ Readonly my %config_definition => (
                 type => "valid(truefalse)",
                 optional => "true"
             },
+            wholefile =>
+            { type => "valid(truefalse)", optional => "true" },
+            path =>
+            { type => "string" },
         },
     },
     truefalse => {
@@ -286,7 +315,11 @@ Readonly my %config_definition => (
             maxwait =>
                 { type => "integer", min => 1, optional => "true" },
             backupdestination => {
-                type     => 'list?(valid(backupdestination))',
+                type     => 'table(valid(backupdestination))',
+                optional => "true",
+            },
+            backupset => {
+                type     => 'table(valid(backupset))',
                 optional => "true",
             },
             duplicitybinary =>
@@ -305,7 +338,9 @@ Readonly my %config_definition => (
             { type => "list?(string)", optional => "true" },
             excludepath =>
             { type => "string", optional => "true" },
-            useagent =>
+             useagent =>
+            { type => "valid(truefalse)", optional => "true" },
+            wholefile =>
             { type => "valid(truefalse)", optional => "true" },
             tempdir =>
             { type => "string", optional => "true" },
@@ -469,9 +504,17 @@ if($DUMP) {
   print Dumper \%CONFIG;
 }
 
-my $config_validator = Config::Validator->new(%config_definition);
+#my %co = %{dclone(\%config_definition)};
 
-print STDERR Dumper [$config_validator->options('default')] if $DEBUG;
+#foreach my $k (keys(%{$co{default}{fields}})) {
+#delete $co{default}{fields}{$k} if ($co{default}{fields}{$k}{type} =~ m{^table}xms);
+#}
+#print STDERR Dumper \%co if $DEBUG;
+
+#my $co = Config::Validator->new(%co);
+#print STDERR Dumper [$co->options("default")] if $DEBUG;
+
+my $config_validator = Config::Validator->new(%config_definition);
 
 $config_validator->validate(\%CONFIG, 'default');
 
