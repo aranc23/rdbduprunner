@@ -24,9 +24,9 @@ use sigtrap qw(die normal-signals);
 #from a standard perl distribution, on UNIX at least
 use English qw( -no_match_vars );
 use File::Basename;
-use Getopt::Long;
+use Getopt::Long qw(:config pass_through) ; # use this to pull out the config file
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
-use Env qw( HOME );
+use Env qw( HOME DEBUG );
 use Data::Dumper;
 use POSIX qw( strftime pause );
 use Pod::Usage;
@@ -242,6 +242,78 @@ our @BACKUPS;
 our $DISPATCHER;
 our @INCREMENTS;
 
+Readonly my %config_definition => (
+    service => {
+        type   => "struct",
+        fields => {
+            port  => { type => "integer", min => 0, max => 65535 },
+            proto => { type => "string" },
+        },
+    },
+    host => {
+        type   => "struct",
+        fields => {
+            name    => { type => "string", match => qr/^\w+$/ },
+            service => { type => "list?(valid(service))" },
+        },
+    },
+    backupdestination => {
+        type   => 'struct',
+        fields =>
+        {
+            type => {
+                type => "string",
+                optional => "true",
+                match => qr{^(rdiff-backup|rsync|duplicity)$}xmsi,
+            },
+            busted => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+        },
+    },
+    truefalse => {
+        type => 'string',
+        match => qr{^(?:on|off|true|false|0|1|yes|no)$}xmsi,
+    },
+    default => {
+        type   => 'struct',
+        fields => {
+            maxprocs =>
+                { type => "integer", min => 1, optional => "true" },
+            defaultbackupdestination =>
+                { type => "string", optional => "true" },
+            maxwait =>
+                { type => "integer", min => 1, optional => "true" },
+            backupdestination => {
+                type     => 'list?(valid(backupdestination))',
+                optional => "true",
+            },
+            duplicitybinary =>
+            { type => "string", optional => "true" },
+            rdiffbackupbinary =>
+            { type => "string", optional => "true" },
+            rsyncbinary =>
+            { type => "string", optional => "true" },
+            zfsbinary =>
+            { type => "string", optional => "true" },
+            verbosity =>
+            { type => "integer", optional => "true" },
+            terminalverbosity =>
+            { type => "integer", optional => "true" },
+            allowfs =>
+            { type => "list?(string)", optional => "true" },
+            excludepath =>
+            { type => "string", optional => "true" },
+            useagent =>
+            { type => "valid(truefalse)", optional => "true" },
+            tempdir =>
+            { type => "string", optional => "true" },
+        },
+    },
+);
+print STDERR Dumper \%config_definition if $DEBUG;
+
 Readonly my %cfg_def =>
   (
    # config file string
@@ -348,6 +420,7 @@ foreach my $key (keys(%cfg_def)) {
   $get_options{$$o{'cli'}} = $$o{'var'};
 }
 
+print STDERR Dumper \%get_options if $DEBUG;
 GetOptions(%get_options);
 
 # print the SYNOPSIS section and exit
@@ -395,6 +468,13 @@ unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
 if($DUMP) {
   print Dumper \%CONFIG;
 }
+
+my $config_validator = Config::Validator->new(%config_definition);
+
+print STDERR Dumper [$config_validator->options('default')] if $DEBUG;
+
+$config_validator->validate(\%CONFIG, 'default');
+
 # set some global options using the config file global options???
 if(not defined $DUPLICITY_BINARY) {
     if(defined $CONFIG{duplicitybinary}) {
