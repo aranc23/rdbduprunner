@@ -280,6 +280,10 @@ my %config_definition = (
             { type => "valid(truefalse)", optional => "true" },
             path =>
             { type => "list?(string)", optional => "true" },
+            disabled => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
         },
     },
     backupdestination => {
@@ -515,6 +519,8 @@ if($DUMP) {
 #print STDERR Dumper [$co->options("default")] if $DEBUG;
 
 my $config_validator = Config::Validator->new(%config_definition);
+
+$config_validator->traverse(sub {print STDERR Dumper $_[0]}, \%CONFIG, 'default');
 
 $config_validator->validate(\%CONFIG, 'default');
 
