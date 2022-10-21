@@ -520,7 +520,7 @@ if($DUMP) {
 
 my $config_validator = Config::Validator->new(%config_definition);
 
-$config_validator->traverse(sub {print STDERR Dumper $_[0]}, \%CONFIG, 'default');
+#$config_validator->traverse(sub {say "traverse:";print STDERR Dumper \@_[1..]}, \%CONFIG, 'default');
 
 $config_validator->validate(\%CONFIG, 'default');
 
