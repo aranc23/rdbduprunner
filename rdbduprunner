@@ -1857,7 +1857,7 @@ sub parse_config_backups {
       if (defined $DEST and $backupdest !~ /$DEST/) {
         next;
       }
-      unless (exists $CONFIG{backupdestination}{$backupdest} and exists $CONFIG{backupdestination}{$backupdest}{path} and exists $CONFIG{backupdestination}{$backupdest}{type}) {
+      unless (exists $CONFIG{backupdestination}{$backupdest} and exists $CONFIG{backupdestination}{$backupdest}{path}) {
         error("there is no such backupdestination as $backupdest in the config, skipping");
         next;
       }
