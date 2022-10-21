@@ -242,10 +242,10 @@ our @BACKUPS;
 our $DISPATCHER;
 our @INCREMENTS;
 
-my %DEFAULT_CONFIG = {
+my %DEFAULT_CONFIG = (
     'stats' => 1,
     'inventory' => 0,# or undef?
-};
+);
 
 my %config_definition = (
     service => {
