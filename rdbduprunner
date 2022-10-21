@@ -372,6 +372,13 @@ my %config_definition = (
             },
             allowfs =>
             { type => "list?(string)", optional => "true" },
+            lc "GPGPassPhrase" => { type => "string", optional => "true" },
+            lc "AWSAccessKeyID" => { type => "string", optional => "true" },
+            lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
+            lc "SignKey" => { type => "string", optional => "true" },
+            lc "EncryptKey" => { type => "string", optional => "true" },
+            # uses --bwlimit on rsync and trickly binary on others:
+            lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
         },
     },
     truefalse => {
@@ -422,6 +429,14 @@ my %config_definition = (
             #     type => "valid(truefalse)",
             #     optional => "true" },
             # },
+            # these are duplicity options:
+            lc "GPGPassPhrase" => { type => "string", optional => "true" },
+            lc "AWSAccessKeyID" => { type => "string", optional => "true" },
+            lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
+            lc "SignKey" => { type => "string", optional => "true" },
+            lc "EncryptKey" => { type => "string", optional => "true" },
+            # uses --bwlimit on rsync and trickly binary on others:
+            lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
         },
     },
 );
