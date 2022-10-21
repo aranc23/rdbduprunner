@@ -19,3 +19,4 @@ common_opts="-n rdbduprunner --version "${version}" --architecture noarch -C ./B
 fpm $common_opts $common_deps $rpm_deps -t rpm --rpm-summary "${summary}" --description "${description}" .
 fpm $common_opts $common_deps $deb_deps -t deb --rpm-summary "${summary}" --description "${description}" .
 
+fpm -s cpan -t rpm --prefix /usr --version 1.5 --replaces rdbduprunner --cpan-perl-lib-path /usr/share/perl5 .
