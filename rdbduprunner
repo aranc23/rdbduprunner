@@ -242,6 +242,11 @@ our @BACKUPS;
 our $DISPATCHER;
 our @INCREMENTS;
 
+my %DEFAULT_CONFIG = {
+    'stats' => 1,
+    'inventory' => 0,# or undef?
+};
+
 my %config_definition = (
     service => {
         type   => "struct",
@@ -261,6 +266,8 @@ my %config_definition = (
         type   => 'struct',
         fields =>
         {
+            # setting the tag only makes sense when inventory is false
+            # and path is specified only once:
             tag => {
                 type => "string",
                 optional => "true",
@@ -272,24 +279,59 @@ my %config_definition = (
                 type => ["hostname","ipv4","ipv6"],
                 optional => "true",
             },
+            # must match an existing backupdestion,
+            # required unless global defaultbackupdestination is set
             backupdestination => {
                 type => "string",
                 optional => "true",
             },
             wholefile =>
             { type => "valid(truefalse)", optional => "true" },
+            # required if inventory is false
             path =>
+            { type => "list?(string)", optional => "true" },
+            exclude =>
+            { type => "list?(string)", optional => "true" },
+            skip =>
+            { type => "list?(string)", optional => "true" },
+            skipre =>
             { type => "list?(string)", optional => "true" },
             disabled => {
                 type => "valid(truefalse)",
                 optional => "true"
             },
+            inventory => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+
+            # only valid for rsync types
+            inplace => { type => "valid(truefalse)", optional => "true" },
+            # only valid for duplicity/rdiff-backup types
+            maxinc => {
+                type     => "integer",
+                min      => 0,
+                max      => 100,
+                optional => "true",
+            },
+            maxage =>
+            { type => "string", optional => "true" },
+            zfscreate => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+            zfssnapshot => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+
         },
     },
     backupdestination => {
         type   => 'struct',
         fields =>
         {
+            # this is only optional because the default is rsync:
             type => {
                 type => "string",
                 optional => "true",
@@ -299,10 +341,37 @@ my %config_definition = (
                 type => "valid(truefalse)",
                 optional => "true"
             },
+            # only valid for rsync types
             wholefile =>
             { type => "valid(truefalse)", optional => "true" },
             path =>
             { type => "string" },
+            # only valid for duplicity/rdiff-backup types
+            percentused => {
+                type     => "integer",
+                min      => 0,
+                max      => 100,
+                optional => "true",
+            },
+            # only valid for duplicity/rdiff-backup types
+            minfree => {
+                type     => "integer",
+                min      => 0,
+                max      => 100,
+                optional => "true",
+            },
+            # only valid for rsync types
+            inplace => { type => "valid(truefalse)", optional => "true" },
+            zfscreate => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+            zfssnapshot => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+            allowfs =>
+            { type => "list?(string)", optional => "true" },
         },
     },
     truefalse => {
@@ -348,6 +417,11 @@ my %config_definition = (
             { type => "valid(truefalse)", optional => "true" },
             tempdir =>
             { type => "string", optional => "true" },
+            # not currently a global option
+            # stats => {
+            #     type => "valid(truefalse)",
+            #     optional => "true" },
+            # },
         },
     },
 );
@@ -1843,6 +1917,7 @@ sub parse_config_backups {
         next;
       }
 
+      # this should already by validated by the config
       if (defined $CONFIG{backupdestination}{$backupdest}{type} and
           $CONFIG{backupdestination}{$backupdest}{type} =~ /^(rdiff\-backup|duplicity|rsync)$/) {
         # check to make sure that if the type isn't set, we set it to rsync
