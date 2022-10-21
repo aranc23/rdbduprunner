@@ -2364,9 +2364,6 @@ Default PID/lock file.
 
 =item I<ZfsBinary> - path to zfs
 
-=item I<LockFile> - change the default lock/pid file from
-F<$HOME/rdbduprunner.pid>
-
 =item I<ExcludePath> - What directory to look for exclude
 files. Defaults to F</etc/rdbduprunner-excludes>
 
