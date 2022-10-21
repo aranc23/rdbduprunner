@@ -1819,7 +1819,8 @@ sub parse_config_backups {
     my @bslist=($CONFIG{backupset}{$bstag});
     if ( reftype $CONFIG{backupset}{$bstag} eq reftype [] ) {
       @bslist=@{$CONFIG{backupset}{$bstag}};
-      warn("multiple backupsets with the same name: ${bstag}");
+      # the config validator should prevent this scenario
+      die("multiple backupsets with the same name: ${bstag}, this cannot happen");
     }
     foreach my $bs (@bslist) {
       my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
