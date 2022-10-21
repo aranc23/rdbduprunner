@@ -1,0 +1,633 @@
+DefaultBackupDestination rsync
+ZfsBinary /usr/sbin/zfs
+AllowFS ext2
+AllowFS ext3
+AllowFS ext4
+AllowFS jfs
+AllowFS xfs
+AllowFS reiserfs
+AllowFS btrfs
+MaxProcs 4
+<BackupDestination rsync>
+  Path /stor01/backups/rsync
+  Type rsync
+  ZfsCreate true
+  ZfsSnapshot true
+</BackupDestination>
+<BackupSet a-lnx003.divms.uiowa.edu-profile_backup_client-backupset>
+  Host a-lnx003.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /vmware
+</BackupSet>
+<BackupSet a-lnx004.divms.uiowa.edu-profile_backup_client-backupset>
+  Host a-lnx004.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /vmware
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+  Skip /local
+</BackupSet>
+<BackupSet a-lnx005.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  PostRun /usr/adminbin/deep-check-files $RDBDUPRUNNER_BACKUP_SRC $RDBDUPRUNNER_BACKUP_DEST
+  Host a-lnx005.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /backup
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+  Skip /virtual
+</BackupSet>
+<BackupSet a-lnx006.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host a-lnx006.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet a-lnx007.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host a-lnx007.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /disk1_backup
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet a-lnx008.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host a-lnx008.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/vmware
+  Skip /tmp
+</BackupSet>
+<BackupSet a-lnx009.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host a-lnx009.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet a-lnx010.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  PostRun /usr/adminbin/deep-check-files $RDBDUPRUNNER_BACKUP_SRC $RDBDUPRUNNER_BACKUP_DEST
+  Host a-lnx010.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /sync
+  Skip /home/accx/Sync
+  Skip /home2
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+  Skip /virtual
+</BackupSet>
+<BackupSet a-lnx014.divms.uiowa.edu-profile_backup_client-backupset>
+  Host a-lnx014.divms.uiowa.edu
+  Inventory true
+  Inplace true
+  Exclude /ISOs
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet a-lnx015.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host a-lnx015.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /backup
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet a-lnx019.divms.uiowa.edu-profile_backup_client-backupset>
+  Host a-lnx019.divms.uiowa.edu
+  Inventory true
+  Exclude /mnt
+  Exclude /iso
+  Exclude /local/hbrown/staging
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet a-lnx020.divms.uiowa.edu-profile_backup_client-backupset>
+  Host a-lnx020.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet athena.physics.uiowa.edu-profile_backup_client-backupset>
+  Host athena.physics.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /big_disk
+  Skip /fast_disk
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet bookdown.psychology.uiowa.edu-profile_backup_client-backupset>
+  Host bookdown.psychology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet cobbler00.campus.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host cobbler00.campus.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet cobbler02.campus.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host cobbler02.campus.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet fastx01.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host fastx01.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /
+  Skip /boot
+  Skip /not_backed_up
+  Skip /var/cache/fscache
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet fastx02.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host fastx02.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /
+  Skip /boot
+  Skip /not_backed_up
+  Skip /var/cache/fscache
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet gcent.clas.uiowa.edu-profile_backup_client-backupset>
+  Host gcent.clas.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /
+  Skip /boot
+  Skip /not_backed_up
+  Skip /var/cache/fscache
+  Skip /data
+</BackupSet>
+<BackupSet hanklablinux.cs.uiowa.edu-profile_backup_client-backupset>
+  Host hanklablinux.cs.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /data
+</BackupSet>
+<BackupSet jiang-2080ti.cs.uiowa.edu-profile_backup_client-backupset>
+  Host jiang-2080ti.cs.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /data
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+  Skip /podman
+</BackupSet>
+<BackupSet l-lnx206.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host l-lnx206.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+</BackupSet>
+<BackupSet p-lnx002.math.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host p-lnx002.math.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /
+  Skip /boot
+  Skip /not_backed_up
+  Skip /var/cache/fscache
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet p-lnx005.math.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host p-lnx005.math.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /data
+</BackupSet>
+<BackupSet p-lnx408.stat.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host p-lnx408.stat.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /
+  Skip /boot
+  Skip /not_backed_up
+  Skip /var/cache/fscache
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx201.cs.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host r-lnx201.cs.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /
+  Skip /boot
+  Skip /not_backed_up
+  Skip /var/cache/fscache
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx207.cs.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host r-lnx207.cs.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /
+  Skip /boot
+  Skip /not_backed_up
+  Skip /var/cache/fscache
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx241.cs.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host r-lnx241.cs.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /
+  Skip /boot
+  Skip /not_backed_up
+  Skip /var/cache/fscache
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx500.psychology.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host r-lnx500.psychology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx501.psychology.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host r-lnx501.psychology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx506.psychology.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host r-lnx506.psychology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx508.psychology.uiowa.edu-profile_backup_client-backupset>
+  Host r-lnx508.psychology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /data
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx509.psychology.uiowa.edu-profile_backup_client-backupset>
+  Host r-lnx509.psychology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /home
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx510.psychology.uiowa.edu-profile_backup_client-backupset>
+  Host r-lnx510.psychology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /home
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx602.biology.uiowa.edu-profile_backup_client-backupset>
+  Host r-lnx602.biology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx603.biology.uiowa.edu-profile_backup_client-backupset>
+  Host r-lnx603.biology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx605.biology.uiowa.edu-profile_backup_client-backupset>
+  Host r-lnx605.biology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx614.biology.uiowa.edu-profile_backup_client-backupset>
+  Host r-lnx614.biology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx708.physics.uiowa.edu-profile_backup_client-backupset>
+  Host r-lnx708.physics.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /data
+  Skip /tmp
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx713.physics.uiowa.edu-profile_backup_client-backupset>
+  Host r-lnx713.physics.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet r-lnx714.physics.uiowa.edu-profile_backup_client-backupset>
+  Host r-lnx714.physics.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet serv21.biology.uiowa.edu-profile_backup_client-backupset>
+  Host serv21.biology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /opt/csg-db-backup
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+  Skip /home
+</BackupSet>
+<BackupSet serv34.divms.uiowa.edu-profile_backup_client-backupset>
+  Host serv34.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet serv41.divms.uiowa.edu-profile_backup_client-backupset>
+  Host serv41.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet serv52.divms.uiowa.edu-profile_backup_client-backupset>
+  Host serv52.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet serv61.divms.uiowa.edu-profile_backup_client-backupset>
+  Host serv61.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet solarsail.cs.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host solarsail.cs.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /
+  Skip /boot
+  Skip /not_backed_up
+  Skip /var/cache/fscache
+  Skip /data
+</BackupSet>
+<BackupSet speciation.biology.uiowa.edu-profile_backup_client-backupset>
+  Host speciation.biology.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /data
+  Skip /home
+</BackupSet>
+<BackupSet testbed.cs.uiowa.edu-profile_backup_client-backupset>
+  Host testbed.cs.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /local-testbed
+  Skip /node-test
+  Skip /node_www
+  Skip /var/lib/pgsql_backup
+  Skip /home
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet vhost00.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host vhost00.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /virtual
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet zfstor00.campus.divms.uiowa.edu-profile_backup_client-backupset>
+  Host zfstor00.campus.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet zfstor02-lc.campus.divms.uiowa.edu-profile_backup_client-backupset>
+  Host zfstor02-lc.campus.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet zfstor04.campus.divms.uiowa.edu-profile_backup_client-backupset>
+  Host zfstor04.campus.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<<include /etc/rdbduprunner/conf.d/*.conf>>
