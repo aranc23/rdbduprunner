@@ -2365,7 +2365,7 @@ Default PID/lock file.
 =item I<ZfsBinary> - path to zfs
 
 =item I<ExcludePath> - What directory to look for exclude
-files. Defaults to F</etc/rdbduprunner-excludes>
+files. Defaults to F</etc/rdbduprunner>
 
 =item I<UseAgent> - Boolean, optional
 Passes the --use-agent option to duplicity.
