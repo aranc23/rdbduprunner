@@ -1416,11 +1416,12 @@ sub build_increment_list {
 	    my $data={}; # store info from the session stats file... which we never ever ever use!
 	    
 	    if(defined $ssdfile) {
-		if(open(SSD,$ssdfile)) {
-		    foreach my $ln (<SSD>) {
+                my $ssd_handle;
+		if(open($ssd_handle, '<', $ssdfile)) {
+                    while(my $ln = <$ssd_handle>) {
 			$ln =~ /^(\w+)\s+(\d+\.?\d*)/ and $$data{$1}=$2;
 		    }
-		    close(SSD);
+		    close($ssd_handle);
 		} else {
 		    error("unable to open increment file: $glob $ssdfile");
 		}
