@@ -324,7 +324,14 @@ my %config_definition = (
                 type => "valid(truefalse)",
                 optional => "true"
             },
-
+            prerun => {
+                type => "string",
+                optional => "true",
+            },
+            postrun => {
+                type => "string",
+                optional => "true",
+            },
         },
     },
     backupdestination => {
