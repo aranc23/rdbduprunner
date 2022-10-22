@@ -8,11 +8,12 @@
 use strict;
 use warnings;
 
-use Test::More tests => 1;
-BEGIN { use_ok('Backup::rdbduprunner') };
+use Test2::V0;
+BEGIN { ok('Backup::rdbduprunner') };
 
 #########################
 
 # Insert your test code below, the Test::More module is use()ed here so read
 # its man page ( perldoc Test::More ) for help writing this test script.
 
+done_testing;
