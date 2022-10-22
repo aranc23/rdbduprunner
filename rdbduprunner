@@ -17,6 +17,9 @@
 use strict;
 use warnings;
 use v5.16;
+
+use Backup::rdbduprunner ':all';
+
 use Fatal qw( :void open close link unlink symlink rename fork );
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(die normal-signals);
@@ -47,10 +50,6 @@ use Readonly;
 use Config::General;
 use Config::Validator;
 use Config::Any;
-use Log::Dispatch;
-use Log::Dispatch::Syslog;
-use Log::Dispatch::Screen;
-use Log::Dispatch::File;
 
 # constant name of the application
 Readonly my $APP_NAME => 'rdbduprunner';
@@ -238,8 +237,6 @@ our %CONFIG;
 # create this list of hashes, with each one corresponding to an
 # invocation of a backup program that needs to be run:
 our @BACKUPS;
-# dispatcher needs a handle to write to:
-our $DISPATCHER;
 our @INCREMENTS;
 
 my %DEFAULT_CONFIG = (
@@ -572,12 +569,8 @@ if(not defined $LOCALHOST) {
   }
 }
 
-my $callback_clean = sub { my %t=@_;
-                           chomp $t{message};
-                           return $t{message}."\n"; # add a newline
-                         };
 
-create_dispatcher();
+create_dispatcher( $APP_NAME, $FACILITY, $LOG_LEVEL, $LOG_FILE );
 $RUNTIME=time();
 dlog('info','starting',{});
 
@@ -1112,7 +1105,8 @@ sub perform_backups {
 
 sub perform_backup {
   my $host=shift;
-  create_dispatcher();    # to set the pid, may not work correctly
+  # to set the pid, may not work correctly
+  create_dispatcher( $APP_NAME, $FACILITY, $LOG_LEVEL, $LOG_FILE );
   my $lock1;
   # store the results of each backup in this hash:
   # like { '/var', 'failure', 1684884888 )
@@ -1528,31 +1522,6 @@ sub tidy {
     }
   }
 
-sub debug {
-  $DISPATCHER->debug(@_);
-}
-sub info {
-  $DISPATCHER->info(@_);
-}
-sub notice {
-  $DISPATCHER->notice(@_);
-}
-sub warning {
-  $DISPATCHER->warning(@_);
-}
-sub error {
-  $DISPATCHER->error(@_);
-}
-sub critical {
-  $DISPATCHER->critical(@_);
-}
-sub alert {
-  $DISPATCHER->alert(@_);
-}
-sub emergency {
-  $DISPATCHER->emergency(@_);
-}
-
 sub set_env {
     my $bh=$_[0];
     my @keys=qw( btype dest path host tag gtag );
@@ -1576,31 +1545,6 @@ sub set_env {
     }
 }
 
-sub create_dispatcher {
-  $DISPATCHER=Log::Dispatch->new( callbacks => $callback_clean );
-
-  $DISPATCHER->add(Log::Dispatch::Syslog->new(name      => 'syslog',
-					      min_level => $LOG_LEVEL,
-					      ident     => 'rdbduprunner'.'['.$$.']',
-					      facility  => $FACILITY,
-					      socket    => 'unix',
-					     )
-		  );
-
-  $DISPATCHER->add(Log::Dispatch::Screen->new(name      => 'screen',
-					      min_level => $LOG_LEVEL,
-					      stderr    => 0,
-					     )
-		  );
-  $DISPATCHER->add(
-                   Log::Dispatch::File->new(
-                                            name      => 'logfile',
-                                            min_level => $LOG_LEVEL,
-                                            filename  => $LOG_FILE,
-                                            mode      => '>>',
-                                           )
-                  );
-}
 
 sub verbargs {
   my $bh=$_[0];
@@ -1774,66 +1718,6 @@ sub log_exit_status {
   }
 }
 
-sub stringy {
-  # each element passed to stringy should be a HASH REF
-  my %a; # strings
-  foreach my $h (@_) {
-    next unless ref $h eq 'HASH';
-    foreach my $key (keys(%$h)) {
-      next if ref ${$h}{$key}; # must not be a reference
-      my $val=${$h}{$key};
-      $val =~ s/\n/NL/g; # remove newlines
-      $val =~ s/"/\\"/g; # replace " with \"
-      if($key eq 'tag' or $key eq 'host') {
-        $a{"rdbduprunner_${key}"}=$val;
-      } else {
-        $a{$key}=$val;
-      }
-    }
-  }
-  my @f;
-  foreach my $key (sort {&sort_tags} (keys(%a))) {
-    push(@f,"$key=\"$a{$key}\"");
-  }
-  return join(" ",@f);
-}
-
-sub dlog {
-  my $level = shift;
-  my $msg   = shift;
-  my $time  = time();
-  my $str   = stringy({'msg'      => $msg,
-                       'severity' => $level,
-                       timestamp  => $time,
-                       datetime   => strftime("%FT%T%z",localtime($time))},
-                      @_);
-  $DISPATCHER->log( level   => $level,
-                    message => $str,
-                  );
-  return $str;
-}
-
-sub sort_tags {
-  return tag_prio($a) <=> tag_prio($b);
-}
-
-sub tag_prio {
-  my %prios=(
-             datetime  => -10,
-             severity  => -9,
-             msg       => -5,
-             timestamp => 50,
-             host      => 2,
-             tag       => 1,
-             backupdestination => 10,
-             dest      => 10,
-             gtag      => 10,
-             btype     => 10,
-            );
-  my $t=lc $_[0];
-  return $prios{$t} if defined $prios{$t};
-  return 0;
-}
 
 # given a string, interpret it as 0 or 1 (false or true)
 sub bool_parse {
