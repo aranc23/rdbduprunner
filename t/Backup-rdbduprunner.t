@@ -9,11 +9,46 @@ use strict;
 use warnings;
 
 use Test2::V0;
-BEGIN { ok('Backup::rdbduprunner') };
+use Backup::rdbduprunner ':all';
+
+
+#BEGIN { ok('use Backup::rdbduprunner') };
 
 #########################
 
 # Insert your test code below, the Test::More module is use()ed here so read
 # its man page ( perldoc Test::More ) for help writing this test script.
+
+is([Backup::rdbduprunner::verbargs({btype => 'rsync'})],
+   [],
+   "empty");
+
+{
+    $VERBOSE=1;
+    $PROGRESS=1;
+    is([Backup::rdbduprunner::verbargs({btype => 'rsync'})],
+       [qw(--progress --verbose)],
+       "verbargs contains --verbose");
+}
+
+{
+    $VERBOSE=0;
+    $PROGRESS=0;
+    $VERBOSITY=9;
+    $TVERBOSITY=1;
+    is([Backup::rdbduprunner::verbargs({btype => 'rdiff-backup'})],
+       [qw(--verbosity 9 --terminal-verbosity 1)],
+       "verbargs sets levels for rdiff-backup");
+}
+{
+    $VERBOSE=0;
+    $PROGRESS=0;
+    $VERBOSITY=9;
+    $TVERBOSITY=1;
+    is([Backup::rdbduprunner::verbargs({btype => 'duplicity'})],
+       [qw(--verbosity 9)],
+       "verbargs sets levels for duplicity");
+}
+ok($VERBOSE == 0, "verbose check");
 
 done_testing;

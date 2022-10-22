@@ -81,14 +81,9 @@ our $FULL=0;
 our $MAXAGE;
 our $MAXINC;
 our $STATS; # use to set --stats and other print-stats options
-our $VERBOSITY;
-our $TVERBOSITY;
 our $USEAGENT;
 our $ALLOWSOURCEMISMATCH=0;
 our $TEMPDIR;
-# rsync specific
-my $VERBOSE=0;
-my $PROGRESS=0;
 # the next three options limit which backups get acted upon
 our $DEST;
 our $HOST;
@@ -1517,29 +1512,6 @@ sub set_env {
 	    $ENV{AWS_SECRET_ACCESS_KEY}=$$bh{awssecretaccesskey};
 	}
     }
-}
-
-
-sub verbargs {
-  my $bh=$_[0];
-  my @a;
-  if($$bh{btype} ne 'rsync') {
-    if(defined $VERBOSITY) {
-      push(@a,'--verbosity',$VERBOSITY);
-    }
-    if(defined $TVERBOSITY and $$bh{btype} eq 'rdiff-backup') {
-      push(@a,'--terminal-verbosity',$TVERBOSITY);
-    }
-  }
-  else {
-    if($PROGRESS) {
-      push(@a,'--progress');
-    }
-    if($VERBOSE) {
-      push(@a,'--verbose');
-    }
-  }
-  @a;
 }
 
 sub build_increment_list {

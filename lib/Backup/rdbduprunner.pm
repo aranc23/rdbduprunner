@@ -36,6 +36,11 @@ alert
 emergency
 dlog
 $EXIT_CODE
+&verbargs
+$VERBOSITY
+$TVERBOSITY
+$VERBOSE
+$PROGRESS
  ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -74,6 +79,14 @@ Readonly our $EXIT_CODE => {
 
 # dispatcher needs a handle to write to:
 our $DISPATCHER;
+
+# these are "global" configuration options that need to move into a
+# hash:
+our $VERBOSITY;
+our $TVERBOSITY;
+# rsync specific
+our $VERBOSE=0;
+our $PROGRESS=0;
 
 =item callback_clean(I have no idea)
 
@@ -211,6 +224,27 @@ sub tag_prio {
   return 0;
 }
 
+sub verbargs {
+  my $bh=$_[0];
+  my @a;
+  if($$bh{btype} ne 'rsync') {
+    if(defined $VERBOSITY) {
+      push(@a,'--verbosity',$VERBOSITY);
+    }
+    if(defined $TVERBOSITY and $$bh{btype} eq 'rdiff-backup') {
+      push(@a,'--terminal-verbosity',$TVERBOSITY);
+    }
+  }
+  else {
+    if($PROGRESS) {
+      push(@a,'--progress');
+    }
+    if($VERBOSE) {
+      push(@a,'--verbose');
+    }
+  }
+  return(@a);
+}
 
 # Preloaded methods go here.
 
