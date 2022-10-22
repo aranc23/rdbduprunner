@@ -22,9 +22,20 @@ use English qw( -no_match_vars );
 use Getopt::Long qw(:config pass_through) ; # use this to pull out the config file
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Storable qw( freeze thaw dclone );
+use Scalar::Util qw/reftype/;
+BEGIN {
+    @AnyDBM_File::ISA = qw(GDBM_File SDBM_File);
+}
+use JSON;
+use AnyDBM_File;
+eval { use Time::HiRes qw( time ); };
+use Fatal qw( :void open close link unlink symlink rename fork );
+# added from CPAN or system packages
+use Config::General;
+use Config::Validator;
+use Config::Any;
 
 our @ISA = qw(Exporter);
-
 
 # Items to export into callers namespace by default. Note: do not export
 # names by default without a very good reason. Use EXPORT_OK instead.
@@ -101,6 +112,10 @@ $PATH
 $MAXAGE
 $MAXINC
 &perform_backups
+&parse_config_backups
+&status_json
+&status_delete
+&backup_sort
  ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -1581,6 +1596,243 @@ sub which_zfs {
   error("we failed to find the zfs at ${backup_destination_path} in /proc/mounts");
   return 0;
 }
+
+# use what is in %CONFIG and global config options to create the
+# @BACKUPS array:
+sub parse_config_backups {
+  my @BACKUPS;
+  for my $bstag (keys(%{$CONFIG{backupset}})) {
+      my @bslist=($CONFIG{backupset}{$bstag});
+      if (
+          reftype($CONFIG{'backupset'}{$bstag})
+          eq reftype([])
+      ) {
+          @bslist=@{$CONFIG{backupset}{$bstag}};
+          # this case can no longer happen because of the config validator
+          die("multiple backupsets with the same name: ${bstag}, this cannot happen");
+      }
+    foreach my $bs (@bslist) {
+      my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
+      my $btype;
+      my $backupdest;
+
+      if (defined $HOST and $host !~ /$HOST/) {
+        next;
+      }
+      dlog('debug','backupset',
+           $bs);
+
+      if (defined $$bs{backupdestination}) {
+        $backupdest=$$bs{backupdestination};
+      } elsif (defined $CONFIG{defaultbackupdestination}) {
+        $backupdest=$CONFIG{defaultbackupdestination};
+      }
+      unless(defined $backupdest) {
+        error("there is no BackupDestination defined for the BackupSet ($bstag): so it cannot be processed");
+        next;
+      }
+
+      # this should already by validated by the config
+      if (defined $CONFIG{backupdestination}{$backupdest}{type} and
+          $CONFIG{backupdestination}{$backupdest}{type} =~ /^(rdiff\-backup|duplicity|rsync)$/) {
+        # check to make sure that if the type isn't set, we set it to rsync
+        $btype=$CONFIG{backupdestination}{$backupdest}{type};
+      } else {
+        $btype='rsync';
+      }
+      if ($btype eq 'duplicity' and $host ne $LOCALHOST) {
+        error("$bstag is a duplicity backup with host set to $host: duplicity backups must have a local source!");
+        next;
+      }
+
+      if (defined $DEST and $backupdest !~ /$DEST/) {
+        next;
+      }
+      unless (exists $CONFIG{backupdestination}{$backupdest} and exists $CONFIG{backupdestination}{$backupdest}{path}) {
+        error("there is no such backupdestination as $backupdest in the config, skipping");
+        next;
+      }
+      my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
+
+      my @paths;
+      if (defined $$bs{path}) {
+        @paths=ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path});
+      }
+      if (defined $$bs{allowfs}) {
+        debug("setting the list of allowed filesystems in the backup set, which will override the global options");
+        @ALLOW_FS=ref($$bs{allowfs}) eq "ARRAY" ? @{$$bs{allowfs}} : ($$bs{allowfs});
+      }
+
+      if ((defined $$bs{inventory} and $$bs{inventory}) and not (defined $$bs{'disabled'} and $$bs{'disabled'})) {
+        # perform inventory
+        debug("performing inventory on $host");
+        my $inventory_command='cat /proc/mounts';
+        if ($host ne $LOCALHOST) {
+          $inventory_command="ssh -x -o BatchMode=yes ${host} ${inventory_command} < /dev/null";
+        }
+        if (-x '/usr/bin/waitmax') {
+          $inventory_command="/usr/bin/waitmax 30 ${inventory_command}";
+        } elsif ( -x '/bin/waitmax') {
+          $inventory_command="/bin/waitmax 30 ${inventory_command}";
+        }
+        my @a=`${inventory_command}`;
+        if ($? == 0) {
+          my @seen;
+        M:
+          foreach my $m (sort(@a)) {
+            my @e=split(/\s+/,$m);
+            if ( scalar @ALLOW_FS > 0 ) {
+              if ( not grep(/^$e[2]$/,@ALLOW_FS) ) {
+                debug("filesystem type is not allowd via the allow list: ${e[2]}");
+                next;
+              }
+            } elsif ( $e[2] =~ /$SKIP_FS_REGEX/ ) {
+              debug("filesystem type is not allowd via the skip list: ${e[2]}");
+              next;
+            }
+            if (defined $$bs{skip}) {
+              foreach my $skip (ref($$bs{skip}) eq "ARRAY" ? @{$$bs{skip}} : ($$bs{skip})) {
+                if ($e[1] eq $skip) {
+                  next M;
+                }
+              }
+            }
+            if (defined $$bs{skipre}) {
+              foreach my $skipre (ref($$bs{skipre}) eq "ARRAY" ? @{$$bs{skipre}} : ($$bs{skipre})) {
+                if ($e[1] =~ /$skipre/) {
+                  next M;
+                }
+              }
+            }
+            # skip seen devices
+            grep(/^$e[0]$/,@seen) and next;
+            push(@seen,$e[0]);
+            push(@paths,$e[1]);
+          }
+        } else {
+          error("unable to inventory ${host}");
+        }
+      }
+      foreach my $path (@paths) {
+        $path =~ s/.+\/$//; # remove any trailing slash, but only if there is something before it!
+        my $bh={};
+        if (defined $PATH and $path !~ /$PATH/) {
+          next;
+        }
+        my $dest;
+        my $tag='';
+        my $gtag='';
+        if (defined $$bs{tag}) {
+          $dest=$$bs{tag};
+          $tag=$dest;
+          $gtag='generic-'.$tag;
+        } else {
+          $dest=$path;
+          $dest =~ s/\//\-/g;
+          $dest =~ s/ /_/g;
+          $dest eq '-' and $dest='-root';
+          $tag=$host.$dest;
+          $gtag='generic'.$dest;
+        }
+        # I should use a perl module here, I guess, not .
+        $dest=$backupdestpath.'/'.$tag;
+        #debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
+
+        $bh={%{$bs}};           # very important to make a copy here
+        $$bh{dest}=$dest;
+        $$bh{path}=$path;
+        $$bh{tag}=$tag;
+        $$bh{host}=$host;
+        $$bh{backupdestination}=$backupdest;
+        $$bh{gtag}=$gtag;
+        $$bh{btype}=$btype;
+        if ($$bh{btype} eq 'rsync') {
+          $$bh{path}=$$bh{path}.'/';
+          $$bh{path} =~ s/\/\/$/\//; # remove double slashes
+        }
+        my $epath=( $btype eq 'rsync'
+                    ? join('/',$EXCLUDE_PATH,'excludes')
+                    : join('/',$EXCLUDE_PATH,'rdb-excludes')
+                  );
+        if ( -f $epath.'/generic' ) {
+          push(@{$$bh{excludes}},$epath.'/generic');
+        }
+
+        if ( -f $epath.'/'.$$bh{gtag} ) {
+          push(@{$$bh{excludes}},$epath.'/'.$$bh{gtag});
+        }
+
+        if ( -f $epath.'/'.$tag ) {
+          push(@{$$bh{excludes}},$epath.'/'.$tag);
+        }
+        $$bh{exclude}=[];
+        foreach my $exc (ref($$bs{exclude}) eq "ARRAY" ? @{$$bs{exclude}} : ($$bs{exclude})) {
+          if (defined $exc and length $exc > 0) {
+            push(@{$$bh{exclude}},$exc);
+          }
+        }
+        if (defined $MAXAGE) {
+          $$bh{maxage}=$MAXAGE;
+        } elsif (not defined $$bh{maxage} and
+                 defined $CONFIG{maxage}) {
+          $$bh{maxage}=$CONFIG{maxage};
+        }
+        if (defined $MAXINC) {
+          $$bh{maxinc}=$MAXINC;
+        } elsif (not defined $$bh{maxinc} and
+                 defined $CONFIG{maxinc}) {
+          $$bh{maxinc}=$CONFIG{maxinc};
+        }
+        # interpret variables from cli, global, bd and bs levels and finally use the default if specified
+        foreach my $key (keys(%cfg_def)) {
+          my $var = $cfg_def{$key}{'var'};
+          if(defined $$var) {
+            # override, no matter what, as it was specified on the
+            # command line:
+            $$bh{$key} = $$var;
+          }
+          elsif( defined $$bs{$key} ) {
+            # should already have been copied!
+            # however to make it clear the is the second top/lowest priority:
+            $$bh{$key} = $$bs{$key};
+          }
+          elsif( defined $CONFIG{backupdestination}{$$bh{backupdestination}}{$key} ) {
+            # defined at the backdestination level
+            $$bh{$key} = $CONFIG{backupdestination}{$$bh{backupdestination}}{$key};
+          }
+          elsif( defined $CONFIG{$key} ) {
+            # defined at the global config level
+            $$bh{$key} = $CONFIG{$key};
+          }
+          elsif( defined $cfg_def{$key}{'def'} ){
+            $$bh{$key} = $cfg_def{$key}{'def'};
+          }
+          if( defined $$bh{$key} and defined $cfg_def{$key}{'normalize'} ) {
+            $$bh{$key} = &{$cfg_def{$key}{'normalize'}}($$bh{$key});
+          }
+        }
+        # if this is defined in a backupset, allow that to override the global definition, if it exists
+        foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot )))) {
+          unless (defined $$bh{$var}) {
+            if (defined $CONFIG{$var}) {
+              $$bh{$var}=$CONFIG{$var};
+            }
+            if (defined $CONFIG{backupdestination}{$$bh{backupdestination}}{$var}) {
+              # the above is why people hate perl, possibly
+              $$bh{$var}=$CONFIG{backupdestination}{$$bh{backupdestination}}{$var};
+            }
+          }
+        }
+        my @split_host = split(/\./,$$bh{host});
+        $$bh{'src'} = ($$bh{host} eq $LOCALHOST or $split_host[0] eq $LOCALHOST ) ? $$bh{path} : $$bh{host}.($$bh{btype} eq 'rsync' ? ':' : '::').$$bh{path};
+        dlog('debug','backup',$bh);
+        push(@BACKUPS,$bh);
+      }
+    }
+  }
+  return @BACKUPS;
+}
+# end of parse_backup_configs
 
 # copied from the old version of List::Util:
 sub string_any {
