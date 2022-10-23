@@ -1,6 +1,7 @@
 #! /bin/bash
 #
-pkg=rdbduprunner
+set -e
+#pkg=rdbduprunner
 #rm -rf ./Build/*
 #mkdir -p ./Build/{usr/bin,"usr/lib/${pkg}","usr/lib/tmpfiles.d","etc/${pkg}/conf.d","run/${pkg}","var/log/${pkg}"} 
 
@@ -8,7 +9,13 @@ pkg=rdbduprunner
 #rsync -av check_mk "./Build/usr/lib/${pkg}"
 #cp "contrib/tmpfiles.d/${pkg}.conf" ./Build/usr/lib/tmpfiles.d/
 
-version=$(git tag -l | tail -1 | sed 's/^v//' )
+tmp=$(mktemp)
+egrep 'our \$VERSION' lib/Backup/rdbduprunner.pm > $tmp
+echo 'print $VERSION."\n"' >> $tmp
+
+version=$(perl $tmp)
+rm -f $tmp
+
 summary="script for making backups with rsync, rdiff-backup, and duplicity"
 description="runs backup programs per a configuration file"
 #rpm_deps="-d perl-JSON -d perl-Log-Dispatch -d perl-Config-General -d perl-Readonly"
