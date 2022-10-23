@@ -113,11 +113,14 @@ $HOST
 $PATH
 $MAXAGE
 $MAXINC
+$FULL
+$ALLOWSOURCEMISMATCH
 &perform_backups
 &parse_config_backups
 &status_json
 &status_delete
 &backup_sort
+&build_backup_command
  ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -132,7 +135,7 @@ our $VERSION = '1.4.5';
 our $APP_NAME = 'rdbduprunner';
 
 # from the man page for rsync 3.1.1
-our $EXIT_CODE = {
+Readonly our $EXIT_CODE => {
     'rsync' => {
         '0'  => 'Success',
         '1'  => 'Syntax or usage error',

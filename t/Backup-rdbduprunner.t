@@ -51,4 +51,15 @@ is([Backup::rdbduprunner::verbargs({btype => 'rsync'})],
 }
 ok($VERBOSE == 0, "verbose check");
 
+is( {   Backup::rdbduprunner::hash_backups(
+    { host => 'test' },
+    { host => 'test', param => 1 },
+    { host => 'other' })
+    },
+    {   'test'  => [ { host => 'test' }, { host => 'test', param => 1 } ],
+        'other' => [ { host => 'other' } ],
+    },
+    "hash_backups"
+);
+
 done_testing;
