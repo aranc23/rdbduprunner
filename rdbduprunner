@@ -20,7 +20,9 @@ use v5.16;
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(die normal-signals);
 
-use Backup::rdbduprunner;
+use Backup::rdbduprunner qw($APP_NAME);
+
+$APP_NAME='rdbduprunner';
 
 Backup::rdbduprunner::main();
 
