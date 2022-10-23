@@ -88,6 +88,7 @@ $APP_NAME
 $FACILITY
 $LOG_LEVEL
 $LOG_FILE
+$LOG_DIR
 @CONFIG_FILES
 $DUMP
 $RSYNC_BINARY
@@ -114,6 +115,8 @@ $PATH
 $MAXAGE
 $MAXINC
 $FULL
+$DRYRUN
+$RSYNC_BINARY
 $ALLOWSOURCEMISMATCH
 &perform_backups
 &parse_config_backups
@@ -222,7 +225,7 @@ Readonly our $STATE_DIR =>
     : exists $ENV{'HOME'}           ? File::Spec->catfile($ENV{'HOME'}, '.local', 'state', $APP_NAME)
     : undef;
 Readonly our $LOCK_DIR => ($USER eq 'root' ? File::Spec->catfile('/run',$APP_NAME) : $STATE_DIR);
-Readonly our $LOG_DIR => $USER eq 'root' ? File::Spec->catfile('/var/log',$APP_NAME) : $STATE_DIR;
+our $LOG_DIR = $USER eq 'root' ? File::Spec->catfile('/var/log',$APP_NAME) : $STATE_DIR;
 Readonly our $DB_FILE => File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
 Readonly our $DB_LOCK => join('.', File::Spec->catfile($LOCK_DIR,basename($DB_FILE)), 'lock');
 Readonly our $LOG_FILE => File::Spec->catfile( $LOG_DIR, 'rdbduprunner.log' );

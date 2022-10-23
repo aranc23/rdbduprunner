@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 use Test2::V0;
-use Backup::rdbduprunner qw(build_backup_command %CONFIG $FULL $USEAGENT $ALLOWSOURCEMISMATCH $TEMPDIR $DUPLICITY_BINARY);
+use Backup::rdbduprunner qw(build_backup_command %CONFIG $FULL $USEAGENT $ALLOWSOURCEMISMATCH $TEMPDIR $DUPLICITY_BINARY $RDIFF_BACKUP_BINARY $DRYRUN $RSYNC_BINARY $LOG_DIR);
 
 use Data::Dumper;
 
@@ -60,6 +60,38 @@ use Data::Dumper;
     is([build_backup_command($bh)],
        [qw(duplicity --use-agent --allow-source-mismatch --sign-key 0x400 --encrypt-key aran --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "not-full duplicity with extra opts");
+    $$bh{btype} = 'rdiff-backup';
+    $$bh{stats} = 0;
+    $RDIFF_BACKUP_BINARY = 'rdiff-backup';
+    is([build_backup_command($bh)],
+       [qw(rdiff-backup --exclude-device-files --exclude-other-filesystems --no-eas --ssh-no-compression --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       "rdiff-backup");
+    $$bh{sshcompress} = 1;
+    $$bh{stats} = 1;
+    is([build_backup_command($bh)],
+       [qw(rdiff-backup --exclude-device-files --exclude-other-filesystems --no-eas --print-statistics --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       "rdiff-backup");
+    $$bh{btype} = 'rsync';
+    $$bh{checksum} = 1;
+    $$bh{trickle} = 4;
+    $$bh{stats} = 0;
+    
+    $DRYRUN = 1;
+    $RSYNC_BINARY='rsync';
+    $LOG_DIR = '/var/log';
+    
+    is([build_backup_command($bh)],
+       [qw(rsync --archive --one-file-system --hard-links --delete --delete-excluded --dry-run --checksum --sparse --bwlimit=4 -z --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       "rsync dry-run");
+    $$bh{inplace} = 1;
+    $$bh{stats} = 1;
+    $$bh{wholefile} = 0;
+    $$bh{exclude} = [qw(nope not this)];
+    $DRYRUN = 0;
+
+    is([build_backup_command($bh)],
+       [qw(rsync --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --bwlimit=4 -z --stats --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
+       "rsync");
 }
 
 done_testing;
