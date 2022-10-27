@@ -24,9 +24,9 @@ use sigtrap qw(die normal-signals);
 #from a standard perl distribution, on UNIX at least
 use English qw( -no_match_vars );
 use File::Basename;
-use Getopt::Long;
+use Getopt::Long qw(:config pass_through) ; # use this to pull out the config file
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
-use Env qw( HOME );
+use Env qw( HOME DEBUG );
 use Data::Dumper;
 use POSIX qw( strftime pause );
 use Pod::Usage;
@@ -40,11 +40,13 @@ BEGIN {
 }
 use JSON;
 use AnyDBM_File;
-use Storable qw( freeze thaw );
+use Storable qw( freeze thaw dclone );
 use Readonly;
 
 # added from CPAN or system packages
 use Config::General;
+use Config::Validator;
+use Config::Any;
 use Log::Dispatch;
 use Log::Dispatch::Syslog;
 use Log::Dispatch::Screen;
@@ -240,6 +242,213 @@ our @BACKUPS;
 our $DISPATCHER;
 our @INCREMENTS;
 
+my %DEFAULT_CONFIG = (
+    'stats' => 1,
+    'inventory' => 0,# or undef?
+);
+
+my %config_definition = (
+    service => {
+        type   => "struct",
+        fields => {
+            port  => { type => "integer", min => 0, max => 65535 },
+            proto => { type => "string" },
+        },
+    },
+    host => {
+        type   => "struct",
+        fields => {
+            name    => { type => "string", match => qr/^\w+$/ },
+            service => { type => "list?(valid(service))" },
+        },
+    },
+    backupset => {
+        type   => 'struct',
+        fields =>
+        {
+            # setting the tag only makes sense when inventory is false
+            # and path is specified only once:
+            tag => {
+                type => "string",
+                optional => "true",
+                # validate this... it must be able to be used as a
+                # directory name and possibly the name of a zfs as
+                # well
+            },
+            host => {
+                type => ["hostname","ipv4","ipv6"],
+                optional => "true",
+            },
+            # must match an existing backupdestion,
+            # required unless global defaultbackupdestination is set
+            backupdestination => {
+                type => "string",
+                optional => "true",
+            },
+            wholefile =>
+            { type => "valid(truefalse)", optional => "true" },
+            # required if inventory is false
+            path =>
+            { type => "list?(string)", optional => "true" },
+            exclude =>
+            { type => "list?(string)", optional => "true" },
+            skip =>
+            { type => "list?(string)", optional => "true" },
+            skipre =>
+            { type => "list?(string)", optional => "true" },
+            disabled => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+            inventory => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+
+            # only valid for rsync types
+            inplace => { type => "valid(truefalse)", optional => "true" },
+            # only valid for duplicity/rdiff-backup types
+            maxinc => {
+                type     => "integer",
+                min      => 0,
+                max      => 100,
+                optional => "true",
+            },
+            maxage =>
+            { type => "string", optional => "true" },
+            zfscreate => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+            zfssnapshot => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+            prerun => {
+                type => "string",
+                optional => "true",
+            },
+            postrun => {
+                type => "string",
+                optional => "true",
+            },
+        },
+    },
+    backupdestination => {
+        type   => 'struct',
+        fields =>
+        {
+            # this is only optional because the default is rsync:
+            type => {
+                type => "string",
+                optional => "true",
+                match => qr{^(rdiff-backup|rsync|duplicity)$}xmsi,
+            },
+            busted => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+            # only valid for rsync types
+            wholefile =>
+            { type => "valid(truefalse)", optional => "true" },
+            path =>
+            { type => "string" },
+            # only valid for duplicity/rdiff-backup types
+            percentused => {
+                type     => "integer",
+                min      => 0,
+                max      => 100,
+                optional => "true",
+            },
+            # only valid for duplicity/rdiff-backup types
+            minfree => {
+                type     => "integer",
+                min      => 0,
+                max      => 100,
+                optional => "true",
+            },
+            # only valid for rsync types
+            inplace => { type => "valid(truefalse)", optional => "true" },
+            zfscreate => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+            zfssnapshot => {
+                type => "valid(truefalse)",
+                optional => "true"
+            },
+            allowfs =>
+            { type => "list?(string)", optional => "true" },
+            lc "GPGPassPhrase" => { type => "string", optional => "true" },
+            lc "AWSAccessKeyID" => { type => "string", optional => "true" },
+            lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
+            lc "SignKey" => { type => "string", optional => "true" },
+            lc "EncryptKey" => { type => "string", optional => "true" },
+            # uses --bwlimit on rsync and trickly binary on others:
+            lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
+        },
+    },
+    truefalse => {
+        type => 'string',
+        match => qr{^(?:on|off|true|false|0|1|yes|no)$}xmsi,
+    },
+    default => {
+        type   => 'struct',
+        fields => {
+            maxprocs =>
+                { type => "integer", min => 1, optional => "true" },
+            defaultbackupdestination =>
+                { type => "string", optional => "true" },
+            maxwait =>
+                { type => "integer", min => 1, optional => "true" },
+            backupdestination => {
+                type     => 'table(valid(backupdestination))',
+                optional => "true",
+            },
+            backupset => {
+                type     => 'table(valid(backupset))',
+                optional => "true",
+            },
+            duplicitybinary =>
+            { type => "string", optional => "true" },
+            rdiffbackupbinary =>
+            { type => "string", optional => "true" },
+            rsyncbinary =>
+            { type => "string", optional => "true" },
+            zfsbinary =>
+            { type => "string", optional => "true" },
+            verbosity =>
+            { type => "integer", optional => "true" },
+            terminalverbosity =>
+            { type => "integer", optional => "true" },
+            allowfs =>
+            { type => "list?(string)", optional => "true" },
+            excludepath =>
+            { type => "string", optional => "true" },
+             useagent =>
+            { type => "valid(truefalse)", optional => "true" },
+            wholefile =>
+            { type => "valid(truefalse)", optional => "true" },
+            tempdir =>
+            { type => "string", optional => "true" },
+            # not currently a global option
+            # stats => {
+            #     type => "valid(truefalse)",
+            #     optional => "true" },
+            # },
+            # these are duplicity options:
+            lc "GPGPassPhrase" => { type => "string", optional => "true" },
+            lc "AWSAccessKeyID" => { type => "string", optional => "true" },
+            lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
+            lc "SignKey" => { type => "string", optional => "true" },
+            lc "EncryptKey" => { type => "string", optional => "true" },
+            # uses --bwlimit on rsync and trickly binary on others:
+            lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
+        },
+    },
+);
+print STDERR Dumper \%config_definition if $DEBUG;
+
 Readonly my %cfg_def =>
   (
    # config file string
@@ -346,6 +555,7 @@ foreach my $key (keys(%cfg_def)) {
   $get_options{$$o{'cli'}} = $$o{'var'};
 }
 
+print STDERR Dumper \%get_options if $DEBUG;
 GetOptions(%get_options);
 
 # print the SYNOPSIS section and exit
@@ -393,6 +603,23 @@ unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
 if($DUMP) {
   print Dumper \%CONFIG;
 }
+
+#my %co = %{dclone(\%config_definition)};
+
+#foreach my $k (keys(%{$co{default}{fields}})) {
+#delete $co{default}{fields}{$k} if ($co{default}{fields}{$k}{type} =~ m{^table}xms);
+#}
+#print STDERR Dumper \%co if $DEBUG;
+
+#my $co = Config::Validator->new(%co);
+#print STDERR Dumper [$co->options("default")] if $DEBUG;
+
+my $config_validator = Config::Validator->new(%config_definition);
+
+#$config_validator->traverse(sub {say "traverse:";print STDERR Dumper \@_[1..]}, \%CONFIG, 'default');
+
+$config_validator->validate(\%CONFIG, 'default');
+
 # set some global options using the config file global options???
 if(not defined $DUPLICITY_BINARY) {
     if(defined $CONFIG{duplicitybinary}) {
@@ -1689,7 +1916,8 @@ sub parse_config_backups {
     my @bslist=($CONFIG{backupset}{$bstag});
     if ( reftype $CONFIG{backupset}{$bstag} eq reftype [] ) {
       @bslist=@{$CONFIG{backupset}{$bstag}};
-      warn("multiple backupsets with the same name: ${bstag}");
+      # the config validator should prevent this scenario
+      die("multiple backupsets with the same name: ${bstag}, this cannot happen");
     }
     foreach my $bs (@bslist) {
       my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
@@ -1712,6 +1940,7 @@ sub parse_config_backups {
         next;
       }
 
+      # this should already by validated by the config
       if (defined $CONFIG{backupdestination}{$backupdest}{type} and
           $CONFIG{backupdestination}{$backupdest}{type} =~ /^(rdiff\-backup|duplicity|rsync)$/) {
         # check to make sure that if the type isn't set, we set it to rsync
@@ -2234,11 +2463,8 @@ Default PID/lock file.
 
 =item I<ZfsBinary> - path to zfs
 
-=item I<LockFile> - change the default lock/pid file from
-F<$HOME/rdbduprunner.pid>
-
 =item I<ExcludePath> - What directory to look for exclude
-files. Defaults to F</etc/rdbduprunner-excludes>
+files. Defaults to F</etc/rdbduprunner>
 
 =item I<UseAgent> - Boolean, optional
 Passes the --use-agent option to duplicity.
