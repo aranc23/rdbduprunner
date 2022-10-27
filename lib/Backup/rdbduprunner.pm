@@ -1608,6 +1608,17 @@ sub which_zfs {
 
 # use what is in %CONFIG and global config options to create the
 # @BACKUPS array:
+# global variables used:
+# %CONFIG
+# $LOCALHOST
+# $HOST
+# @ALLOW_FS .... this looks like a bug as it overwrites it
+# $SKIP_FS_REGEX
+# $EXCLUDE_PATH
+# $MAXAGE
+# $MAXINC
+# %cfg_def
+# these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
 sub parse_config_backups {
   my @BACKUPS;
   for my $bstag (keys(%{$CONFIG{backupset}})) {
@@ -1821,6 +1832,7 @@ sub parse_config_backups {
           }
         }
         # if this is defined in a backupset, allow that to override the global definition, if it exists
+        # I don't see how these are being added to the command line options:
         foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot )))) {
           unless (defined $$bh{$var}) {
             if (defined $CONFIG{$var}) {
