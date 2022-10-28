@@ -1621,6 +1621,9 @@ sub which_zfs {
 # these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
 sub parse_config_backups {
   my @BACKUPS;
+  print STDERR Dumper \%CONFIG if $DEBUG;
+  print STDERR Dumper \%cfg_def if $DEBUG;
+  print STDERR Dumper [$LOCALHOST,$HOST,\@ALLOW_FS,$SKIP_FS_REGEX,$EXCLUDE_PATH,$MAXAGE,$MAXINC] if $DEBUG;
   for my $bstag (keys(%{$CONFIG{backupset}})) {
       my @bslist=($CONFIG{backupset}{$bstag});
       if (
@@ -1851,6 +1854,7 @@ sub parse_config_backups {
       }
     }
   }
+  print STDERR Dumper [sort { $$a{dest} cmp $$b{dest} } @BACKUPS] if $DEBUG;
   return @BACKUPS;
 }
 # end of parse_backup_configs
