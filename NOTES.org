@@ -1,0 +1,5 @@
+* rdbduprunner
+| key    | valid     | cli | global  | notes |
+|--------+-----------+-----+---------+-------|
+| maxinc | c,g,bs,bd |     | $MAXINC |       |
+|        |           |     |         |       |
