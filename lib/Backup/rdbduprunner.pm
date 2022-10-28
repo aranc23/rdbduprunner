@@ -310,6 +310,8 @@ our @ALLOW_FS;
 
 # read the config file into this hash:
 our %CONFIG;
+# read the command line options into this hash:
+our %CLI_CONFIG;
 # create this list of hashes, with each one corresponding to an
 # invocation of a backup program that needs to be run:
 our @BACKUPS;
@@ -497,6 +499,52 @@ our %config_definition = (
             allowfs =>
             { type => "list?(string)", optional => "true" },
             excludepath =>
+            { type => "string", optional => "true" },
+             useagent =>
+            { type => "valid(truefalse)", optional => "true" },
+            wholefile =>
+            { type => "valid(truefalse)", optional => "true" },
+            tempdir =>
+            { type => "string", optional => "true" },
+            # not currently a global option
+            # stats => {
+            #     type => "valid(truefalse)",
+            #     optional => "true" },
+            # },
+            # these are duplicity options:
+            lc "GPGPassPhrase" => { type => "string", optional => "true" },
+            lc "AWSAccessKeyID" => { type => "string", optional => "true" },
+            lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
+            lc "SignKey" => { type => "string", optional => "true" },
+            lc "EncryptKey" => { type => "string", optional => "true" },
+            # uses --bwlimit on rsync and trickly binary on others:
+            lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
+        },
+    },
+    cli => {
+        type   => 'struct',
+        fields => {
+            maxprocs =>
+                { type => "integer", min => 1, optional => "true" },
+            defaultbackupdestination =>
+                { type => "string", optional => "true" },
+            maxwait =>
+                { type => "integer", min => 1, optional => "true" },
+            duplicitybinary =>
+            { type => "string", optional => "true" },
+            rdiffbackupbinary =>
+            { type => "string", optional => "true" },
+            rsyncbinary =>
+            { type => "string", optional => "true" },
+            zfsbinary =>
+            { type => "string", optional => "true" },
+            verbosity =>
+            { type => "integer", optional => "true" },
+            terminalverbosity =>
+            { type => "integer", optional => "true" },
+            allowfs =>
+            { type => "list?(string)", optional => "true" },
+            'excludepath|exclude-path|exclude_path' =>
             { type => "string", optional => "true" },
              useagent =>
             { type => "valid(truefalse)", optional => "true" },
@@ -1948,13 +1996,13 @@ if($DUMP) {
 #print STDERR Dumper \%co if $DEBUG;
 
 #my $co = Config::Validator->new(%co);
-#print STDERR Dumper [$co->options("default")] if $DEBUG;
 
 my $config_validator = Config::Validator->new(%config_definition);
 
 #$config_validator->traverse(sub {say "traverse:";print STDERR Dumper \@_[1..]}, \%CONFIG, 'default');
 
-$config_validator->validate(\%CONFIG, 'default');
+#$config_validator->validate(\%CLI_CONFIG, 'host');
+print STDERR Dumper [$config_validator->options("cli")] if $DEBUG;
 
 # set some global options using the config file global options???
 if(not defined $DUPLICITY_BINARY) {
