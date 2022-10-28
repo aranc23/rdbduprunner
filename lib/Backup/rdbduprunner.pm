@@ -1892,6 +1892,11 @@ foreach my $key (keys(%cfg_def)) {
 print STDERR Dumper \%get_options if $DEBUG;
 GetOptions(%get_options);
 
+if ( scalar @ARGV ) {
+    print STDERR Dumper \@ARGV;
+    die "unparsed options on the command line: ".join(' ',@ARGV);
+}
+
 # print the SYNOPSIS section and exit
 pod2usage(-1) if $HELP;
 
