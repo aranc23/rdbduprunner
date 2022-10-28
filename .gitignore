@@ -1,5 +1,7 @@
 *.rpm
 *.deb
+packages/*.rpm
+packages/*.deb
 !Build/
 .last_cover_stats
 /META.yml
