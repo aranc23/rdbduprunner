@@ -205,7 +205,8 @@ use Data::Dumper;
                 'btype' => 'rsync',
                 'excludes' => [
                     'tests/excludes/generic',
-                    'tests/excludes/generic-var'
+                    'tests/excludes/generic-var',
+                    'tests/excludes/tick.physics.uiowa.edu-var'
                 ],
                 'inplace' => 1,
                 'stats' => 1,
@@ -247,7 +248,8 @@ use Data::Dumper;
                 'inplace' => 1,
                 'excludes' => [
                     'tests/excludes/generic',
-                    'tests/excludes/generic-root'
+                    'tests/excludes/generic-root',
+                    'tests/excludes/tock-root'
                 ],
                 'btype' => 'rsync',
                 'backupdestination' => 'scratch',

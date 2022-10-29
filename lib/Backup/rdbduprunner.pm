@@ -1826,16 +1826,16 @@ sub parse_config_backups {
                     ? catfile($EXCLUDE_PATH,'excludes')
                     : catfile($EXCLUDE_PATH,'rdb-excludes')
                   );
-        if ( -f $epath.'/generic' ) {
-          push(@{$$bh{excludes}},$epath.'/generic');
+        if ( -f catfile($epath,'generic') ) {
+          push(@{$$bh{excludes}}, catfile($epath,'generic'));
         }
 
-        if ( -f $epath.'/'.$$bh{gtag} ) {
-          push(@{$$bh{excludes}},$epath.'/'.$$bh{gtag});
+        if ( -f catfile($epath, $$bh{gtag}) ) {
+          push(@{$$bh{excludes}}, catfile($epath, $$bh{gtag}));
         }
 
-        if ( -f $epath.'/'.$tag ) {
-          push(@{$$bh{excludes}},$epath.'/'.$tag);
+        if ( -f catfile($epath, $tag) ) {
+          push(@{$$bh{excludes}}, catfile($epath, $tag));
         }
         $$bh{exclude}=[];
         foreach my $exc (ref($$bs{exclude}) eq "ARRAY" ? @{$$bs{exclude}} : ($$bs{exclude})) {
