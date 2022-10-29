@@ -899,7 +899,7 @@ sub build_backup_command {
       push(@com,'--stats');
     }
     # use logging
-    push(@com,'--log-file='.$LOG_DIR.'/'.$$bh{tag}.'.log')
+    push(@com,'--log-file='.catfile($LOG_DIR,$$bh{tag}).'.log')
   }
   if(defined $TEMPDIR) {
     if(-d $TEMPDIR) {
