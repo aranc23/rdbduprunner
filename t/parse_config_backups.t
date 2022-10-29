@@ -134,8 +134,8 @@ use Data::Dumper;
                 'backupdestination' => 'scratch',
                 'btype' => 'rsync',
                 'excludes' => [
-                    './tests/excludes/generic',
-                    './tests/excludes/generic-home'
+                    'tests/excludes/generic',
+                    'tests/excludes/generic-home'
                 ],
                 'inplace' => 1,
                 'stats' => 1,
@@ -158,8 +158,8 @@ use Data::Dumper;
                 'backupdestination' => 'scratch',
                 'btype' => 'rsync',
                 'excludes' => [
-                    './tests/excludes/generic',
-                    './tests/excludes/generic-root'
+                    'tests/excludes/generic',
+                    'tests/excludes/generic-root'
                 ],
                 'inplace' => 1
             },
@@ -172,7 +172,7 @@ use Data::Dumper;
                 'backupdestination' => 'scratch',
                 'btype' => 'rsync',
                 'excludes' => [
-                    './tests/excludes/generic'
+                    'tests/excludes/generic'
                 ],
                 'inplace' => 1,
                 'stats' => 1,
@@ -189,8 +189,8 @@ use Data::Dumper;
                 'stats' => 1,
                 'inplace' => 1,
                 'excludes' => [
-                    './tests/excludes/generic',
-                    './tests/excludes/generic-usr'
+                    'tests/excludes/generic',
+                    'tests/excludes/generic-usr'
                 ],
                 'btype' => 'rsync',
                 'backupdestination' => 'scratch',
@@ -204,8 +204,8 @@ use Data::Dumper;
                 'backupdestination' => 'scratch',
                 'btype' => 'rsync',
                 'excludes' => [
-                    './tests/excludes/generic',
-                    './tests/excludes/generic-var'
+                    'tests/excludes/generic',
+                    'tests/excludes/generic-var'
                 ],
                 'inplace' => 1,
                 'stats' => 1,
@@ -227,8 +227,8 @@ use Data::Dumper;
                 'dest' => '/scratch/backups/tock-home',
                 'inplace' => 1,
                 'excludes' => [
-                    './tests/excludes/generic',
-                    './tests/excludes/generic-home'
+                    'tests/excludes/generic',
+                    'tests/excludes/generic-home'
                 ],
                 'btype' => 'rsync',
                 'backupdestination' => 'scratch',
@@ -246,8 +246,8 @@ use Data::Dumper;
                 'dest' => '/scratch/backups/tock-root',
                 'inplace' => 1,
                 'excludes' => [
-                    './tests/excludes/generic',
-                    './tests/excludes/generic-root'
+                    'tests/excludes/generic',
+                    'tests/excludes/generic-root'
                 ],
                 'btype' => 'rsync',
                 'backupdestination' => 'scratch',

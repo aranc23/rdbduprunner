@@ -18,7 +18,7 @@ use Readonly;
 use Env qw( HOME DEBUG );
 use Data::Dumper;
 use File::Basename;
-use File::Spec;
+use File::Spec::Functions;
 use File::Path qw(make_path);
 use English qw( -no_match_vars );
 use Getopt::Long qw(:config pass_through) ; # use this to pull out the config file
@@ -1823,8 +1823,8 @@ sub parse_config_backups {
           $$bh{path} =~ s/\/\/$/\//; # remove double slashes
         }
         my $epath=( $btype eq 'rsync'
-                    ? join('/',$EXCLUDE_PATH,'excludes')
-                    : join('/',$EXCLUDE_PATH,'rdb-excludes')
+                    ? catfile($EXCLUDE_PATH,'excludes')
+                    : catfile($EXCLUDE_PATH,'rdb-excludes')
                   );
         if ( -f $epath.'/generic' ) {
           push(@{$$bh{excludes}},$epath.'/generic');
