@@ -563,7 +563,7 @@ our %config_definition = (
             lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
             lc "SignKey" => { type => "string", optional => "true" },
             lc "EncryptKey" => { type => "string", optional => "true" },
-            # uses --bwlimit on rsync and trickly binary on others:
+            # uses --bwlimit on rsync and trickle binary on others:
             lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
         },
     },
