@@ -610,6 +610,9 @@ Readonly our %cfg_def =>
    },
   );
 
+Readonly our %cli_alias => (
+    duplicitybinary => [ 'duplicity-binary', 'duplicity_binary' ],
+);
 
 
 our %get_options=
