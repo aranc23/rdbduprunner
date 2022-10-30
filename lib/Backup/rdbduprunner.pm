@@ -1919,21 +1919,49 @@ sub string_any {
     }
     return 0;
 }
-sub main {
 
-# we can create our own directories if needed:
-for my $dir ($STATE_DIR,$CONFIG_DIR,$LOCK_DIR,$LOG_DIR) {
-    unless ( -d $dir ) {
-        my @created;
-        unless ( @created = make_path($dir, { mode => 0700 }) ) {
-            die "unable to create directory: ${dir}";
-        }
-        unless (string_any($dir,@created)) {
-            warn @created;
-            die "make_path did not return the expected result trying to create ${dir}";
+sub make_dirs {
+    # we can create our own directories if needed:
+    for my $dir ( $STATE_DIR, $CONFIG_DIR, $LOCK_DIR, $LOG_DIR ) {
+        unless ( -d $dir ) {
+            my @created;
+            unless ( @created = make_path( $dir, { mode => 0700 } ) ) {
+                die "unable to create directory: ${dir}";
+            }
+            unless ( string_any( $dir, @created ) ) {
+                warn @created;
+                die
+                    "make_path did not return the expected result trying to create ${dir}";
+            }
         }
     }
 }
+
+sub munge_getopts {
+    my @s = split('=',$_);
+    unless(exists $cli_alias{$s[0]}) {
+        return $_;
+    }
+    if (scalar @s == 1 ) {
+        return join('|', @s, @{$cli_alias{$s[0]}});
+    }
+    # combine:
+    return join('=',join('|',$s[0],@{$cli_alias{$s[0]}}),$s[1]);
+}
+
+sub main {
+
+    make_dirs();
+
+    my $config_validator = Config::Validator->new(%config_definition);
+
+    print STDERR Dumper [$config_validator->options("cli")] if $DEBUG;
+
+    my @options = map &munge_getopts, $config_validator->options('cli');
+    print STDERR Dumper \@options if $DEBUG;
+
+    #GetOptions(\%CLI_CONFIG, @options);
+    #$config_validator->validate(\%CLI_CONFIG,'cli');
 
 # push the options onto the big get_options hash for passing to GetOptions
 foreach my $key (keys(%cfg_def)) {
@@ -1990,22 +2018,7 @@ unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
 if($DUMP) {
   print Dumper \%CONFIG;
 }
-
-#my %co = %{dclone(\%config_definition)};
-
-#foreach my $k (keys(%{$co{default}{fields}})) {
-#delete $co{default}{fields}{$k} if ($co{default}{fields}{$k}{type} =~ m{^table}xms);
-#}
-#print STDERR Dumper \%co if $DEBUG;
-
-#my $co = Config::Validator->new(%co);
-
-my $config_validator = Config::Validator->new(%config_definition);
-
-#$config_validator->traverse(sub {say "traverse:";print STDERR Dumper \@_[1..]}, \%CONFIG, 'default');
-
-#$config_validator->validate(\%CLI_CONFIG, 'host');
-print STDERR Dumper [$config_validator->options("cli")] if $DEBUG;
+    $config_validator->validate(\%CONFIG,'default');
 
 # set some global options using the config file global options???
 if(not defined $DUPLICITY_BINARY) {
