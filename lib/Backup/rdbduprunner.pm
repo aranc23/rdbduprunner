@@ -544,7 +544,7 @@ our %config_definition = (
             { type => "integer", optional => "true" },
             allowfs =>
             { type => "list?(string)", optional => "true" },
-            'excludepath|exclude-path|exclude_path' =>
+            'excludepath' =>
             { type => "string", optional => "true" },
              useagent =>
             { type => "valid(truefalse)", optional => "true" },
