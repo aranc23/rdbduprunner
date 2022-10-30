@@ -24,7 +24,8 @@ use Data::Dumper;
                 'path' => '/home/accx',
                 'host' => 'a-lnx005.divms.uiowa.edu',
                 'tag' => 'accx',
-                'wholefile' => 0
+                'wholefile' => 0,
+                'inplace' => 0,
             }
         },
         'backupdestination' => {
@@ -38,7 +39,7 @@ use Data::Dumper;
         [
             {
                 'stats' => 1,
-                'inplace' => 1,
+                'inplace' => 0,
                 'path' => '/home/accx/',
                 'checksum' => 0,
                 'gtag' => 'generic-accx',
@@ -66,7 +67,8 @@ use Data::Dumper;
         },
         'backupset' => {
             'test' => {
-                'path' => '/home/spin/bin'
+                'path' => '/home/spin/bin',
+                'inplace' => 1,
             }
         },
         'defaultbackupdestination' => 'data-tmp'
@@ -104,6 +106,7 @@ use Data::Dumper;
                     '/home',
                     '/tmp'
                 ],
+                'inplace' => 1,
                 'inventory' => 0
             },
             'tock' => {
@@ -111,6 +114,7 @@ use Data::Dumper;
                     '/',
                     '/home'
                 ],
+                'inplace' => 1,
                 'inventory' => 0,
                 'host' => 'tock'
             }
