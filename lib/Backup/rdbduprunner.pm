@@ -530,47 +530,46 @@ our %config_definition = (
     cli => {
         type   => 'struct',
         fields => {
-            maxprocs =>
-                { type => "integer", min => 1, optional => "true" },
-            defaultbackupdestination =>
-                { type => "string", optional => "true" },
-            maxwait =>
-                { type => "integer", min => 1, optional => "true" },
-            duplicitybinary =>
-            { type => "string", optional => "true" },
-            rdiffbackupbinary =>
-            { type => "string", optional => "true" },
-            rsyncbinary =>
-            { type => "string", optional => "true" },
-            zfsbinary =>
-            { type => "string", optional => "true" },
-            verbosity =>
-            { type => "integer", optional => "true" },
-            terminalverbosity =>
-            { type => "integer", optional => "true" },
-            allowfs =>
-            { type => "list?(string)", optional => "true" },
-            'excludepath' =>
-            { type => "string", optional => "true" },
-             useagent =>
-            { type => "valid(truefalse)", optional => "true" },
-            wholefile =>
-            { type => "valid(truefalse)", optional => "true" },
-            tempdir =>
-            { type => "string", optional => "true" },
-            # not currently a global option
-            # stats => {
-            #     type => "valid(truefalse)",
-            #     optional => "true" },
-            # },
-            # these are duplicity options:
-            lc "GPGPassPhrase" => { type => "string", optional => "true" },
-            lc "AWSAccessKeyID" => { type => "string", optional => "true" },
-            lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
-            lc "SignKey" => { type => "string", optional => "true" },
-            lc "EncryptKey" => { type => "string", optional => "true" },
-            # uses --bwlimit on rsync and trickle binary on others:
-            lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
+            # maxprocs =>
+            #     { type => "integer", min => 1, optional => "true" },
+            # defaultbackupdestination =>
+            #     { type => "string", optional => "true" },
+            # maxwait =>
+            #     { type => "integer", min => 1, optional => "true" },
+            # duplicitybinary =>
+            # { type => "string", optional => "true" },
+            # rdiffbackupbinary =>
+            # { type => "string", optional => "true" },
+            # rsyncbinary =>
+            # { type => "string", optional => "true" },
+            # zfsbinary =>
+            # { type => "string", optional => "true" },
+            # verbosity =>
+            # { type => "integer", optional => "true" },
+            # terminalverbosity =>
+            # { type => "integer", optional => "true" },
+            # allowfs =>
+            # { type => "list?(string)", optional => "true" },
+            # 'excludepath' =>
+            # { type => "string", optional => "true" },
+            #  useagent =>
+            # { type => "valid(truefalse)", optional => "true" },
+            # wholefile =>
+            # { type => "valid(truefalse)", optional => "true" },
+            # tempdir =>
+            # { type => "string", optional => "true" },
+            stats => {
+                type => "boolean",
+                optional => "true",
+            },
+            # # these are duplicity options:
+            # lc "GPGPassPhrase" => { type => "string", optional => "true" },
+            # lc "AWSAccessKeyID" => { type => "string", optional => "true" },
+            # lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
+            # lc "SignKey" => { type => "string", optional => "true" },
+            # lc "EncryptKey" => { type => "string", optional => "true" },
+            # # uses --bwlimit on rsync and trickle binary on others:
+            # lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
         },
     },
 );
