@@ -21,7 +21,7 @@ use File::Basename;
 use File::Spec::Functions;
 use File::Path qw(make_path);
 use English qw( -no_match_vars );
-use Getopt::Long qw(:config pass_through) ; # use this to pull out the config file
+use Getopt::Long qw(GetOptionsFromArray :config pass_through) ; # use this to pull out the config file
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Storable qw( freeze thaw dclone );
 use Scalar::Util qw/reftype/;
@@ -53,7 +53,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 &debug
 &info
 &notice
-&warning
+&_warning
 &error
 &critical
 &alert
@@ -126,6 +126,11 @@ $ALLOWSOURCEMISMATCH
 &status_delete
 &backup_sort
 &build_backup_command
+&parse_argv
+$CHECKSUM
+$WHOLEFILE
+$INPLACE
+$STATS
  ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -571,7 +576,7 @@ our %config_definition = (
 
 print STDERR Dumper \%config_definition if $DEBUG;
 
-Readonly our %cfg_def =>
+our %cfg_def =
   (
    # config file string
    'wholefile' =>
@@ -654,7 +659,7 @@ our %get_options=
    'progress!'              => \$PROGRESS,
    'n|dry-run'              => \$DRYRUN,
    # options with applicbility to rdiff-backup, duplicity and rsync
-   'stats!'                 => \$STATS,
+#   'stats!'                 => \$STATS,
 
    # the next three options limit which backups get acted upon
    'dest=s'                 => \$DEST,
@@ -721,7 +726,7 @@ sub info {
 sub notice {
   $DISPATCHER->notice(@_);
 }
-sub warning {
+sub _warning {
   $DISPATCHER->warning(@_);
 }
 sub error {
@@ -831,7 +836,7 @@ sub build_backup_command {
 
   if($$bh{btype} eq 'duplicity' and not -d $$bh{path}) {
     dlog('warning','path does not exist',$bh);
-    warning("backup path $$bh{path} does not exist for $$bh{tag}: skipping this backup");
+    _warning("backup path $$bh{path} does not exist for $$bh{tag}: skipping this backup");
     return;
   }
 
@@ -1911,6 +1916,26 @@ sub parse_config_backups {
 }
 # end of parse_backup_configs
 
+# parse all the args using specified options, return hash config?
+sub parse_argv {
+    my $argv = shift;
+    my $options = shift;
+    my $cfg_def = shift;
+    my $cli_config = {};
+
+    # push the options onto the big get_options hash for passing to GetOptions
+    foreach my $key (keys(%{$cfg_def})) {
+        my $o = $$cfg_def{$key};
+        next if defined $$options{$$o{'cli'}};
+        $$options{$$o{'cli'}} = $$o{'var'};
+    }
+    print STDERR Dumper $argv if $DEBUG;
+    print STDERR Dumper $options if $DEBUG;
+    #GetOptions(\%CLI_CONFIG, @options);
+    GetOptionsFromArray($argv, %{$options});
+    return $cli_config;
+}
+
 # copied from the old version of List::Util:
 sub string_any {
     my $s = shift;
@@ -1949,7 +1974,7 @@ sub munge_getopts {
     return join('=',join('|',$s[0],@{$cli_alias{$s[0]}}),$s[1]);
 }
 
-sub main {
+sub rdbduprunner {
 
     make_dirs();
 
@@ -1957,25 +1982,17 @@ sub main {
 
     print STDERR Dumper [$config_validator->options("cli")] if $DEBUG;
 
-    my @options = map &munge_getopts, $config_validator->options('cli');
-    print STDERR Dumper \@options if $DEBUG;
+    #my @options = map &munge_getopts, $config_validator->options('cli');
+    #print STDERR Dumper \@options if $DEBUG;
 
-    #GetOptions(\%CLI_CONFIG, @options);
     #$config_validator->validate(\%CLI_CONFIG,'cli');
 
-# push the options onto the big get_options hash for passing to GetOptions
-foreach my $key (keys(%cfg_def)) {
-  my $o = $cfg_def{$key};
-  $get_options{$$o{'cli'}} = $$o{'var'};
-}
+    %CLI_CONFIG = %{parse_argv(\%get_options,\%cfg_def)};
 
-print STDERR Dumper \%get_options if $DEBUG;
-GetOptions(%get_options);
-
-if ( scalar @ARGV ) {
-    print STDERR Dumper \@ARGV;
-    die "unparsed options on the command line: ".join(' ',@ARGV);
-}
+    if ( scalar @ARGV ) {
+        print STDERR Dumper \@ARGV;
+        die "unparsed options on the command line: ".join(' ',@ARGV);
+    }
 
 # print the SYNOPSIS section and exit
 pod2usage(-1) if $HELP;
@@ -2315,8 +2332,8 @@ elsif($ORPHANS) {
             unless(remove_oldest($$bh{backupdestination})) {
               # we failed to remove an increment from the backupdestination
               # we cannot do backups on this bd for this run!
-              warning("unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
-              warning("no further attempts will be made to do backups to this destination");
+              _warning("unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
+              _warning("no further attempts will be made to do backups to this destination");
               $CONFIG{$$bh{backupdestination}}{busted}=1;
               next BACKUP;
             }

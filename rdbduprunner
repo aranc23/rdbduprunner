@@ -24,7 +24,7 @@ use Backup::rdbduprunner qw($APP_NAME);
 
 $APP_NAME='rdbduprunner';
 
-Backup::rdbduprunner::main();
+Backup::rdbduprunner::rdbduprunner();
 
 =head1 NAME
 
