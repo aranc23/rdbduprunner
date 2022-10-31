@@ -1921,18 +1921,21 @@ sub parse_argv {
     my $argv = shift;
     my $options = shift;
     my $cfg_def = shift;
+    my @options_array = @_;
     my $cli_config = {};
 
+    print STDERR Dumper $argv,$options,$cfg_def,\@options_array if $DEBUG;
     # push the options onto the big get_options hash for passing to GetOptions
     foreach my $key (keys(%{$cfg_def})) {
         my $o = $$cfg_def{$key};
         next if defined $$options{$$o{'cli'}};
         $$options{$$o{'cli'}} = $$o{'var'};
     }
-    print STDERR Dumper $argv if $DEBUG;
     print STDERR Dumper $options if $DEBUG;
-    #GetOptions(\%CLI_CONFIG, @options);
+    GetOptionsFromArray($argv, $cli_config, @options_array);
+    print STDERR Dumper $argv if $DEBUG;
     GetOptionsFromArray($argv, %{$options});
+    print STDERR Dumper $cli_config if $DEBUG;
     return $cli_config;
 }
 
@@ -1982,12 +1985,11 @@ sub rdbduprunner {
 
     print STDERR Dumper [$config_validator->options("cli")] if $DEBUG;
 
-    #my @options = map &munge_getopts, $config_validator->options('cli');
-    #print STDERR Dumper \@options if $DEBUG;
+    my @options = map &munge_getopts, $config_validator->options('cli');
+    print STDERR Dumper \@options if $DEBUG;
 
-    #$config_validator->validate(\%CLI_CONFIG,'cli');
-
-    %CLI_CONFIG = %{parse_argv(\%get_options,\%cfg_def)};
+    %CLI_CONFIG = %{parse_argv(\@ARGV,\%get_options,\%cfg_def,@options)};
+    $config_validator->validate(\%CLI_CONFIG,'cli');
 
     if ( scalar @ARGV ) {
         print STDERR Dumper \@ARGV;
