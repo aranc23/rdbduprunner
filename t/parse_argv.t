@@ -166,9 +166,7 @@ my $defaults = {
 
     my $results;
     $results = parse_argv([], \%get_options,\%cfg_def);
-    ok(lives {
-        $cv->validate($results,"cli");
-    }, "unparaseable");
+    ok(lives { $cv->validate($results, 'cli'); }, 'unparaseable');
     is( $results,
         {},
         "nothing passed");
@@ -177,23 +175,20 @@ my $defaults = {
         "no options global vars",
     );
 
-    {
-        local $STATS=$STATS;
-        local $TEST=$TEST;
-        $results = parse_argv([qw(--notest --stats)], \%get_options,\%cfg_def);
-        ok(lives {
-            $cv->validate($results,"cli");
-        }, "unparaseable");
-        is( $results,
-            {},
-            "nothing passed");
-        $$defaults{test} = 0;
-        $$defaults{stats} = 1;
-        is( big_globals(),
-            $defaults,
-            "test and stats");
-    }
-    
+    $results = parse_argv([qw(--notest --stats)], \%get_options,\%cfg_def);
+    ok(lives { $cv->validate($results, 'cli'); }, 'unparaseable');
+    is( $results,
+        {},
+        "nothing passed");
+    $$defaults{test} = 0;
+    $$defaults{stats} = 1;
+    is( big_globals(),
+        $defaults,
+        "test and stats");
+
+    # start of "everything"
+    $STATS = undef;
+    $TEST = 1;
     $results = parse_argv([
         qw(
               --calculate-average
@@ -208,98 +203,44 @@ my $defaults = {
               --tidy
               --list
               --orphans
+              --status-json
+              --status-delete pork
+              --force
+              --full
+              --maxage 1d
+              --maxinc 4
+              --verbosity 5
+              -t 5
+              -u
+              --allow-source-mismatch
+              --tempdir /var/tmp
+              -v
+              --progress
+              -n
       )], \%get_options,\%cfg_def);
     ok(lives {
         $cv->validate($results,"cli");
     }, "unparaseable");
+    $$defaults{test} = 1;
+    $$defaults{stats} = undef;
     is( $results,
         {},
         "nothing passed");
-    $$defaults{test} = 1;
-    $$defaults{stats} = undef;
-    
-    for(qw(calculate-average cleanup check verify compare dump list-oldest remove-oldest status tidy list orphans)) {
+
+    for(qw(calculate-average cleanup check verify compare dump list-oldest remove-oldest status tidy list orphans status_json allow-source-mismatch dryrun force full progress v u)) {
         $$defaults{$_} = 1;
     }
+    $$defaults{'status_delete'} = [qw(pork)];
+    $$defaults{'tempdir'} = '/var/tmp';
+    $$defaults{'maxage'} = '1d';
+    $$defaults{'maxinc'} = '4';
+    $$defaults{'t'} = 5;
+    $$defaults{'verbosity'} = 5;
+
     is( big_globals(),
         $defaults,
-        "major modes");
+        "everything");
 
-    # our $bh = {
-    #     host              => 'server',
-    #     btype             => 'rsync',
-    #     backupdestination => 'default',
-    #     path              => '/tmp',
-    #     tag               => 'server-tmp',
-    #     exclude           => ['nope'],
-    #     excludes          => ['/etc/some/file'],
-    #     src               => 'server:/tmp',
-    #     dest              => '/some/where/server-tmp',
-    # };
-    # {
-    #     local $bh = $bh;
-    #     $$bh{disabled} = 1;
-    #     is( build_backup_command($bh),
-    #         undef,
-    #         "disabled backup",
-    #     );
-    # }
-    # %CONFIG = ( 'default' => { 'busted' => 1 });
-    # is( build_backup_command($bh),
-    #     undef,
-    #     "busted backup destination this check is right but wrong"
-    # );
-    # $$bh{btype} = 'duplicity';
-    # $FULL = 1;
-    # $USEAGENT = 1;
-    # $ALLOWSOURCEMISMATCH = 1;
-    # $TEMPDIR = '/var/tmp';
-    # $DUPLICITY_BINARY = 'duplicity';
-    # $$bh{disabled} = 0;
-    # $CONFIG{default}{busted}=0;
-
-    # is([build_backup_command($bh)],
-    #    [qw(duplicity full --use-agent --allow-source-mismatch --no-print-statistics --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
-    #    "full duplicity");
-    # $$bh{signkey} = '0x400';
-    # $$bh{encryptkey} = 'aran';
-    # $$bh{stats} = 1;
-    # $FULL = 0;
-    # is([build_backup_command($bh)],
-    #    [qw(duplicity --use-agent --allow-source-mismatch --sign-key 0x400 --encrypt-key aran --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
-    #    "not-full duplicity with extra opts");
-    # $$bh{btype} = 'rdiff-backup';
-    # $$bh{stats} = 0;
-    # $RDIFF_BACKUP_BINARY = 'rdiff-backup';
-    # is([build_backup_command($bh)],
-    #    [qw(rdiff-backup --exclude-device-files --exclude-other-filesystems --no-eas --ssh-no-compression --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
-    #    "rdiff-backup");
-    # $$bh{sshcompress} = 1;
-    # $$bh{stats} = 1;
-    # is([build_backup_command($bh)],
-    #    [qw(rdiff-backup --exclude-device-files --exclude-other-filesystems --no-eas --print-statistics --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
-    #    "rdiff-backup");
-    # $$bh{btype} = 'rsync';
-    # $$bh{checksum} = 1;
-    # $$bh{trickle} = 4;
-    # $$bh{stats} = 0;
-    
-    # $DRYRUN = 1;
-    # $RSYNC_BINARY='rsync';
-    # $LOG_DIR = '/var/log';
-    
-    # is([build_backup_command($bh)],
-    #    [qw(rsync --archive --one-file-system --hard-links --delete --delete-excluded --dry-run --checksum --sparse --bwlimit=4 -z --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
-    #    "rsync dry-run");
-    # $$bh{inplace} = 1;
-    # $$bh{stats} = 1;
-    # $$bh{wholefile} = 0;
-    # $$bh{exclude} = [qw(nope not this)];
-    # $DRYRUN = 0;
-
-    # is([build_backup_command($bh)],
-    #    [qw(rsync --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --bwlimit=4 -z --stats --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
-    #    "rsync");
 }
 
 done_testing;
