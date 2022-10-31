@@ -131,6 +131,7 @@ $CHECKSUM
 $WHOLEFILE
 $INPLACE
 $STATS
+&munge_getopts
  ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
