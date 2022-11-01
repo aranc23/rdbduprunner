@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 use Test2::V0;
-use Backup::rdbduprunner qw(build_backup_command %CONFIG $FULL $USEAGENT $ALLOWSOURCEMISMATCH $TEMPDIR $DUPLICITY_BINARY $RDIFF_BACKUP_BINARY $DRYRUN $RSYNC_BINARY $LOG_DIR parse_config_backups $LOCALHOST $EXCLUDE_PATH %CLI_CONFIG %DEFAULT_CONFIG %cfg_def);
+use Backup::rdbduprunner qw(build_backup_command %CONFIG $FULL $USEAGENT $ALLOWSOURCEMISMATCH $TEMPDIR $DUPLICITY_BINARY $RDIFF_BACKUP_BINARY $DRYRUN $RSYNC_BINARY $LOG_DIR parse_config_backups $LOCALHOST $EXCLUDE_PATH %CLI_CONFIG %DEFAULT_CONFIG);
 
 use Data::Dumper;
 
@@ -36,8 +36,8 @@ use Data::Dumper;
                                       }
                                   },
                               },
-                              \%CLI_CONFIG,
-                              \%cfg_def)],
+                              \%CLI_CONFIG),
+                          ],
         [
             {
                 'stats' => 1,
@@ -77,7 +77,6 @@ use Data::Dumper;
                     'defaultbackupdestination' => 'data-tmp'
                 },
                 \%CLI_CONFIG,
-                \%cfg_def
             )
         ],
         [   {   'btype'             => 'rsync',
@@ -116,7 +115,6 @@ use Data::Dumper;
                 { inplace => 0,
                   checksum => 0,
                 },
-                \%cfg_def
             )
         ],
         [   {   'btype'             => 'rsync',
@@ -160,7 +158,6 @@ use Data::Dumper;
                     'defaultbackupdestination' => 'scratch'
                 },
                 \%CLI_CONFIG,
-                \%cfg_def
             )
         ],
         [   {   'inventory' => 0,
