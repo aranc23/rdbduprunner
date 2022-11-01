@@ -57,9 +57,6 @@ sub big_globals {
         'allowfs'               => \@ALLOW_FS,
         'maxprocs'              => $MAXPROCS,
         'maxwait'               => $MAXWAIT,
-        checksum                => $CHECKSUM,
-        #wholefile               => $WHOLEFILE,
-        inplace                 => $INPLACE,
     };
 }
 my $defaults = {
@@ -154,9 +151,6 @@ my $defaults = {
     'allowfs'  => [],
     'maxprocs' => undef,
     'maxwait'  => undef,
-    checksum   => undef,
-    #wholefile  => undef,
-    inplace    => undef,
 };
 
 {
@@ -218,13 +212,15 @@ my $defaults = {
               --progress
               --dry-run
               --wholefile
+              --checksum
       )], \%get_options,\%cfg_def,@options);
     ok(lives {
         $cv->validate($results,"cli");
     }, "unparaseable");
     $$defaults{test} = 1;
     is( $results,
-        {wholefile => 1},
+        {wholefile => 1,
+     checksum => 1},
         "nothing passed");
 
     for(qw(calculate-average cleanup check verify compare dump list-oldest remove-oldest status tidy list orphans status_json allow-source-mismatch dryrun force full progress v u)) {

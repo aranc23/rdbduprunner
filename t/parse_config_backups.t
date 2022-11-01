@@ -96,6 +96,45 @@ use Data::Dumper;
         ],
         "skip the skips",
     );
+    is( [   parse_config_backups(
+                \%DEFAULT_CONFIG,
+                {   'backupdestination' => {
+                        'data-tmp' => {
+                            'type' => 'rsync',
+                            'path' => '/data/tmp/rsync'
+                        }
+                    },
+                    'backupset' => {
+                        'test' => {
+                            'path'     => '/home/spin/bin',
+                            'inplace'  => 1,
+                            'checksum' => 1,
+                        }
+                    },
+                    'defaultbackupdestination' => 'data-tmp'
+                },
+                { inplace => 0,
+                  checksum => 0,
+                },
+                \%cfg_def
+            )
+        ],
+        [   {   'btype'             => 'rsync',
+                'stats'             => 1,
+                'src'               => '/home/spin/bin/',
+                'checksum'          => 0,
+                'exclude'           => [],
+                'backupdestination' => 'data-tmp',
+                'tag'               => 'a-lnx005-home-spin-bin',
+                'host'              => 'a-lnx005',
+                'inplace'           => 0,
+                'gtag'              => 'generic-home-spin-bin',
+                'dest'              => '/data/tmp/rsync/a-lnx005-home-spin-bin',
+                'path'              => '/home/spin/bin/'
+            }
+        ],
+        "cli override inplace and checksum",
+    );
 
     # start of tick-tock
     $EXCLUDE_PATH = './tests';
