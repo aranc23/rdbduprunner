@@ -128,7 +128,6 @@ $ALLOWSOURCEMISMATCH
 &build_backup_command
 &parse_argv
 $CHECKSUM
-$WHOLEFILE
 $INPLACE
 %DEFAULT_CONFIG
 &hashref_keys_drop
@@ -325,9 +324,14 @@ our @INCREMENTS;
 
 our %DEFAULT_CONFIG = (
     'stats' => {
-        default => 1,
-        getopt => 'stats!',
-        type => "valid(truefalse)",
+        default  => 1,
+        getopt   => 'stats!',
+        type     => "valid(truefalse)",
+        optional => "true",
+    },
+    'wholefile' => {
+        'getopt' => 'wholefile|whole-file|whole_file!',
+        type     => "valid(truefalse)",
         optional => "true",
     },
             # maxprocs =>
@@ -571,14 +575,6 @@ our %config_definition = (
 
 our %cfg_def =
   (
-   # config file string
-   'wholefile' =>
-   {
-    'cli'       => 'whole-file|wholefile!',
-    'var'       => \$WHOLE_FILE,
-    'normalize' => \&bool_parse,
-    'valid'     => qw( global backupset backupdestination ),
-   },
    # on Sundays, the default for inplace is false, and true the rest of the week
    'inplace' =>
    {
@@ -1855,13 +1851,14 @@ sub parse_config_backups {
           $$bh{maxinc}=$CONFIG{maxinc};
         }
         print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
-        for my $key (qw( stats )) {
-            $$bh{$key} = key_select($key,
-                                    hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                                    \%CONFIG, # config file, top level
-                                    $CONFIG{backupdestination}{$$bh{backupdestination}}, # from the destination
-                                    $bh, # ourselves
-                                    \%CLI_CONFIG);
+        for my $key (qw( stats wholefile )) {
+            my $v = key_select($key,
+                               hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                               \%CONFIG, # config file, top level
+                               $CONFIG{backupdestination}{$$bh{backupdestination}}, # from the destination
+                               $bh, # ourselves
+                               \%CLI_CONFIG);
+            $$bh{$key} = $v if $v;
         }
         print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
         # interpret variables from cli, global, bd and bs levels and finally use the default if specified
