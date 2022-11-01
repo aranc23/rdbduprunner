@@ -57,4 +57,14 @@ is( {   Backup::rdbduprunner::hash_backups(
     "hash_backups"
 );
 
+is( [sort(Backup::rdbduprunner::hashref_key_filter_array(
+    {
+        'bob' => { stuff => 'fork'},
+        'sam' => { stuff => 'spoon'},
+        'cat' => { stuff => 'fo'},
+    },
+    'stuff',
+    qr{^sp}))],
+    [sort(qw(bob cat))],
+);
 done_testing;

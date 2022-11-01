@@ -2383,6 +2383,17 @@ sub hashref_keys_drop {
     return $m;
 }
 
+sub hashref_key_filter_array {
+    my $m = shift;
+    my $key = shift;
+    my $q = shift;
+    my @a;
+    while(my ($k,$v) = each(%{$m})) {
+        push(@a, $k) if $$v{$key} !~ $q;
+    }
+    return @a;
+}
+
 # Preloaded methods go here.
 
 # Autoload methods go after =cut, and are processed by the autosplit program.
