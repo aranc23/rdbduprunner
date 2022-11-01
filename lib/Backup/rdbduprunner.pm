@@ -2384,14 +2384,17 @@ sub hashref_keys_drop {
 }
 
 sub hashref_key_filter_array {
-    my $m = shift;
     my $key = shift;
     my $q = shift;
-    my @a;
-    while(my ($k,$v) = each(%{$m})) {
-        push(@a, $k) if $$v{$key} !~ $q;
+    my %a;
+    foreach my $m (@_) {
+        while(my ($k,$v) = each(%{$m})) {
+            if ($$v{$key} !~ $q) {
+                $a{$k}=1;
+            }
+        }
     }
-    return @a;
+    return keys %a;
 }
 
 # Preloaded methods go here.
