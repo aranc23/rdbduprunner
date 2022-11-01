@@ -130,8 +130,9 @@ $ALLOWSOURCEMISMATCH
 $CHECKSUM
 $WHOLEFILE
 $INPLACE
-$STATS
-&munge_getopts
+%DEFAULT_CONFIG
+&hashref_keys_drop
+&hashref_key_array
  ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -208,7 +209,6 @@ our $FORCE=0;
 our $FULL=0;
 our $MAXAGE;
 our $MAXINC;
-our $STATS; # use to set --stats and other print-stats options
 our $USEAGENT;
 our $ALLOWSOURCEMISMATCH=0;
 our $TEMPDIR;
@@ -324,8 +324,48 @@ our @BACKUPS;
 our @INCREMENTS;
 
 our %DEFAULT_CONFIG = (
-    'stats' => 1,
-    'inventory' => 0,# or undef?
+    'stats' => {
+        default => 1,
+        getopt => 'stats!',
+        type => "valid(truefalse)",
+        optional => "true",
+    },
+            # maxprocs =>
+            #     { type => "integer", min => 1, optional => "true" },
+            # defaultbackupdestination =>
+            #     { type => "string", optional => "true" },
+            # maxwait =>
+            #     { type => "integer", min => 1, optional => "true" },
+            # duplicitybinary =>
+            # { type => "string", optional => "true" },
+            # rdiffbackupbinary =>
+            # { type => "string", optional => "true" },
+            # rsyncbinary =>
+            # { type => "string", optional => "true" },
+            # zfsbinary =>
+            # { type => "string", optional => "true" },
+            # verbosity =>
+            # { type => "integer", optional => "true" },
+            # terminalverbosity =>
+            # { type => "integer", optional => "true" },
+            # allowfs =>
+            # { type => "list?(string)", optional => "true" },
+            # 'excludepath' =>
+            # { type => "string", optional => "true" },
+            #  useagent =>
+            # { type => "valid(truefalse)", optional => "true" },
+            # wholefile =>
+            # { type => "valid(truefalse)", optional => "true" },
+            # tempdir =>
+            # { type => "string", optional => "true" },
+            # # these are duplicity options:
+            # lc "GPGPassPhrase" => { type => "string", optional => "true" },
+            # lc "AWSAccessKeyID" => { type => "string", optional => "true" },
+            # lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
+            # lc "SignKey" => { type => "string", optional => "true" },
+            # lc "EncryptKey" => { type => "string", optional => "true" },
+            # # uses --bwlimit on rsync and trickle binary on others:
+            # lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
 );
 
 our %config_definition = (
@@ -527,54 +567,7 @@ our %config_definition = (
             lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
         },
     },
-    cli => {
-        type   => 'struct',
-        fields => {
-            # maxprocs =>
-            #     { type => "integer", min => 1, optional => "true" },
-            # defaultbackupdestination =>
-            #     { type => "string", optional => "true" },
-            # maxwait =>
-            #     { type => "integer", min => 1, optional => "true" },
-            # duplicitybinary =>
-            # { type => "string", optional => "true" },
-            # rdiffbackupbinary =>
-            # { type => "string", optional => "true" },
-            # rsyncbinary =>
-            # { type => "string", optional => "true" },
-            # zfsbinary =>
-            # { type => "string", optional => "true" },
-            # verbosity =>
-            # { type => "integer", optional => "true" },
-            # terminalverbosity =>
-            # { type => "integer", optional => "true" },
-            # allowfs =>
-            # { type => "list?(string)", optional => "true" },
-            # 'excludepath' =>
-            # { type => "string", optional => "true" },
-            #  useagent =>
-            # { type => "valid(truefalse)", optional => "true" },
-            # wholefile =>
-            # { type => "valid(truefalse)", optional => "true" },
-            # tempdir =>
-            # { type => "string", optional => "true" },
-            stats => {
-                type => "boolean",
-                optional => "true",
-            },
-            # # these are duplicity options:
-            # lc "GPGPassPhrase" => { type => "string", optional => "true" },
-            # lc "AWSAccessKeyID" => { type => "string", optional => "true" },
-            # lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
-            # lc "SignKey" => { type => "string", optional => "true" },
-            # lc "EncryptKey" => { type => "string", optional => "true" },
-            # # uses --bwlimit on rsync and trickle binary on others:
-            # lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
-        },
-    },
 );
-
-print STDERR Dumper \%config_definition if $DEBUG;
 
 our %cfg_def =
   (
@@ -605,19 +598,19 @@ our %cfg_def =
     'valid'     => qw( global backupset backupdestination ),
    },
    # print stats, probably always want this if possible
-   'stats' =>
-   {
-    'cli'       => 'stats!',
-    'var'       => \$STATS,
-    'def'       => 1,
-    'normalize' => \&bool_parse,
-    'valid'     => qw( global backupset backupdestination ),
-   },
+   # 'stats' =>
+   # {
+   #  'cli'       => 'stats!',
+   #  'var'       => \$STATS,
+   #  'def'       => 1,
+   #  'normalize' => \&bool_parse,
+   #  'valid'     => qw( global backupset backupdestination ),
+   # },
   );
 
-Readonly our %cli_alias => (
-    duplicitybinary => [ 'duplicity-binary', 'duplicity_binary' ],
-);
+# Readonly our %cli_alias => (
+#     duplicitybinary => [ 'duplicity-binary', 'duplicity_binary' ],
+# );
 
 
 our %get_options=
@@ -658,8 +651,6 @@ our %get_options=
    'v|verbose'              => \$VERBOSE,
    'progress!'              => \$PROGRESS,
    'n|dry-run'              => \$DRYRUN,
-   # options with applicbility to rdiff-backup, duplicity and rsync
-#   'stats!'                 => \$STATS,
 
    # the next three options limit which backups get acted upon
    'dest=s'                 => \$DEST,
@@ -1863,6 +1854,16 @@ sub parse_config_backups {
                  defined $CONFIG{maxinc}) {
           $$bh{maxinc}=$CONFIG{maxinc};
         }
+        print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
+        for my $key (qw( stats )) {
+            $$bh{$key} = key_select($key,
+                                    hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                    \%CONFIG, # config file, top level
+                                    $CONFIG{backupdestination}{$$bh{backupdestination}}, # from the destination
+                                    $bh, # ourselves
+                                    \%CLI_CONFIG);
+        }
+        print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
         # interpret variables from cli, global, bd and bs levels and finally use the default if specified
         foreach my $key (keys(%cfg_def)) {
           my $var = $cfg_def{$key}{'var'};
@@ -1916,6 +1917,17 @@ sub parse_config_backups {
 }
 # end of parse_backup_configs
 
+sub key_select {
+    print STDERR Dumper \@_ if $DEBUG;
+    my $key = shift;
+    for my $h (reverse(@_)) {
+        if(defined $$h{$key}) {
+            return $$h{$key};
+        }
+    }
+    return;
+}
+
 # parse all the args using specified options, return hash config?
 sub parse_argv {
     my $argv = shift;
@@ -1965,27 +1977,30 @@ sub make_dirs {
     }
 }
 
-sub munge_getopts {
-    my @s = split('=',$_);
-    unless(exists $cli_alias{$s[0]}) {
-        return $_;
-    }
-    if (scalar @s == 1 ) {
-        return join('|', @s, @{$cli_alias{$s[0]}});
-    }
-    # combine:
-    return join('=',join('|',$s[0],@{$cli_alias{$s[0]}}),$s[1]);
-}
+# sub munge_getopts {
+#     my @s = split('=',$_);
+#     unless(exists $cli_alias{$s[0]}) {
+#         return $_;
+#     }
+#     if (scalar @s == 1 ) {
+#         return join('|', @s, @{$cli_alias{$s[0]}});
+#     }
+#     # combine:
+#     return join('=',join('|',$s[0],@{$cli_alias{$s[0]}}),$s[1]);
+# }
 
 sub rdbduprunner {
 
     make_dirs();
+    $config_definition{cli} = { type => "struct",
+                                fields => hashref_keys_drop(\%DEFAULT_CONFIG,'default','getopt'),
+                            };
+    print STDERR Dumper \%config_definition if $DEBUG;
 
     my $config_validator = Config::Validator->new(%config_definition);
 
-    print STDERR Dumper [$config_validator->options("cli")] if $DEBUG;
-
-    my @options = map &munge_getopts, $config_validator->options('cli');
+    my @options = hashref_key_array(\%DEFAULT_CONFIG,
+                                    'getopt');
     print STDERR Dumper \@options if $DEBUG;
 
     %CLI_CONFIG = %{parse_argv(\@ARGV,\%get_options,\%cfg_def,@options)};
@@ -2355,6 +2370,39 @@ dlog('info',
      'exiting',
      {'total_run_time_seconds' => time()-$RUNTIME});
 
+}
+
+sub hashref_key_array {
+    my $m = shift;
+    my $key = shift;
+    my @a;
+    for my $h (values(%{$m})) {
+        push(@a, $$h{$key}) if exists $$h{$key};
+    }
+    print STDERR Data::Dumper->Dump([\@a], [qw(hashref_key_array)]) if $DEBUG;
+    return @a;
+}
+
+sub hashref_key_hash {
+    my $m = shift;
+    my $key = shift;
+    my $a = {};
+    while(my ($k,$v) = each(%{$m})) {
+        $$a{$k} = $$v{$key} if exists $$v{$key};
+    }
+    print STDERR Data::Dumper->Dump([$a], [qw(hashref_key_hash)]) if $DEBUG;
+    return $a;
+}
+
+sub hashref_keys_drop {
+    my $m = Storable::dclone(shift);
+    while(my ($k,$v) = each(%{$m})) {
+        for my $key (keys(%$v)) {
+            delete $$v{$key} if string_any($key,@_);
+        }
+    }
+    print STDERR Data::Dumper->Dump([$m], [qw(hashref_keys_drop)]) if $DEBUG;
+    return $m;
 }
 
 # Preloaded methods go here.
