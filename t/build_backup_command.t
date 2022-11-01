@@ -27,6 +27,10 @@ use Data::Dumper;
         excludes          => ['/etc/some/file'],
         src               => 'server:/tmp',
         dest              => '/some/where/server-tmp',
+        progress          => 1,
+        verbose           => 1,
+        verbosity         => 5,
+        tverbosity        => 9,
     };
     {
         local $bh = $bh;
@@ -51,26 +55,26 @@ use Data::Dumper;
     $CONFIG{default}{busted}=0;
 
     is([build_backup_command($bh)],
-       [qw(duplicity full --use-agent --allow-source-mismatch --no-print-statistics --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       [qw(duplicity --verbosity 5 full --use-agent --allow-source-mismatch --no-print-statistics --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "full duplicity");
     $$bh{signkey} = '0x400';
     $$bh{encryptkey} = 'aran';
     $$bh{stats} = 1;
     $FULL = 0;
     is([build_backup_command($bh)],
-       [qw(duplicity --use-agent --allow-source-mismatch --sign-key 0x400 --encrypt-key aran --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       [qw(duplicity --verbosity 5 --use-agent --allow-source-mismatch --sign-key 0x400 --encrypt-key aran --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "not-full duplicity with extra opts");
     $$bh{btype} = 'rdiff-backup';
     $$bh{stats} = 0;
     $RDIFF_BACKUP_BINARY = 'rdiff-backup';
     is([build_backup_command($bh)],
-       [qw(rdiff-backup --exclude-device-files --exclude-other-filesystems --no-eas --ssh-no-compression --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       [qw(rdiff-backup --verbosity 5 --terminal-verbosity 9 --exclude-device-files --exclude-other-filesystems --no-eas --ssh-no-compression --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "rdiff-backup");
     $$bh{sshcompress} = 1;
     $$bh{stats} = 1;
     is([build_backup_command($bh)],
-       [qw(rdiff-backup --exclude-device-files --exclude-other-filesystems --no-eas --print-statistics --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
-       "rdiff-backup");
+       [qw(rdiff-backup --verbosity 5 --terminal-verbosity 9 --exclude-device-files --exclude-other-filesystems --no-eas --print-statistics --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       "rdiff-backup with stats");
     $$bh{btype} = 'rsync';
     $$bh{checksum} = 1;
     $$bh{trickle} = 4;
@@ -81,7 +85,7 @@ use Data::Dumper;
     $LOG_DIR = '/var/log';
     
     is([build_backup_command($bh)],
-       [qw(rsync --archive --one-file-system --hard-links --delete --delete-excluded --dry-run --checksum --sparse --bwlimit=4 -z --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --dry-run --checksum --sparse --bwlimit=4 -z --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "rsync dry-run");
     $$bh{inplace} = 1;
     $$bh{stats} = 1;
@@ -90,7 +94,7 @@ use Data::Dumper;
     $DRYRUN = 0;
 
     is([build_backup_command($bh)],
-       [qw(rsync --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --bwlimit=4 -z --stats --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
+       [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --bwlimit=4 -z --stats --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
        "rsync");
 }
 

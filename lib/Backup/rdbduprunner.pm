@@ -809,18 +809,18 @@ sub verbargs {
   my $bh=$_[0];
   my @a;
   if($$bh{btype} ne 'rsync') {
-    if(defined $VERBOSITY) {
-      push(@a,'--verbosity',$VERBOSITY);
+    if(defined $$bh{verbosity}) {
+      push(@a,'--verbosity',$$bh{verbosity});
     }
-    if(defined $TVERBOSITY and $$bh{btype} eq 'rdiff-backup') {
-      push(@a,'--terminal-verbosity',$TVERBOSITY);
+    if(defined $$bh{tverbosity} and $$bh{btype} eq 'rdiff-backup') {
+      push(@a,'--terminal-verbosity',$$bh{tverbosity});
     }
   }
   else {
-    if($PROGRESS) {
+    if($$bh{progress}) {
       push(@a,'--progress');
     }
-    if($VERBOSE) {
+    if($$bh{verbose}) {
       push(@a,'--verbose');
     }
   }

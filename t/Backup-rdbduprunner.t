@@ -24,28 +24,24 @@ is([Backup::rdbduprunner::verbargs({btype => 'rsync'})],
    "empty");
 
 {
-    $VERBOSE=1;
-    $PROGRESS=1;
-    is([Backup::rdbduprunner::verbargs({btype => 'rsync'})],
+    is([Backup::rdbduprunner::verbargs({btype => 'rsync',
+                                        verbose => 1,
+                                        progress => 1,
+                                    })],
        [qw(--progress --verbose)],
        "verbargs contains --verbose");
 }
 
 {
-    $VERBOSE=0;
-    $PROGRESS=0;
-    $VERBOSITY=9;
-    $TVERBOSITY=1;
-    is([Backup::rdbduprunner::verbargs({btype => 'rdiff-backup'})],
+    is([Backup::rdbduprunner::verbargs({btype => 'rdiff-backup',
+                                        verbosity => 9,
+                                    tverbosity => 1})],
        [qw(--verbosity 9 --terminal-verbosity 1)],
        "verbargs sets levels for rdiff-backup");
 }
 {
-    $VERBOSE=0;
-    $PROGRESS=0;
-    $VERBOSITY=9;
-    $TVERBOSITY=1;
-    is([Backup::rdbduprunner::verbargs({btype => 'duplicity'})],
+    is([Backup::rdbduprunner::verbargs({btype => 'duplicity',
+                                    verbosity => 9})],
        [qw(--verbosity 9)],
        "verbargs sets levels for duplicity");
 }
