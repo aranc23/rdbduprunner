@@ -127,8 +127,6 @@ $ALLOWSOURCEMISMATCH
 &backup_sort
 &build_backup_command
 &parse_argv
-$CHECKSUM
-$INPLACE
 %DEFAULT_CONFIG
 %CLI_CONFIG
 %cfg_def
@@ -195,9 +193,6 @@ our $AVERAGE=0;
 our $CLEANUP=0;
 our $COMPARE=0;
 our $DRYRUN=0;
-our $CHECKSUM;
-our $WHOLE_FILE; # contains the boolean result --no-whole-file or --whole-file
-our $INPLACE; # hold cli value for inplace
 our $DUMP=0;
 our $LISTOLDEST=0;
 our $REMOVE=0;
@@ -336,6 +331,18 @@ our %DEFAULT_CONFIG = (
         type     => "valid(truefalse)",
         optional => "true",
     },
+    'inplace' => {
+        getopt => 'inplace!',
+        type   => "valid(truefalse)",
+        default => strftime('%w',localtime(time())) == 0 ? 0 : 1,
+        optional => "true",
+    },
+    'checksum' => {
+        getopt   => 'checksum|c!',
+        type     => "valid(truefalse)",
+        default  => 0,
+        optional => "true",
+    }
             # maxprocs =>
             #     { type => "integer", min => 1, optional => "true" },
             # defaultbackupdestination =>
@@ -459,6 +466,22 @@ our %config_definition = (
                 type => "string",
                 optional => "true",
             },
+            'stats' => {
+                type     => "valid(truefalse)",
+                optional => "true",
+            },
+            'wholefile' => {
+                type     => "valid(truefalse)",
+                optional => "true",
+            },
+            'inplace' => {
+                type   => "valid(truefalse)",
+                optional => "true",
+            },
+            'checksum' => {
+                type     => "valid(truefalse)",
+                optional => "true",
+            },
         },
     },
     backupdestination => {
@@ -476,8 +499,6 @@ our %config_definition = (
                 optional => "true"
             },
             # only valid for rsync types
-            wholefile =>
-            { type => "valid(truefalse)", optional => "true" },
             path =>
             { type => "string" },
             # only valid for duplicity/rdiff-backup types
@@ -494,8 +515,6 @@ our %config_definition = (
                 max      => 100,
                 optional => "true",
             },
-            # only valid for rsync types
-            inplace => { type => "valid(truefalse)", optional => "true" },
             zfscreate => {
                 type => "valid(truefalse)",
                 optional => "true"
@@ -513,6 +532,22 @@ our %config_definition = (
             lc "EncryptKey" => { type => "string", optional => "true" },
             # uses --bwlimit on rsync and trickly binary on others:
             lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
+            'stats' => {
+                type     => "valid(truefalse)",
+                optional => "true",
+            },
+            'wholefile' => {
+                type     => "valid(truefalse)",
+                optional => "true",
+            },
+            'inplace' => {
+                type   => "valid(truefalse)",
+                optional => "true",
+            },
+            'checksum' => {
+                type     => "valid(truefalse)",
+                optional => "true",
+            },
         },
     },
     truefalse => {
@@ -558,11 +593,6 @@ our %config_definition = (
             { type => "valid(truefalse)", optional => "true" },
             tempdir =>
             { type => "string", optional => "true" },
-            # not currently a global option
-            # stats => {
-            #     type => "valid(truefalse)",
-            #     optional => "true" },
-            # },
             # these are duplicity options:
             lc "GPGPassPhrase" => { type => "string", optional => "true" },
             lc "AWSAccessKeyID" => { type => "string", optional => "true" },
@@ -571,6 +601,22 @@ our %config_definition = (
             lc "EncryptKey" => { type => "string", optional => "true" },
             # uses --bwlimit on rsync and trickly binary on others:
             lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
+            'stats' => {
+                type     => "valid(truefalse)",
+                optional => "true",
+            },
+            'wholefile' => {
+                type     => "valid(truefalse)",
+                optional => "true",
+            },
+            'inplace' => {
+                type   => "valid(truefalse)",
+                optional => "true",
+            },
+            'checksum' => {
+                type     => "valid(truefalse)",
+                optional => "true",
+            },
         },
     },
 );
@@ -578,23 +624,23 @@ our %config_definition = (
 our %cfg_def =
   (
    # on Sundays, the default for inplace is false, and true the rest of the week
-   'inplace' =>
-   {
-    'cli'       => 'inplace!',
-    'var'       => \$INPLACE,
-    'def'       => strftime('%w',localtime(time())) == 0 ? 0 : 1,
-    'normalize' => \&bool_parse,
-    'valid'     => qw( global backupset backupdestination ),
-   },
-   # use checksum, but don't please
-   'checksum' =>
-   {
-    'cli'       => 'c|checksum!',
-    'var'       => \$CHECKSUM,
-    'def'       => 0,
-    'normalize' => \&bool_parse,
-    'valid'     => qw( global backupset backupdestination ),
-   },
+   # 'inplace' =>
+   # {
+   #  'cli'       => 'inplace!',
+   #  'var'       => \$INPLACE,
+   #  'def'       => strftime('%w',localtime(time())) == 0 ? 0 : 1,
+   #  'normalize' => \&bool_parse,
+   #  'valid'     => qw( global backupset backupdestination ),
+   # },
+   # # use checksum, but don't please
+   # 'checksum' =>
+   # {
+   #  'cli'       => 'c|checksum!',
+   #  'var'       => \$CHECKSUM,
+   #  'def'       => 0,
+   #  'normalize' => \&bool_parse,
+   #  'valid'     => qw( global backupset backupdestination ),
+   # },
    # print stats, probably always want this if possible
    # 'stats' =>
    # {
@@ -1858,14 +1904,14 @@ sub parse_config_backups {
           $$bh{maxinc}=$CONFIG{maxinc};
         }
         print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
-        for my $key (qw( stats wholefile )) {
+        for my $key (qw( stats wholefile inplace checksum )) {
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
                                $CONFIG{backupdestination}{$$bh{backupdestination}}, # from the destination
                                $bh, # ourselves
                                \%CLI_CONFIG);
-            $$bh{$key} = $v if $v;
+            $$bh{$key} = $v if defined $v;
         }
         print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
         # interpret variables from cli, global, bd and bs levels and finally use the default if specified
