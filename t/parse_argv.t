@@ -41,7 +41,6 @@ sub big_globals {
         'v'                     => $VERBOSE,
         'progress'              => $PROGRESS,
         dryrun                  => $DRYRUN,
-        stats                   => $STATS,
         'dest'                  => $DEST,
         'host'                  => $HOST,
         'path'                  => $PATH,
@@ -90,7 +89,6 @@ my $defaults = {
     'v'                     => 0,
     'progress'              => 0,
     dryrun                  => 0,
-    stats                   => undef,
     'dest'                  => undef,
     'host'                  => undef,
     'path'                  => undef,
@@ -162,10 +160,14 @@ my $defaults = {
 };
 
 {
+    $config_definition{cli} = { type => "struct",
+                                fields => hashref_keys_drop(\%DEFAULT_CONFIG,'default','getopt'),
+                            };
     my $cv = Config::Validator->new(%config_definition);
-
+    my @options = hashref_key_array(\%DEFAULT_CONFIG,
+                                    'getopt');
     my $results;
-    $results = parse_argv([], \%get_options,\%cfg_def);
+    $results = parse_argv([], \%get_options,\%cfg_def,@options);
     ok(lives { $cv->validate($results, 'cli'); }, 'unparaseable');
     is( $results,
         {},
@@ -175,19 +177,17 @@ my $defaults = {
         "no options global vars",
     );
 
-    $results = parse_argv([qw(--notest --stats)], \%get_options,\%cfg_def);
+    $results = parse_argv([qw(--notest --stats)], \%get_options,\%cfg_def,@options);
     ok(lives { $cv->validate($results, 'cli'); }, 'unparaseable');
     is( $results,
-        {},
-        "nothing passed");
+        {stats => 1},
+        "options: notest and stats");
     $$defaults{test} = 0;
-    $$defaults{stats} = 1;
     is( big_globals(),
         $defaults,
-        "test and stats");
+        "old options: notest and stats");
 
     # start of "everything"
-    $STATS = undef;
     $TEST = 1;
     $results = parse_argv([
         qw(
@@ -216,13 +216,12 @@ my $defaults = {
               --tempdir /var/tmp
               -v
               --progress
-              -n
-      )], \%get_options,\%cfg_def);
+              --dry-run
+      )], \%get_options,\%cfg_def,@options);
     ok(lives {
         $cv->validate($results,"cli");
     }, "unparaseable");
     $$defaults{test} = 1;
-    $$defaults{stats} = undef;
     is( $results,
         {},
         "nothing passed");
