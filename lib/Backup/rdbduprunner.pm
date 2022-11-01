@@ -130,6 +130,8 @@ $ALLOWSOURCEMISMATCH
 $CHECKSUM
 $INPLACE
 %DEFAULT_CONFIG
+%CLI_CONFIG
+%cfg_def
 &hashref_keys_drop
 &hashref_key_array
  ) ] );
@@ -1664,6 +1666,11 @@ sub which_zfs {
 # %cfg_def
 # these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
 sub parse_config_backups {
+    my %DEFAULT_CONFIG = %{shift(@_)};
+    my %CONFIG = %{shift(@_)};
+    my %CLI_CONFIG = %{shift(@_)};
+    my %cfg_def = %{shift(@_)};
+
   my @BACKUPS;
   print STDERR Dumper \%CONFIG if $DEBUG;
   print STDERR Dumper \%cfg_def if $DEBUG;
@@ -1912,7 +1919,7 @@ sub parse_config_backups {
   print STDERR Dumper [sort { $$a{dest} cmp $$b{dest} } @BACKUPS] if $DEBUG;
   return @BACKUPS;
 }
-# end of parse_backup_configs
+# end of parse_config_backups
 
 sub key_select {
     print STDERR Dumper \@_ if $DEBUG;
@@ -2152,7 +2159,7 @@ elsif ( basename($PROGRAM_NAME) eq 'check_rdbduprunner' or $STATUS_JSON ) {
     exit;
 }
 
-@BACKUPS = parse_config_backups();
+@BACKUPS = parse_config_backups(\%DEFAULT_CONFIG, \%CONFIG, \%CLI_CONFIG, \%cfg_def);
 if($DUMP) {
   print Dumper \@BACKUPS;
   notice("you asked me to dump and exit!");
