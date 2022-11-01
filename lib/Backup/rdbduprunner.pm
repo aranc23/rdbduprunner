@@ -1876,11 +1876,17 @@ sub parse_config_backups {
           $$bh{maxinc}=$CONFIG{maxinc};
         }
         print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
-        # for my $key (keys(%{hashref_key_hash(\%DEFAULT_CONFIG,'default')}),
-        #              keys(%CONFIG),
-        #              keys(%{$CONFIG{backupdestination}{$$bh{backupdestination}}}),
-        #              keys(%CLI_CONFIG)) {
-        for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
+    KEY:
+        for my $key (sort(
+            hashref_key_filter_array('type',
+                                     qr{^(list|table)},
+                                     $config_definition{'default'}{fields},
+                                     $config_definition{'backupset'}{fields},
+                                     $config_definition{'backupdestination'}{fields},
+                                     $config_definition{'cli'}{fields}),
+            keys(%DEFAULT_CONFIG))) {
+        # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
+            next KEY if string_any($key, qw(path defaultbackupdestination type ));
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
@@ -2394,7 +2400,8 @@ sub hashref_key_filter_array {
             }
         }
     }
-    return keys %a;
+    print STDERR Data::Dumper->Dump([\%a],[qw(hashref_key_filter_array)]) if $DEBUG;
+    return keys(%a);
 }
 
 # Preloaded methods go here.
