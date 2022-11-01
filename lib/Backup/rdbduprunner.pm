@@ -70,7 +70,6 @@ $CONFIG_DIR
 $LOCK_DIR
 $LOG_DIR
 $LOCALHOST
-%cfg_def
 %get_options
 %CONFIG
 $CONFIG_FILE
@@ -129,7 +128,6 @@ $ALLOWSOURCEMISMATCH
 &parse_argv
 %DEFAULT_CONFIG
 %CLI_CONFIG
-%cfg_def
 &hashref_keys_drop
 &hashref_key_array
  ) ] );
@@ -620,37 +618,6 @@ our %config_definition = (
         },
     },
 );
-
-our %cfg_def =
-  (
-   # on Sundays, the default for inplace is false, and true the rest of the week
-   # 'inplace' =>
-   # {
-   #  'cli'       => 'inplace!',
-   #  'var'       => \$INPLACE,
-   #  'def'       => strftime('%w',localtime(time())) == 0 ? 0 : 1,
-   #  'normalize' => \&bool_parse,
-   #  'valid'     => qw( global backupset backupdestination ),
-   # },
-   # # use checksum, but don't please
-   # 'checksum' =>
-   # {
-   #  'cli'       => 'c|checksum!',
-   #  'var'       => \$CHECKSUM,
-   #  'def'       => 0,
-   #  'normalize' => \&bool_parse,
-   #  'valid'     => qw( global backupset backupdestination ),
-   # },
-   # print stats, probably always want this if possible
-   # 'stats' =>
-   # {
-   #  'cli'       => 'stats!',
-   #  'var'       => \$STATS,
-   #  'def'       => 1,
-   #  'normalize' => \&bool_parse,
-   #  'valid'     => qw( global backupset backupdestination ),
-   # },
-  );
 
 # Readonly our %cli_alias => (
 #     duplicitybinary => [ 'duplicity-binary', 'duplicity_binary' ],
@@ -1709,17 +1676,16 @@ sub which_zfs {
 # $EXCLUDE_PATH
 # $MAXAGE
 # $MAXINC
-# %cfg_def
 # these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
 sub parse_config_backups {
     my %DEFAULT_CONFIG = %{shift(@_)};
     my %CONFIG = %{shift(@_)};
     my %CLI_CONFIG = %{shift(@_)};
-    my %cfg_def = %{shift(@_)};
 
   my @BACKUPS;
+  print STDERR Dumper \%DEFAULT_CONFIG if $DEBUG;
   print STDERR Dumper \%CONFIG if $DEBUG;
-  print STDERR Dumper \%cfg_def if $DEBUG;
+  print STDERR Dumper \%CLI_CONFIG if $DEBUG;
   print STDERR Dumper [$LOCALHOST,$HOST,\@ALLOW_FS,$SKIP_FS_REGEX,$EXCLUDE_PATH,$MAXAGE,$MAXINC] if $DEBUG;
   for my $bstag (keys(%{$CONFIG{backupset}})) {
       my @bslist=($CONFIG{backupset}{$bstag});
@@ -1914,35 +1880,6 @@ sub parse_config_backups {
             $$bh{$key} = $v if defined $v;
         }
         print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
-        # interpret variables from cli, global, bd and bs levels and finally use the default if specified
-        foreach my $key (keys(%cfg_def)) {
-          my $var = $cfg_def{$key}{'var'};
-          if(defined $$var) {
-            # override, no matter what, as it was specified on the
-            # command line:
-            $$bh{$key} = $$var;
-          }
-          elsif( defined $$bs{$key} ) {
-            # should already have been copied!
-            # however to make it clear the is the second top/lowest priority:
-            $$bh{$key} = $$bs{$key};
-          }
-          elsif( defined $CONFIG{backupdestination}{$$bh{backupdestination}}{$key} ) {
-            # defined at the backdestination level
-            $$bh{$key} = $CONFIG{backupdestination}{$$bh{backupdestination}}{$key};
-          }
-          elsif( defined $CONFIG{$key} ) {
-            # defined at the global config level
-            $$bh{$key} = $CONFIG{$key};
-          }
-          elsif( defined $cfg_def{$key}{'def'} ){
-            $$bh{$key} = $cfg_def{$key}{'def'};
-          }
-          if( defined $$bh{$key} and defined $cfg_def{$key}{'normalize'} ) {
-            $$bh{$key} = &{$cfg_def{$key}{'normalize'}}($$bh{$key});
-          }
-        }
-        # if this is defined in a backupset, allow that to override the global definition, if it exists
         # I don't see how these are being added to the command line options:
         foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot )))) {
           unless (defined $$bh{$var}) {
@@ -1982,17 +1919,10 @@ sub key_select {
 sub parse_argv {
     my $argv = shift;
     my $options = shift;
-    my $cfg_def = shift;
     my @options_array = @_;
     my $cli_config = {};
 
-    print STDERR Dumper $argv,$options,$cfg_def,\@options_array if $DEBUG;
-    # push the options onto the big get_options hash for passing to GetOptions
-    foreach my $key (keys(%{$cfg_def})) {
-        my $o = $$cfg_def{$key};
-        next if defined $$options{$$o{'cli'}};
-        $$options{$$o{'cli'}} = $$o{'var'};
-    }
+    print STDERR Dumper $argv,$options,\@options_array if $DEBUG;
     print STDERR Dumper $options if $DEBUG;
     GetOptionsFromArray($argv, $cli_config, @options_array);
     print STDERR Dumper $argv if $DEBUG;
@@ -2053,7 +1983,7 @@ sub rdbduprunner {
                                     'getopt');
     print STDERR Dumper \@options if $DEBUG;
 
-    %CLI_CONFIG = %{parse_argv(\@ARGV,\%get_options,\%cfg_def,@options)};
+    %CLI_CONFIG = %{parse_argv(\@ARGV,\%get_options,@options)};
     $config_validator->validate(\%CLI_CONFIG,'cli');
 
     if ( scalar @ARGV ) {
@@ -2205,7 +2135,7 @@ elsif ( basename($PROGRAM_NAME) eq 'check_rdbduprunner' or $STATUS_JSON ) {
     exit;
 }
 
-@BACKUPS = parse_config_backups(\%DEFAULT_CONFIG, \%CONFIG, \%CLI_CONFIG, \%cfg_def);
+@BACKUPS = parse_config_backups(\%DEFAULT_CONFIG, \%CONFIG, \%CLI_CONFIG);
 if($DUMP) {
   print Dumper \@BACKUPS;
   notice("you asked me to dump and exit!");
