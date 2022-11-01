@@ -35,7 +35,7 @@ is([Backup::rdbduprunner::verbargs({btype => 'rsync'})],
 {
     is([Backup::rdbduprunner::verbargs({btype => 'rdiff-backup',
                                         verbosity => 9,
-                                    tverbosity => 1})],
+                                    terminalverbosity => 1})],
        [qw(--verbosity 9 --terminal-verbosity 1)],
        "verbargs sets levels for rdiff-backup");
 }
@@ -45,7 +45,6 @@ is([Backup::rdbduprunner::verbargs({btype => 'rsync'})],
        [qw(--verbosity 9)],
        "verbargs sets levels for duplicity");
 }
-ok($VERBOSE == 0, "verbose check");
 
 is( {   Backup::rdbduprunner::hash_backups(
     { host => 'test' },

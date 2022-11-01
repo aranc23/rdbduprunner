@@ -61,10 +61,6 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 &dlog
 $EXIT_CODE
 &verbargs
-$VERBOSITY
-$TVERBOSITY
-$VERBOSE
-$PROGRESS
 $STATE_DIR
 $CONFIG_DIR
 $LOCK_DIR
@@ -171,14 +167,6 @@ Readonly our $EXIT_CODE => {
 
 # dispatcher needs a handle to write to:
 our $DISPATCHER;
-
-# these are "global" configuration options that need to move into a
-# hash:
-our $VERBOSITY;
-our $TVERBOSITY;
-# rsync specific
-our $VERBOSE=0;
-our $PROGRESS=0;
 
 # print usage and exit
 our $HELP=0;
@@ -330,9 +318,9 @@ our %DEFAULT_CONFIG = (
         optional => "true",
     },
     'inplace' => {
-        getopt => 'inplace!',
-        type   => "valid(truefalse)",
-        default => strftime('%w',localtime(time())) == 0 ? 0 : 1,
+        getopt   => 'inplace!',
+        type     => "valid(truefalse)",
+        default  => strftime( '%w', localtime( time() ) ) == 0 ? 0 : 1,
         optional => "true",
     },
     'checksum' => {
@@ -340,7 +328,29 @@ our %DEFAULT_CONFIG = (
         type     => "valid(truefalse)",
         default  => 0,
         optional => "true",
-    }
+    },
+    'verbosity' => {
+        getopt   => 'verbosity=i',
+        type     => "integer",
+        optional => "true",
+    },
+    'terminalverbosity' => {
+        getopt   => 'terminalverbosity|tverbosity|t|terminal-verbosity=i',
+        type     => "integer",
+        optional => "true",
+    },
+    'verbose' => {
+        getopt   => 'verbose|v!',
+        type     => "valid(truefalse)",
+        optional => "true",
+        default  => 0,
+    },
+    'progress' => {
+        getopt   => 'progress!',
+        type     => "valid(truefalse)",
+        optional => "true",
+        default  => 0,
+    },
             # maxprocs =>
             #     { type => "integer", min => 1, optional => "true" },
             # defaultbackupdestination =>
@@ -652,15 +662,11 @@ our %get_options=
    'full'                   => \$FULL,
    'maxage=s'               => \$MAXAGE,
    'maxinc=s'               => \$MAXINC,
-   'verbosity=i'            => \$VERBOSITY,
-   't|terminal-verbosity=i' => \$TVERBOSITY,
    'u|use-agent!'           => \$USEAGENT,
    'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
    'tempdir=s'              => \$TEMPDIR,
 
    # rsync specific options
-   'v|verbose'              => \$VERBOSE,
-   'progress!'              => \$PROGRESS,
    'n|dry-run'              => \$DRYRUN,
 
    # the next three options limit which backups get acted upon
@@ -812,8 +818,8 @@ sub verbargs {
     if(defined $$bh{verbosity}) {
       push(@a,'--verbosity',$$bh{verbosity});
     }
-    if(defined $$bh{tverbosity} and $$bh{btype} eq 'rdiff-backup') {
-      push(@a,'--terminal-verbosity',$$bh{tverbosity});
+    if(defined $$bh{terminalverbosity} and $$bh{btype} eq 'rdiff-backup') {
+      push(@a,'--terminal-verbosity',$$bh{terminalverbosity});
     }
   }
   else {
@@ -1870,7 +1876,11 @@ sub parse_config_backups {
           $$bh{maxinc}=$CONFIG{maxinc};
         }
         print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
-        for my $key (qw( stats wholefile inplace checksum )) {
+        # for my $key (keys(%{hashref_key_hash(\%DEFAULT_CONFIG,'default')}),
+        #              keys(%CONFIG),
+        #              keys(%{$CONFIG{backupdestination}{$$bh{backupdestination}}}),
+        #              keys(%CLI_CONFIG)) {
+        for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
@@ -2064,18 +2074,6 @@ if(not defined $ZFS_BINARY) {
 	$ZFS_BINARY=$CONFIG{zfsbinary};
   } else {
 	$ZFS_BINARY='zfs'; # in our path we hope
-  }
-}
-
-unless(defined $VERBOSITY) { # from the command line
-  if(defined $CONFIG{verbosity}) {
-    $VERBOSITY=$CONFIG{verbosity};
-  }
-}
-
-unless(defined $TVERBOSITY) { # from the command line
-  if(defined $CONFIG{terminalverbosity}) {
-    $TVERBOSITY=$CONFIG{terminalverbosity};
   }
 }
 

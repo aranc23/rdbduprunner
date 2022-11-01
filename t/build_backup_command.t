@@ -30,7 +30,7 @@ use Data::Dumper;
         progress          => 1,
         verbose           => 1,
         verbosity         => 5,
-        tverbosity        => 9,
+        terminalverbosity => 9,
     };
     {
         local $bh = $bh;

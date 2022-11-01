@@ -55,7 +55,9 @@ use Data::Dumper;
                 'btype' => 'rsync',
                 'src' => '/home/accx/',
                 'host' => 'a-lnx005.divms.uiowa.edu',
-                'dest' => '/home/accx/tmp/rsync/accx'
+                'dest' => '/home/accx/tmp/rsync/accx',
+                'progress' => 0,
+                'verbose' => 0,
             }
         ],
         "simple config",
@@ -90,7 +92,9 @@ use Data::Dumper;
                 'inplace'           => 1,
                 'gtag'              => 'generic-home-spin-bin',
                 'dest'              => '/data/tmp/rsync/a-lnx005-home-spin-bin',
-                'path'              => '/home/spin/bin/'
+                'path'              => '/home/spin/bin/',
+                'progress' => 0,
+                'verbose' => 0,
             }
         ],
         "skip the skips",
@@ -114,6 +118,8 @@ use Data::Dumper;
                 },
                 { inplace => 0,
                   checksum => 0,
+                  progress => 1,
+                  verbose => 1,
                 },
             )
         ],
@@ -128,7 +134,9 @@ use Data::Dumper;
                 'inplace'           => 0,
                 'gtag'              => 'generic-home-spin-bin',
                 'dest'              => '/data/tmp/rsync/a-lnx005-home-spin-bin',
-                'path'              => '/home/spin/bin/'
+                'path'              => '/home/spin/bin/',
+                'progress'          => 1,
+                'verbose'           => 1,
             }
         ],
         "cli override inplace and checksum",
@@ -176,7 +184,9 @@ use Data::Dumper;
                 'host'     => 'tick.physics.uiowa.edu',
                 'checksum' => 0,
                 'gtag'     => 'generic-home',
-                'tag'      => 'tick.physics.uiowa.edu-home'
+                'tag'      => 'tick.physics.uiowa.edu-home',
+                'progress' => 0,
+                'verbose' => 0,
             },
             {   'dest'      => '/scratch/backups/tick.physics.uiowa.edu-root',
                 'inventory' => 0,
@@ -194,7 +204,9 @@ use Data::Dumper;
                     'tests/excludes/generic',
                     'tests/excludes/generic-root'
                 ],
-                'inplace' => 1
+                'inplace' => 1,
+                'progress' => 0,
+                'verbose' => 0,
             },
             {   'inventory' => 0,
                 'exclude'   => [],
@@ -209,7 +221,9 @@ use Data::Dumper;
                 'host'              => 'tick.physics.uiowa.edu',
                 'gtag'              => 'generic-tmp',
                 'tag'               => 'tick.physics.uiowa.edu-tmp',
-                'checksum'          => 0
+                'checksum'          => 0,
+                'progress' => 0,
+                'verbose' => 0,
             },
             {   'tag'      => 'tick.physics.uiowa.edu-usr',
                 'gtag'     => 'generic-usr',
@@ -227,7 +241,9 @@ use Data::Dumper;
                 'exclude'   => [],
                 'path'      => '/usr/',
                 'src'       => 'tick.physics.uiowa.edu:/usr/',
-                'inventory' => 0
+                'inventory' => 0,
+                'progress' => 0,
+                'verbose' => 0,
             },
             {   'backupdestination' => 'scratch',
                 'btype'             => 'rsync',
@@ -246,7 +262,9 @@ use Data::Dumper;
                 'exclude'   => [],
                 'path'      => '/var/',
                 'src'       => 'tick.physics.uiowa.edu:/var/',
-                'dest'      => '/scratch/backups/tick.physics.uiowa.edu-var'
+                'dest'      => '/scratch/backups/tick.physics.uiowa.edu-var',
+                'progress' => 0,
+                'verbose' => 0,
             },
             {   'exclude'   => [],
                 'path'      => '/home/',
@@ -264,7 +282,9 @@ use Data::Dumper;
                 'checksum'          => 0,
                 'gtag'              => 'generic-home',
                 'host'              => 'tock',
-                'stats'             => 1
+                'stats'             => 1,
+                'progress' => 0,
+                'verbose' => 0,
             },
             {   'exclude'   => [],
                 'path'      => '/',
@@ -283,7 +303,9 @@ use Data::Dumper;
                 'checksum'          => 0,
                 'gtag'              => 'generic-root',
                 'host'              => 'tock',
-                'stats'             => 1
+                'stats'             => 1,
+                'progress' => 0,
+                'verbose' => 0,
             }
         ],
         "tick-tock",

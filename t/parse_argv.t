@@ -33,13 +33,9 @@ sub big_globals {
         'full'                  => $FULL,
         'maxage'                => $MAXAGE,
         'maxinc'                => $MAXINC,
-        'verbosity'             => $VERBOSITY,
-        't'                     => $TVERBOSITY,
         'u'                     => $USEAGENT,
         'allow-source-mismatch' => $ALLOWSOURCEMISMATCH,
         'tempdir'               => $TEMPDIR,
-        'v'                     => $VERBOSE,
-        'progress'              => $PROGRESS,
         dryrun                  => $DRYRUN,
         'dest'                  => $DEST,
         'host'                  => $HOST,
@@ -78,13 +74,9 @@ my $defaults = {
     'full'                  => 0,
     'maxage'                => undef,
     'maxinc'                => undef,
-    'verbosity'             => undef,
-    't'                     => undef,
     'u'                     => undef,
     'allow-source-mismatch' => 0,
     'tempdir'               => undef,
-    'v'                     => 0,
-    'progress'              => 0,
     dryrun                  => 0,
     'dest'                  => undef,
     'host'                  => undef,
@@ -220,18 +212,21 @@ my $defaults = {
     $$defaults{test} = 1;
     is( $results,
         {wholefile => 1,
-     checksum => 1},
+         checksum => 1,
+         terminalverbosity => 5,
+         verbosity => 5,
+         progress => 1,
+         verbose => 1,
+     },
         "nothing passed");
 
-    for(qw(calculate-average cleanup check verify compare dump list-oldest remove-oldest status tidy list orphans status_json allow-source-mismatch dryrun force full progress v u)) {
+    for(qw(calculate-average cleanup check verify compare dump list-oldest remove-oldest status tidy list orphans status_json allow-source-mismatch dryrun force full u)) {
         $$defaults{$_} = 1;
     }
     $$defaults{'status_delete'} = [qw(pork)];
     $$defaults{'tempdir'} = '/var/tmp';
     $$defaults{'maxage'} = '1d';
     $$defaults{'maxinc'} = '4';
-    $$defaults{'t'} = 5;
-    $$defaults{'verbosity'} = 5;
 
     is( big_globals(),
         $defaults,
