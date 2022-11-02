@@ -52,7 +52,6 @@ sub big_globals {
         'test'                  => $TEST,
         'skipfs'                => \@SKIP_FS,
         'allowfs'               => \@ALLOW_FS,
-        'maxprocs'              => $MAXPROCS,
         'maxwait'               => $MAXWAIT,
     };
 }
@@ -142,7 +141,6 @@ my $defaults = {
             zfs)
     ],
     'allowfs'  => [],
-    'maxprocs' => undef,
     'maxwait'  => undef,
 };
 
@@ -216,6 +214,7 @@ my $defaults = {
               --dry-run
               --wholefile
               --checksum
+              --maxprocs 2
       )], \%get_options,@options);
     ok(lives {
         $cv->validate($results,"cli");
@@ -228,6 +227,7 @@ my $defaults = {
          verbosity => 5,
          progress => 1,
          verbose => 1,
+         maxprocs => 2,
      },
         "nothing passed");
 
