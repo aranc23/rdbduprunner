@@ -46,8 +46,6 @@ sub big_globals {
         'rsync-binary'          => $RSYNC_BINARY,
         'zfs-binary'            => $ZFS_BINARY,
         'exclude-path'          => $EXCLUDE_PATH,
-        'facility'              => $FACILITY,
-        'level'                 => $LOG_LEVEL,
         'localhost'             => $LOCALHOST,
         'test'                  => $TEST,
         'skipfs'                => \@SKIP_FS,
@@ -86,8 +84,6 @@ my $defaults = {
     'rsync-binary'          => undef,
     'zfs-binary'            => undef,
     'exclude-path'          => undef,
-    'facility'              => 'user',
-    'level'                 => 'info',
     'localhost'             => undef,
     'test'                  => 1,
     'skipfs'                => [
@@ -215,6 +211,8 @@ my $defaults = {
               --wholefile
               --checksum
               --maxprocs 2
+              --facility daemon
+              --level debug
       )], \%get_options,@options);
     ok(lives {
         $cv->validate($results,"cli");
@@ -228,6 +226,8 @@ my $defaults = {
          progress => 1,
          verbose => 1,
          maxprocs => 2,
+         facility => 'daemon',
+         level => 'debug',
      },
         "nothing passed");
 

@@ -85,8 +85,6 @@ $AVERAGE
 $TIDY
 $HELP
 $APP_NAME
-$FACILITY
-$LOG_LEVEL
 $LOG_FILE
 $LOG_DIR
 @CONFIG_FILES
@@ -207,8 +205,6 @@ our $RDIFF_BACKUP_BINARY;
 our $RSYNC_BINARY;
 our $ZFS_BINARY;
 our $EXCLUDE_PATH;
-our $FACILITY='user';
-our $LOG_LEVEL='info';
 our $STATUS_JSON;
 our @STATUS_DELETE;
 our $LOCALHOST;
@@ -380,6 +376,22 @@ our %DEFAULT_CONFIG = (
         min      => 1,
         default  => 1,
         sections => [qw(cli global)],
+    },
+    'facility' => {
+        getopt   => 'facility=s',
+        default  => 'user',
+        type     => "string",
+        optional => "true",
+        sections => [qw(cli global)],
+        match    => qr{^(auth|authpriv|cron|daemon|kern|local[0-7]|mail|news|syslog|user|uucp)$},
+    },
+    'level' => {
+        getopt   => 'level|log-level|log_level=s',
+        default  => 'info',
+        type     => "string",
+        optional => "true",
+        sections => [qw(cli global)],
+        match => qr{^(debug|info|notice|warning|error|critical|alert|emergency)$},
     },
             # maxprocs =>
             #     { type => "integer", min => 1, optional => "true" },
@@ -656,8 +668,6 @@ our %get_options=
    'rsync-binary=s'         => \$RSYNC_BINARY,
    'zfs-binary=s'           => \$ZFS_BINARY,
    'exclude-path=s'         => \$EXCLUDE_PATH,
-   'facility=s'             => \$FACILITY,
-   'level=s'                => \$LOG_LEVEL,
    'localhost=s'            => \$LOCALHOST,
    'test!'                  => \$TEST,
    'skipfs=s'               => \@SKIP_FS,
@@ -671,6 +681,9 @@ my $callback_clean = sub { my %t=@_;
                          };
 sub create_dispatcher {
     my ( $IDENT, $FACILITY, $LOG_LEVEL, $LOG_FILE ) = @_;
+    print STDERR Data::Dumper->Dump([$IDENT, $FACILITY, $LOG_LEVEL, $LOG_FILE],
+                                    [qw(ident facility log_level log_file)]) if $DEBUG;
+
     $DISPATCHER = Log::Dispatch->new( callbacks => $callback_clean );
 
     $DISPATCHER->add(
@@ -992,7 +1005,22 @@ sub perform_backups {
 sub perform_backup {
   my $host=shift;
   # to set the pid, may not work correctly
-  create_dispatcher( $APP_NAME, $FACILITY, $LOG_LEVEL, $LOG_FILE );
+  create_dispatcher(
+      $APP_NAME,
+      key_select(
+          'facility',
+          hashref_key_hash( \%DEFAULT_CONFIG, 'default' ),
+          \%CONFIG,    # config file, top level
+          \%CLI_CONFIG
+      ),
+      key_select(
+          'level',
+          hashref_key_hash( \%DEFAULT_CONFIG, 'default' ),
+          \%CONFIG,    # config file, top level
+          \%CLI_CONFIG
+      ),
+      $LOG_FILE
+  );
   my $lock1;
   # store the results of each backup in this hash:
   # like { '/var', 'failure', 1684884888 )
@@ -1575,7 +1603,13 @@ sub log_exit_status {
                  $bh);
   $msg =~ s/\"/\\\"/g;
   if($$bh{host} ne $LOCALHOST) {
-    my $com="ssh -x -o BatchMode=yes $$bh{host} \"logger -t rdbduprunner -p ${FACILITY}.notice '${msg}'\" < /dev/null";
+      my $facility =
+          key_select('facility',
+                     hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                     \%CONFIG, # config file, top level
+                     \%CLI_CONFIG);
+
+    my $com="ssh -x -o BatchMode=yes $$bh{host} \"logger -t rdbduprunner -p ${facility}.notice '${msg}'\" < /dev/null";
     #print $com."\n";
     system($com);
   }
@@ -1869,7 +1903,7 @@ sub parse_config_backups {
                                      $config_definition{'cli'}{fields}),
             keys(%DEFAULT_CONFIG))) {
         # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
-            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs));
+            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility));
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
@@ -2015,7 +2049,14 @@ if(not defined $LOCALHOST) {
 }
 
 
-create_dispatcher( $APP_NAME, $FACILITY, $LOG_LEVEL, $LOG_FILE );
+    create_dispatcher( $APP_NAME,
+                       key_select('facility',
+                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                  \%CLI_CONFIG),
+                       key_select('level',
+                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                  \%CLI_CONFIG),
+                       $LOG_FILE );
 $RUNTIME=time();
 dlog('info','starting',{});
 
@@ -2038,6 +2079,17 @@ unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
 			    -IncludeGlob => 1,
 			    -AutoTrue => 1,
 			    -LowerCaseNames => 1)->getall() or die "unable to parse $CONFIG_FILE";
+
+    create_dispatcher( $APP_NAME,
+                       key_select('facility',
+                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                  \%CONFIG, # config file, top level
+                                  \%CLI_CONFIG),
+                       key_select('level',
+                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                  \%CONFIG, # config file, top level
+                                  \%CLI_CONFIG),
+                       $LOG_FILE );
 if($DUMP) {
   print Dumper \%CONFIG;
 }

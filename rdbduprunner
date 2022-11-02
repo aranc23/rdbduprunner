@@ -240,7 +240,7 @@ the logging verbosity to the terminal for duplicity.
 
 Validity: CLI, Global, BackupDestination, BackupSet
 
-=item I<WholeFile> I<yes|no|on|off|0|1|true|false> {B<--whole-file|--wholefile|--no-whole-file|--no-wholefile>} (rsync only)
+=item C<WholeFile> I<yes|no|on|off|0|1|true|false> {B<--whole-file|--wholefile|--no-whole-file|--no-wholefile>} (rsync only)
 
 When true, pass --whole-file to rsync.
 When false, pass --no-whole-file to rsync.
@@ -249,17 +249,23 @@ Default: false
 
 Validity: CLI, Global, BackupDestination, BackupSet
 
-=item {B<--facility> I<user|daemon|...>}
+=item C<Facility> I<auth|authpriv|cron|daemon|kern|local[0-7]|mail|news|syslog|user|uucp> {B<--facility> I<user|daemon|...>}
+
+Changes the facility as passed to L<Log::Dispatch::Syslog>
 
 Default: user
-Changes the facility as passed to the syslog subsystem.
 
-=item {B<--level> I<debug|info|notice|warning|error|critical|alert|emergency>}
+Validity: CLI, Global
+
+=item C<Level> I<debug|info|notice|warning|error|critical|alert|emergency> {B<--level> I<debug|info|...>}
+
+Syslog minimum severity level which is passed to the logging
+dispatcher. Log messages of the specified severity or greater will be
+logged to syslog, stdout, and the rdbduprunner log file.
 
 Default: info
-Syslog severity level which is passed to the logging dispatcher. Log
-messages of the specified severity or greater will be logged to
-syslog, stdout, and the rdbduprunner log file.
+
+Validity: CLI, Global
 
 =item {B<--maxinc> I<integer>}
 
