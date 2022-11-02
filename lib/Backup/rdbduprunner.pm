@@ -393,6 +393,53 @@ our %DEFAULT_CONFIG = (
         sections => [qw(cli global)],
         match => qr{^(debug|info|notice|warning|error|critical|alert|emergency)$},
     },
+    # duplicity options, so who cares
+    lc "GPGPassPhrase" => {
+        type     => "string",
+        optional => "true",
+        sections => [qw(global backupdestination)],
+    },
+    lc "AWSAccessKeyID" => {
+        type     => "string",
+        optional => "true",
+        sections => [qw(global backupdestination)],
+    },
+    lc "AWSSecretAccessKey" => {
+        type     => "string",
+        optional => "true",
+        sections => [qw(global backupdestination)],
+    },
+    lc "SignKey" => {
+        type     => "string",
+        optional => "true",
+        sections => [qw(global backupdestination)],
+    },
+    lc "EncryptKey" => {
+        type     => "string",
+        optional => "true",
+        sections => [qw(global backupdestination)],
+    },
+
+    # uses --bwlimit on rsync and trickly binary on others:
+    lc "Trickle" => {
+        getopt   => 'trickle=i',
+        type     => "integer",
+        optional => "true",
+        "min"    => 1,
+        sections => [qw(cli global backupdestination backupset)],
+    },
+
+    # zfs options
+    lc "ZfsCreate" => {
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(global backupdestination)],
+        },
+    lc "ZfsSnapshot" => {
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(global backupdestination)],
+    },
             # defaultbackupdestination =>
             #     { type => "string", optional => "true" },
             # maxwait =>
@@ -415,18 +462,9 @@ our %DEFAULT_CONFIG = (
             # { type => "string", optional => "true" },
             #  useagent =>
             # { type => "valid(truefalse)", optional => "true" },
-            # wholefile =>
-            # { type => "valid(truefalse)", optional => "true" },
             # tempdir =>
             # { type => "string", optional => "true" },
             # # these are duplicity options:
-            # lc "GPGPassPhrase" => { type => "string", optional => "true" },
-            # lc "AWSAccessKeyID" => { type => "string", optional => "true" },
-            # lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
-            # lc "SignKey" => { type => "string", optional => "true" },
-            # lc "EncryptKey" => { type => "string", optional => "true" },
-            # # uses --bwlimit on rsync and trickle binary on others:
-            # lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
 );
 
 our %config_definition = (
@@ -494,14 +532,6 @@ our %config_definition = (
             },
             maxage =>
             { type => "string", optional => "true" },
-            zfscreate => {
-                type => "valid(truefalse)",
-                optional => "true"
-            },
-            zfssnapshot => {
-                type => "valid(truefalse)",
-                optional => "true"
-            },
             prerun => {
                 type => "string",
                 optional => "true",
@@ -543,23 +573,8 @@ our %config_definition = (
                 max      => 100,
                 optional => "true",
             },
-            zfscreate => {
-                type => "valid(truefalse)",
-                optional => "true"
-            },
-            zfssnapshot => {
-                type => "valid(truefalse)",
-                optional => "true"
-            },
             allowfs =>
             { type => "list?(string)", optional => "true" },
-            lc "GPGPassPhrase" => { type => "string", optional => "true" },
-            lc "AWSAccessKeyID" => { type => "string", optional => "true" },
-            lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
-            lc "SignKey" => { type => "string", optional => "true" },
-            lc "EncryptKey" => { type => "string", optional => "true" },
-            # uses --bwlimit on rsync and trickly binary on others:
-            lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
         },
     },
     truefalse => {
@@ -601,14 +616,6 @@ our %config_definition = (
             { type => "valid(truefalse)", optional => "true" },
             tempdir =>
             { type => "string", optional => "true" },
-            # these are duplicity options:
-            lc "GPGPassPhrase" => { type => "string", optional => "true" },
-            lc "AWSAccessKeyID" => { type => "string", optional => "true" },
-            lc "AWSSecretAccessKey" => { type => "string", optional => "true" },
-            lc "SignKey" => { type => "string", optional => "true" },
-            lc "EncryptKey" => { type => "string", optional => "true" },
-            # uses --bwlimit on rsync and trickly binary on others:
-            lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
         },
     },
 );
@@ -1909,18 +1916,6 @@ sub parse_config_backups {
             $$bh{$key} = $v if defined $v;
         }
         print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
-        # I don't see how these are being added to the command line options:
-        foreach my $var (sort(map(lc,qw( GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot )))) {
-          unless (defined $$bh{$var}) {
-            if (defined $CONFIG{$var}) {
-              $$bh{$var}=$CONFIG{$var};
-            }
-            if (defined $CONFIG{backupdestination}{$$bh{backupdestination}}{$var}) {
-              # the above is why people hate perl, possibly
-              $$bh{$var}=$CONFIG{backupdestination}{$$bh{backupdestination}}{$var};
-            }
-          }
-        }
         my @split_host = split(/\./,$$bh{host});
         $$bh{'src'} = ($$bh{host} eq $LOCALHOST or $split_host[0] eq $LOCALHOST ) ? $$bh{path} : $$bh{host}.($$bh{btype} eq 'rsync' ? ':' : '::').$$bh{path};
         dlog('debug','backup',$bh);
