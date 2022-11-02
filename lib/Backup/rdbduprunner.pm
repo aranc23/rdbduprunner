@@ -363,6 +363,13 @@ our %DEFAULT_CONFIG = (
         default  => 0,
         sections => [qw(cli global backupdestination backupset)],
     },
+    # seems specific to rdiff-backup, where compression is enabled by default:
+    'sshcompress' => {
+        getopt   => 'sshcompress!',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    }
             # maxprocs =>
             #     { type => "integer", min => 1, optional => "true" },
             # defaultbackupdestination =>
