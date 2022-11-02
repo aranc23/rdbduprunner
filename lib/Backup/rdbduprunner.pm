@@ -393,8 +393,6 @@ our %DEFAULT_CONFIG = (
         sections => [qw(cli global)],
         match => qr{^(debug|info|notice|warning|error|critical|alert|emergency)$},
     },
-            # maxprocs =>
-            #     { type => "integer", min => 1, optional => "true" },
             # defaultbackupdestination =>
             #     { type => "string", optional => "true" },
             # maxwait =>
@@ -575,8 +573,6 @@ our %config_definition = (
     global => {
         type   => 'struct',
         fields => {
-            maxprocs =>
-                { type => "integer", min => 1, optional => "true" },
             defaultbackupdestination =>
                 { type => "string", optional => "true" },
             maxwait =>
