@@ -310,6 +310,8 @@ our @BACKUPS;
 our @INCREMENTS;
 
 our %DEFAULT_CONFIG = (
+    # this affects what is logged as well as output to the terminal so
+    # setting it everywhere seems acceptable:
     'stats' => {
         default  => 1,
         getopt   => 'stats!',
@@ -337,31 +339,34 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli global backupdestination backupset)],
     },
+    # because this affects the log output of rdiff-backup it should be
+    # settable across levels
     'verbosity' => {
         getopt   => 'verbosity=i',
         type     => "integer",
         optional => "true",
         sections => [qw(cli global backupdestination backupset)],
     },
+    # only used on rdiff-backup, only affects terminal output
     'terminalverbosity' => {
         getopt   => 'terminalverbosity|tverbosity|t|terminal-verbosity=i',
         type     => "integer",
         optional => "true",
-        sections => [qw(cli global backupdestination backupset)],
+        sections => [qw(cli)],
     },
     'verbose' => {
         getopt   => 'verbose|v!',
         type     => "valid(truefalse)",
         optional => "true",
         default  => 0,
-        sections => [qw(cli global backupdestination backupset)],
+        sections => [qw(cli)],
     },
     'progress' => {
         getopt   => 'progress!',
         type     => "valid(truefalse)",
         optional => "true",
         default  => 0,
-        sections => [qw(cli global backupdestination backupset)],
+        sections => [qw(cli)],
     },
     # seems specific to rdiff-backup, where compression is enabled by default:
     'sshcompress' => {
