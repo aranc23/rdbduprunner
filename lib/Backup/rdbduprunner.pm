@@ -2384,6 +2384,19 @@ sub hashref_key_array_match {
     return $h;
 }
 
+sub dtruefalse {
+    my $h = shift;
+    croak "dtrue needs a hashref" unless reftype $h eq reftype {};
+    my $k = shift;
+    if ( defined $$h{$k} and $$h{$k} ) {
+        return 1;
+    }
+    if ( defined $$h{$k} and not $$h{$k} ) {
+        return 0;
+    }
+    return;
+}
+
 # Preloaded methods go here.
 
 # Autoload methods go after =cut, and are processed by the autosplit program.

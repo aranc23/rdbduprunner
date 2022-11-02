@@ -83,4 +83,22 @@ is( Backup::rdbduprunner::hashref_key_array_match(
         'cat' => { other => 'infoc', listy => ['left','right','up'] },
     },
     "righty");
+
+is( Backup::rdbduprunner::dtruefalse(
+    { k => 1 },
+    'k'),
+    1,
+    "dtruefalse: 1");
+
+is( Backup::rdbduprunner::dtruefalse(
+    { k => 0 },
+    'k'),
+    0,
+    "dtruefalse: 0");
+is( Backup::rdbduprunner::dtruefalse(
+    { k => 0 },
+    'q'),
+    undef,
+    "dtruefalse: undef");
+
 done_testing;
