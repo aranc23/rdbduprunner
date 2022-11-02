@@ -34,19 +34,19 @@ rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
 
 B<rdbduprunner> {B<-h|--help>}
 
-B<rdbduprunner> {B<--calculate-average>|B<--check>|B<--cleanup>|B<--compare>|B<--verify>|B<--dry-run>|B<--checksum>|B<--dump>|B<--list>|B<--list-oldest>|B<--orphans>|B<--remove-oldest>|B<--status>|B<--tidy>} {B<--test>|B<--notest>} {B<--config> I<path>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>} {B<--facility> I<user|daemon|...>} {B<--level> I<info|warn|...>} {B<--lockfile> I<path>} {B<-t|--terminal-verbosity> I<integer>} {B<--verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--maxinc> I<integer>} {B<--maxage> I<timespec>}  {B<--tempdir> I<path>} {B<--full>} {B<--force>} {B<--maxprocs> I<integer>} {B<--maxwait> I<integer>} =item {B<--allow-source-mismatch>} {B<-n|--dry-run>} {B<-c|--checksum|--no-checksum>} {B<--inplace>|B<--no-inplace>} {B<--whole-file>|B<--no-whole-file>} {B<--stats>|B<--nostats>} {B<--skipfs> I<filesystem>} {B<--allowfs> I<filesystem>}
+B<rdbduprunner> {B<--calculate-average|--check|--cleanup|--compare|--verify|--dump|--list|--list-oldest|--orphans|--remove-oldest|--status|--tidy|--status-json|--status-delete=I<backup>>} {B<-t|--terminal-verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--full>} {B<--force>} {B<--allow-source-mismatch>} {B<-n|--dry-run>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>}
 
 =head1 DESCRIPTION
 
 rdbduprunner is a wrapper for rsync, rdiff-backup, and duplicity
-backups.  By default rdbduprunner will get all it's configuration from
-~/.rdbduprunner.rc using an apache-esque config file format parsed by
-the Config::General module.
+backups.  rdbduprunner will look for configuration files in a short
+list of standard locations as detailed under FILES.  These files are
+parsed by Config::General which supports an Apache-like config file.
 
 General usage involves running rdbduprunner with no options which will
 only print out warnings and the commands that would be invoked if you
 were to run it with the --notest option. Then run it again with the
---notest option to see the output.
+--notest option to actually perform the backups
 
 Other common options involve filtering which backups to run, adjusting
 the verbosity of the output, adjusting logging, and so on.
@@ -75,7 +75,7 @@ rdbduprunner "forget" about them.  Does not change in any way what
 rdbduprunner will back up in the future, only alters the status
 database used by monitoring tools (cmk).
 
-IE: rdbduprunner --status-delete /local/
+IE: rdbduprunner --status-delete /local/ --status-delete /home/
 
 Can be specified multiple times.
 
@@ -146,20 +146,25 @@ specified backups.
 
 =back
 
-=head2 SUB OPTIONS
+=head2 COMMAND LINE ONLY OPTIONS
+
+Some options do not have equivalent configuration file parameters,
+those are documented below.  Many parameters can be configured via
+command line and config file and those are documented in the following
+sections.
 
 =over 4
 
 =item {B<--test>|B<--notest>}
 
 The default invocation assumes --test which causes rdbduprunner to
-print which commands it would run.  Passing --notest will cause
-rdbduprunner to actually run the backup commands.
+print which commands it would run without running them.  Passing
+--notest will cause rdbduprunner to run the backup commands.
 
 =item {B<--dest> I<regex>}
 
 This option causes the backups to be run to be filtered based on the
-BackupDestination.
+name of the BackupDestination.
 
 =item {B<--host> I<regex>}
 
@@ -171,14 +176,9 @@ Host.
 This option causes the backups to be run to be filtered based on the
 path on the host to be backed up.
 
-=item {B<-t|--terminal-verbosity> I<integer>}
+=item {B<-t|--terminal-verbosity> I<integer>} (rdiff-backup only)
 
-Increases logging verbosity to the terminal with rdiff-backup or
-duplicity backups.
-
-=item {B<--verbosity> I<integer>}
-
-Increases logging verbosity to the rdiff-backup/duplicity log files.
+Increases logging verbosity to the terminal with rdiff-backup.
 
 =item {B<-v|--verbose>} (rsync only)
 
@@ -187,6 +187,67 @@ Passes -v to rsync invocations.
 =item {B<--progress>} (rsync only)
 
 Passes --progress to rsync invocations.
+
+=item {B<--full>} (duplicity only)
+
+Passess the full option to duplicity backup.
+
+=item {B<--force>} (duplicity only)
+
+Passess the --force option to duplicity cleanup mode.
+
+=item {B<--config> I<path>}
+
+Change path to configuration file.
+
+=item {B<--allow-source-mismatch>} (duplicity only)
+
+Passes the identical option to duplicity.  No affect on other backup
+types.
+
+=item {B<-n|--dry-run>} (rsync and duplicity only)
+
+Passes the --dry-run option to rsync or duplicity.  rdbduprunner will
+not run the prerun, postrun or zfs create and zfs snapshot commands
+(when applicable.)  rdiff-backup does not have a dry-run option.
+
+
+=back
+
+=head2 CONFIGURATION FILE PARAMETERS
+
+Configuration files for rdbduprunner have 3 sections: global options,
+backupsets and backupdestinations.  Many configuration parameters are
+valid at the top level and inside backups and backupdestination
+defintions.
+
+For an overview of the configuration file format see the L</FILES> section.
+
+=over 4
+
+=item C<Stats> I<yes|no|on|off|0|1|true|false> {B<--stats|--no-stats>}
+
+All backup binaries supported by rdbduprunner have the option to
+produce some kind of statistics after a run.  Setting this to false
+will turn those options off.
+
+Default: true
+
+=item C<Verbosity> I<Integer> {B<--verbosity> I<integer>} (rdiff-backup and duplicity)
+
+Increases logging verbosity to the rdiff-backup log file and adjusts
+the logging verbosity to the terminal for duplicity.
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
+=item I<WholeFile> I<yes|no|on|off|0|1|true|false> {B<--whole-file|--wholefile|--no-whole-file|--no-wholefile>} (rsync only)
+
+When true, pass --whole-file to rsync.
+When false, pass --no-whole-file to rsync.
+
+Default: false
+
+Validity: CLI, Global, BackupDestination, BackupSet
 
 =item {B<--facility> I<user|daemon|...>}
 
@@ -212,28 +273,12 @@ Acts as if the MaxAge config option were applied to every backup in
 the configuration, but the backup specific MaxAge still takes
 precendence for any given backup.
 
-=item {B<--stats>|B<--nostats>|B<--no-stats>}
-
-Corresponds to and supersedes the Stats configuration item, see below.
-
 =item {B<--tempdir> I<path>}
 
 Pass the --tempdir or --temp-dir options to underlying binaries in the
 same manner as if the TempDir global config option had been specified.
 
-=item {B<--full>} (duplicity only)
-
-Passess the full option to duplicity backup.
-
-=item {B<--force>} (duplicity only)
-
-Passess the --force option to duplicity cleanup mode.
-
-=item {B<--config> I<path>}
-
-Change path to configuration file.
-
-=item {B<--maxprocs> I<integer>}
+=item {B<--maxprocs> I<integer>} {C<maxprocs> = I<integer>}
 
 Default: 1
 Maximum number of simultaneous backups to perform.  rdbduprunner will
@@ -247,23 +292,6 @@ Default: 86400
 Maximum number of seconds to wait for a lock on any given per-host
 lock file.
 See MaxWait global config option.
-
-=item {B<--allow-source-mismatch>} (duplicity only)
-
-Passes the identical option to duplicity.  No affect on other backup
-types.
-
-=item {B<-n|--dry-run>} (rsync only)
-
-Passes the --dry-run (-n) option to rsync.  rdbduprunner will not run
-the prerun, postrun or zfs create and zfs snapshot commands (when
-applicable.)
-
-=item {B<--whole-file|--wholefile|--no-whole-file|--no-wholefile>} (rsync only)
-
-Passes the --whole-file or --no-whole-file options to rsync.  This
-supersedes the WholeFile configuration boolean specified in the config
-file.
 
 =item {B<--inplace|--no-inplace|--noinplace> - Boolean (true|t|yes|on|1), optional, rsync only
 
@@ -302,6 +330,10 @@ types specified this way will be included during inventory.
 
 =head1 FILES
 
+=head2 F<$HOME/.local/state/rdbduprunner.pid> F</var/run/rdbduprunner.pid>
+
+Default PID/lock file.
+
 =head2 F<$HOME/.config/rdbduprunner/config> F</etc/rdbduprunner/rdbduprunner.conf>
 
 rdbduprunner's config file is an Apache style config file parsed by
@@ -310,9 +342,22 @@ options enclosed in a BackupDestination config section and options
 enclosed in a BackupSet section.  The options names are case
 insensitive. Options are generally honored in this order:
 
-=head2 F<$HOME/.local/state/rdbduprunner.pid> F</var/run/rdbduprunner.pid>
+The precendence is as follows:
 
-Default PID/lock file.
+=over 2
+
+=item Command Line Options
+
+=item BackupSet
+
+=item BackupDestination
+
+=item Global Options
+
+=item Defaults
+
+=back
+
 
 =over 4
 
@@ -361,19 +406,6 @@ Only inventory filesystems matching filesystem types specified via
 this option.  Can be specified multiple times.  Can also be specified
 at the BackupSet level.
 
-=item I<WholeFile> - Boolean (default: false)
-
-When true, pass --whole-file to rsync.
-When false, pass --no-whole-file to rsync.
-
-Can be specified at the BackupDestination and BackupSet levels as
-well, which will override the global setting.
-
-=item I<Stats> - Boolean (default: true)
-
-Most backup binaries supported by rdbduprunner have the option to
-produce some kind of statistics after a run.  Setting this to false
-will turn those options off.
 
 =back
 
@@ -535,6 +567,8 @@ with later entries superseding the prior level. This assumes that the
 option itself is applicable all the way down to the individual
 invocations of the backup software.
 
+=over 4
+
 =item Global Configuration
 
 =item BackupDestination
@@ -542,6 +576,8 @@ invocations of the backup software.
 =item BackupSet
 
 =item Command Line Options
+
+=back
 
 =head1 AUTHOR
 
@@ -553,6 +589,6 @@ Aran Cox <arancox@gmail.com>
 
 =over 4
 
-rdiff-backup(1), duplicity(1), rsync(1), trickle(1), ssh(1), unison(1).
+L<rdiff-backup(1)>, L<duplicity(1)>, L<rsync(1)>, L<trickle(1)>, L<ssh(1)>, L<unison(1)>.
 
 =back
