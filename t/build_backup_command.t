@@ -32,7 +32,7 @@ use Data::Dumper;
         verbosity         => 5,
         terminalverbosity => 9,
     };
-    {
+    { # disabled backup
         local $bh = $bh;
         $$bh{disabled} = 1;
         is( build_backup_command($bh),
@@ -40,11 +40,14 @@ use Data::Dumper;
             "disabled backup",
         );
     }
+    # start of "busted backup destination this check is right but wrong"
     %CONFIG = ( 'default' => { 'busted' => 1 });
     is( build_backup_command($bh),
         undef,
         "busted backup destination this check is right but wrong"
     );
+
+    # start of "full duplicity"
     $$bh{btype} = 'duplicity';
     $FULL = 1;
     $USEAGENT = 1;
@@ -57,6 +60,8 @@ use Data::Dumper;
     is([build_backup_command($bh)],
        [qw(duplicity --verbosity 5 full --use-agent --allow-source-mismatch --no-print-statistics --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "full duplicity");
+
+    # start of "not-full duplicity with extra opts"
     $$bh{signkey} = '0x400';
     $$bh{encryptkey} = 'aran';
     $$bh{stats} = 1;
@@ -64,26 +69,39 @@ use Data::Dumper;
     is([build_backup_command($bh)],
        [qw(duplicity --verbosity 5 --use-agent --allow-source-mismatch --sign-key 0x400 --encrypt-key aran --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "not-full duplicity with extra opts");
+
+    # start of "rdiff-backup"
     $$bh{btype} = 'rdiff-backup';
     $$bh{stats} = 0;
     $RDIFF_BACKUP_BINARY = 'rdiff-backup';
     is([build_backup_command($bh)],
        [qw(rdiff-backup --verbosity 5 --terminal-verbosity 9 --exclude-device-files --exclude-other-filesystems --no-eas --ssh-no-compression --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "rdiff-backup");
+
+    # start of "rdiff-backup with stats"
     $$bh{sshcompress} = 1;
     $$bh{stats} = 1;
     is([build_backup_command($bh)],
        [qw(rdiff-backup --verbosity 5 --terminal-verbosity 9 --exclude-device-files --exclude-other-filesystems --no-eas --print-statistics --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "rdiff-backup with stats");
+
+    # start of "rdiff-backup with stats and disable ssh compression"
+    $$bh{sshcompress} = 0;
+    is([build_backup_command($bh)],
+       [qw(rdiff-backup --verbosity 5 --terminal-verbosity 9 --exclude-device-files --exclude-other-filesystems --no-eas --ssh-no-compression --print-statistics --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       "rdiff-backup with stats and disable ssh compression");
+
+    # start of "rsync"
     $$bh{btype} = 'rsync';
     $$bh{checksum} = 1;
     $$bh{trickle} = 4;
     $$bh{stats} = 0;
-    
+    $$bh{sshcompress} = 1;
+
     $DRYRUN = 1;
     $RSYNC_BINARY='rsync';
     $LOG_DIR = '/var/log';
-    
+
     is([build_backup_command($bh)],
        [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --dry-run --checksum --sparse --bwlimit=4 -z --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "rsync dry-run");
