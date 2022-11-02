@@ -827,6 +827,9 @@ sub build_backup_command {
   if($$bh{btype} eq 'duplicity') {
     @com=($DUPLICITY_BINARY);
     $FULL and push(@com,'full');
+    if($DRYRUN) {
+      push(@com,'--dry-run');
+    }
     $USEAGENT and push(@com,'--use-agent');
     $ALLOWSOURCEMISMATCH and push(@com,'--allow-source-mismatch');
     if(defined $$bh{signkey}) {
