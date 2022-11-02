@@ -98,7 +98,6 @@ $EXCLUDE_PATH
 %config_definition
 @SKIP_FS
 @STATUS_DELETE
-$MAXPROCS
 $MAXWAIT
 $SKIP_FS_REGEX
 $STATUS_JSON
@@ -243,7 +242,6 @@ our @CONFIG_FILES =
     );
 
 our $TEST=1;
-our $MAXPROCS;
 our $MAXWAIT; # sleep no longer than this value (in seconds)
 our %children; # store children for master backup loop
 our $RUNTIME; # storing the start time so we can calculate run time
@@ -374,7 +372,15 @@ our %DEFAULT_CONFIG = (
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli global backupdestination backupset)],
-    }
+    },
+    'maxprocs' => {
+        getopt   => 'maxprocs=i',
+        type     => "integer",
+        optional => "true",
+        min      => 1,
+        default  => 1,
+        sections => [qw(cli global)],
+    },
             # maxprocs =>
             #     { type => "integer", min => 1, optional => "true" },
             # defaultbackupdestination =>
@@ -656,7 +662,6 @@ our %get_options=
    'test!'                  => \$TEST,
    'skipfs=s'               => \@SKIP_FS,
    'allowfs=s'              => \@ALLOW_FS,
-   'maxprocs=i'             => \$MAXPROCS,
    'maxwait=i'              => \$MAXWAIT,
   );
 
@@ -953,7 +958,12 @@ sub perform_backups {
       debug("waitpid returned child ${pid}");
       delete $children{$pid};
     }
-    while ( scalar(keys(%children)) < $MAXPROCS and scalar(keys(%BACKUPS)) > 0 ) {
+    my $maxprocs = key_select('maxprocs',
+                              hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                              \%CONFIG, # config file, top level
+                              \%CLI_CONFIG);
+    while ( scalar(keys(%children)) < $maxprocs
+            and scalar(keys(%BACKUPS)) > 0 ) {
       my $host=(keys %BACKUPS)[0];
       my $list=$BACKUPS{$host};
       debug("about to spawn sub-process for ${host}");
@@ -1859,7 +1869,7 @@ sub parse_config_backups {
                                      $config_definition{'cli'}{fields}),
             keys(%DEFAULT_CONFIG))) {
         # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
-            next KEY if string_any($key, qw(path defaultbackupdestination type ));
+            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs));
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
@@ -2090,14 +2100,6 @@ if(not defined $TEMPDIR) {
   if(defined $CONFIG{tempdir}) {
     $TEMPDIR=$CONFIG{tempdir};
   }
-}
-
-if(not defined $MAXPROCS) {
-    if(defined $CONFIG{maxprocs}) {
-	$MAXPROCS=$CONFIG{maxprocs};
-    } else {
-	$MAXPROCS=1;
-    }
 }
 
 if(not defined $MAXWAIT) {
