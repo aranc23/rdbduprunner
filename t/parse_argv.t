@@ -30,8 +30,6 @@ sub big_globals {
         'orphans'               => $ORPHANS,
         'status_json'           => $STATUS_JSON,
         'status_delete'         => \@STATUS_DELETE,
-        'force'                 => $FORCE,
-        'full'                  => $FULL,
         'maxage'                => $MAXAGE,
         'maxinc'                => $MAXINC,
         'u'                     => $USEAGENT,
@@ -68,8 +66,6 @@ my $defaults = {
     'orphans'               => 0,
     'status_json'           => undef,
     'status_delete'         => [],
-    'force'                 => 0,
-    'full'                  => 0,
     'maxage'                => undef,
     'maxinc'                => undef,
     'u'                     => undef,
@@ -228,10 +224,12 @@ my $defaults = {
          maxprocs => 2,
          facility => 'daemon',
          level => 'debug',
+         force => 1,
+         full => 1,
      },
         "nothing passed");
 
-    for(qw(calculate-average cleanup check verify compare dump list-oldest remove-oldest status tidy list orphans status_json allow-source-mismatch dryrun force full u)) {
+    for(qw(calculate-average cleanup check verify compare dump list-oldest remove-oldest status tidy list orphans status_json allow-source-mismatch dryrun u)) {
         $$defaults{$_} = 1;
     }
     $$defaults{'status_delete'} = [qw(pork)];
