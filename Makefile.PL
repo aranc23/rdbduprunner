@@ -22,7 +22,8 @@ WriteMakefile(
         'Log::Dispatch::Syslog' => 0,
         'Log::Dispatch::File' => 0,
         'Hash::Merge' => 0,
-        'Clone' => 1,
+        'Clone' => 0,
+        'Carp' => 0,
     },
     ABSTRACT_FROM     => 'lib/Backup/rdbduprunner.pm', # retrieve abstract from module
     AUTHOR            => 'Aran Cox <arancox@gmail.com>',

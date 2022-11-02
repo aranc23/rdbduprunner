@@ -38,6 +38,7 @@ use Config::Validator;
 use Config::Any;
 use Hash::Merge qw(merge);
 use Clone qw(clone);
+use Carp;
 #from a standard perl distribution, on UNIX at least
 use Pod::Usage;
 
