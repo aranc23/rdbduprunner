@@ -105,13 +105,11 @@ $LISTOLDEST
 $REMOVE
 $ORPHANS
 $CLEANUP
-$FORCE
 $DEST
 $HOST
 $PATH
 $MAXAGE
 $MAXINC
-$FULL
 $DRYRUN
 $RSYNC_BINARY
 $ALLOWSOURCEMISMATCH
@@ -188,8 +186,6 @@ our $TIDY=0;
 our $LIST=0;
 our $ORPHANS=0;
 # the following affect what options are passed to rdiff-backup and/or duplicity
-our $FORCE=0;
-our $FULL=0;
 our $MAXAGE;
 our $MAXINC;
 our $USEAGENT;
@@ -440,6 +436,18 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(global backupdestination)],
     },
+    'full' => {
+        getopt   => 'full!',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    'force' => {
+        getopt   => 'force!',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
             # defaultbackupdestination =>
             #     { type => "string", optional => "true" },
             # maxwait =>
@@ -649,8 +657,6 @@ our %get_options=
    'status_json|status-json!'       => \$STATUS_JSON,
    'status_delete|status-delete=s@' => \@STATUS_DELETE,
    # the following affect what options are passed to rdiff-backup and/or duplicity
-   'force!'                 => \$FORCE,
-   'full'                   => \$FULL,
    'maxage=s'               => \$MAXAGE,
    'maxinc=s'               => \$MAXINC,
    'u|use-agent!'           => \$USEAGENT,
@@ -847,7 +853,7 @@ sub build_backup_command {
 
   if($$bh{btype} eq 'duplicity') {
     @com=($DUPLICITY_BINARY);
-    $FULL and push(@com,'full');
+    push(@com,'full') if dtruefalse(\%CLI_CONFIG, 'full');
     if($DRYRUN) {
       push(@com,'--dry-run');
     }
@@ -1906,7 +1912,7 @@ sub parse_config_backups {
                                      $config_definition{'cli'}{fields}),
             keys(%DEFAULT_CONFIG))) {
         # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
-            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility));
+            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full));
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
@@ -2224,9 +2230,7 @@ elsif($ORPHANS) {
         if($$bh{btype} eq 'duplicity') {
             push(@com,$DUPLICITY_BINARY,'cleanup');
             $USEAGENT and push(@com,'--use-agent');
-            if($FORCE) {
-                push(@com,'--force');
-            }
+            push(@com,'--force') if dtruefalse(\%CLI_CONFIG, 'force');
         } elsif($$bh{btype} eq 'rdiff-backup') {
             push(@com,$RDIFF_BACKUP_BINARY,'--check-destination-dir');
         }
