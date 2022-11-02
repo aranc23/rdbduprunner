@@ -460,10 +460,6 @@ our %DEFAULT_CONFIG = (
             # { type => "string", optional => "true" },
             # zfsbinary =>
             # { type => "string", optional => "true" },
-            # verbosity =>
-            # { type => "integer", optional => "true" },
-            # terminalverbosity =>
-            # { type => "integer", optional => "true" },
             # allowfs =>
             # { type => "list?(string)", optional => "true" },
             # 'excludepath' =>
