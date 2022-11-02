@@ -12,6 +12,7 @@ use Test2::V0;
 use Backup::rdbduprunner qw(:all);
 
 use Data::Dumper;
+use Hash::Merge qw(merge);
 
 sub big_globals {
     return {
@@ -146,9 +147,19 @@ my $defaults = {
 };
 
 {
-    $config_definition{cli} = { type => "struct",
-                                fields => hashref_keys_drop(\%DEFAULT_CONFIG,'default','getopt'),
-                            };
+    for my $section (qw(cli global backupdestination backupset)) {
+        $config_definition{$section}{fields} = merge(
+            $config_definition{$section}{fields},
+            hashref_keys_drop(
+                hashref_key_array_match(\%DEFAULT_CONFIG,
+                                        'sections',
+                                        $section),
+                'default',
+                'getopt',
+                'sections')
+        );
+    }
+
     my $cv = Config::Validator->new(%config_definition);
     my @options = hashref_key_array(\%DEFAULT_CONFIG,
                                     'getopt');

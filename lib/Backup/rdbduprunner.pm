@@ -36,7 +36,7 @@ use Fatal qw( :void open close link unlink symlink rename fork );
 use Config::General;
 use Config::Validator;
 use Config::Any;
-use Hash::Merge;
+use Hash::Merge qw(merge);
 use Clone qw(clone);
 #from a standard perl distribution, on UNIX at least
 use Pod::Usage;
@@ -128,6 +128,7 @@ $ALLOWSOURCEMISMATCH
 %CLI_CONFIG
 &hashref_keys_drop
 &hashref_key_array
+&hashref_key_array_match
  ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -313,45 +314,53 @@ our %DEFAULT_CONFIG = (
         getopt   => 'stats!',
         type     => "valid(truefalse)",
         optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
     },
     'wholefile' => {
         'getopt' => 'wholefile|whole-file|whole_file!',
         type     => "valid(truefalse)",
         optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
     },
     'inplace' => {
         getopt   => 'inplace!',
         type     => "valid(truefalse)",
         default  => strftime( '%w', localtime( time() ) ) == 0 ? 0 : 1,
         optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
     },
     'checksum' => {
         getopt   => 'checksum|c!',
         type     => "valid(truefalse)",
         default  => 0,
         optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
     },
     'verbosity' => {
         getopt   => 'verbosity=i',
         type     => "integer",
         optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
     },
     'terminalverbosity' => {
         getopt   => 'terminalverbosity|tverbosity|t|terminal-verbosity=i',
         type     => "integer",
         optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
     },
     'verbose' => {
         getopt   => 'verbose|v!',
         type     => "valid(truefalse)",
         optional => "true",
         default  => 0,
+        sections => [qw(cli global backupdestination backupset)],
     },
     'progress' => {
         getopt   => 'progress!',
         type     => "valid(truefalse)",
         optional => "true",
         default  => 0,
+        sections => [qw(cli global backupdestination backupset)],
     },
             # maxprocs =>
             #     { type => "integer", min => 1, optional => "true" },
@@ -429,8 +438,6 @@ our %config_definition = (
                 type => "string",
                 optional => "true",
             },
-            wholefile =>
-            { type => "valid(truefalse)", optional => "true" },
             # required if inventory is false
             path =>
             { type => "list?(string)", optional => "true" },
@@ -449,8 +456,6 @@ our %config_definition = (
                 optional => "true"
             },
 
-            # only valid for rsync types
-            inplace => { type => "valid(truefalse)", optional => "true" },
             # only valid for duplicity/rdiff-backup types
             maxinc => {
                 type     => "integer",
@@ -474,22 +479,6 @@ our %config_definition = (
             },
             postrun => {
                 type => "string",
-                optional => "true",
-            },
-            'stats' => {
-                type     => "valid(truefalse)",
-                optional => "true",
-            },
-            'wholefile' => {
-                type     => "valid(truefalse)",
-                optional => "true",
-            },
-            'inplace' => {
-                type   => "valid(truefalse)",
-                optional => "true",
-            },
-            'checksum' => {
-                type     => "valid(truefalse)",
                 optional => "true",
             },
         },
@@ -542,29 +531,17 @@ our %config_definition = (
             lc "EncryptKey" => { type => "string", optional => "true" },
             # uses --bwlimit on rsync and trickly binary on others:
             lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
-            'stats' => {
-                type     => "valid(truefalse)",
-                optional => "true",
-            },
-            'wholefile' => {
-                type     => "valid(truefalse)",
-                optional => "true",
-            },
-            'inplace' => {
-                type   => "valid(truefalse)",
-                optional => "true",
-            },
-            'checksum' => {
-                type     => "valid(truefalse)",
-                optional => "true",
-            },
         },
     },
     truefalse => {
         type => 'string',
         match => qr{^(?:on|off|true|false|0|1|yes|no)$}xmsi,
     },
-    default => {
+    cli => {
+        type   => 'struct',
+        fields => { },
+    },
+    global => {
         type   => 'struct',
         fields => {
             maxprocs =>
@@ -589,17 +566,11 @@ our %config_definition = (
             { type => "string", optional => "true" },
             zfsbinary =>
             { type => "string", optional => "true" },
-            verbosity =>
-            { type => "integer", optional => "true" },
-            terminalverbosity =>
-            { type => "integer", optional => "true" },
             allowfs =>
             { type => "list?(string)", optional => "true" },
             excludepath =>
             { type => "string", optional => "true" },
              useagent =>
-            { type => "valid(truefalse)", optional => "true" },
-            wholefile =>
             { type => "valid(truefalse)", optional => "true" },
             tempdir =>
             { type => "string", optional => "true" },
@@ -611,22 +582,6 @@ our %config_definition = (
             lc "EncryptKey" => { type => "string", optional => "true" },
             # uses --bwlimit on rsync and trickly binary on others:
             lc "Trickle" => { type => "integer", optional => "true", "min" => 1 },
-            'stats' => {
-                type     => "valid(truefalse)",
-                optional => "true",
-            },
-            'wholefile' => {
-                type     => "valid(truefalse)",
-                optional => "true",
-            },
-            'inplace' => {
-                type   => "valid(truefalse)",
-                optional => "true",
-            },
-            'checksum' => {
-                type     => "valid(truefalse)",
-                optional => "true",
-            },
         },
     },
 );
@@ -1990,9 +1945,19 @@ sub make_dirs {
 sub rdbduprunner {
 
     make_dirs();
-    $config_definition{cli} = { type => "struct",
-                                fields => hashref_keys_drop(\%DEFAULT_CONFIG,'default','getopt'),
-                            };
+    for my $section (qw(cli global backupdestination backupset)) {
+        $config_definition{$section}{fields} = merge(
+            $config_definition{$section}{fields},
+            hashref_keys_drop(
+                hashref_key_array_match(\%DEFAULT_CONFIG,
+                                        'sections',
+                                        $section),
+                'default',
+                'getopt',
+                'sections')
+        );
+    }
+
     print STDERR Dumper \%config_definition if $DEBUG;
 
     my $config_validator = Config::Validator->new(%config_definition);
@@ -2050,7 +2015,7 @@ unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
 if($DUMP) {
   print Dumper \%CONFIG;
 }
-    $config_validator->validate(\%CONFIG,'default');
+    $config_validator->validate(\%CONFIG,'global');
 
 # set some global options using the config file global options???
 if(not defined $DUPLICITY_BINARY) {
@@ -2404,6 +2369,18 @@ sub hashref_key_filter_array {
     }
     print STDERR Data::Dumper->Dump([\%a],[qw(hashref_key_filter_array)]) if $DEBUG;
     return keys(%a);
+}
+
+# return cloned hash of hashes consiting of keys where given hash
+# values contain an arrayref which contains value
+sub hashref_key_array_match {
+    my $h = clone(shift);
+    my $key = shift;
+    my $value = shift;
+    for my $k (keys(%{$h})) {
+        delete $$h{$k} unless string_any($value,@{$$h{$k}{$key}});
+    }
+    return $h;
 }
 
 # Preloaded methods go here.

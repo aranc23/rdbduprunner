@@ -68,4 +68,19 @@ is( [sort(Backup::rdbduprunner::hashref_key_filter_array(
     ))],
     [sort(qw(bob cat))],
 );
+
+is( Backup::rdbduprunner::hashref_key_array_match(
+    {
+        'bob' => { other => 'infob', listy => ['left','right'] },
+        'sam' => { other => 'infos', listy => ['up','down'] },
+        'cat' => { other => 'infoc', listy => ['left','right','up'] },
+        'tom' => { other => 'infot', listy => ['left','down'] },
+    },
+    'listy',
+    'right'),
+    {
+        'bob' => { other => 'infob', listy => ['left','right'] },
+        'cat' => { other => 'infoc', listy => ['left','right','up'] },
+    },
+    "righty");
 done_testing;
