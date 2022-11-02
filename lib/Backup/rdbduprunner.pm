@@ -36,6 +36,8 @@ use Fatal qw( :void open close link unlink symlink rename fork );
 use Config::General;
 use Config::Validator;
 use Config::Any;
+use Hash::Merge;
+use Clone qw(clone);
 #from a standard perl distribution, on UNIX at least
 use Pod::Usage;
 
@@ -2379,7 +2381,7 @@ sub hashref_key_hash {
 }
 
 sub hashref_keys_drop {
-    my $m = Storable::dclone(shift);
+    my $m = clone(shift);
     while(my ($k,$v) = each(%{$m})) {
         for my $key (keys(%$v)) {
             delete $$v{$key} if string_any($key,@_);
