@@ -574,11 +574,10 @@ our %config_definition = (
                 max      => 100,
                 optional => "true",
             },
-            # only valid for duplicity/rdiff-backup types
+            # only valid for duplicity/rdiff-backup types, expressed in 512B blocks
             minfree => {
                 type     => "integer",
                 min      => 0,
-                max      => 100,
                 optional => "true",
             },
             allowfs =>
