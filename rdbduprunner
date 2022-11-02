@@ -267,6 +267,78 @@ Default: info
 
 Validity: CLI, Global
 
+=item C<GPGPassPhrase> I<string> (duplicity only)
+
+Used to set PASSPHRASE environment variable which is used by duplicity.
+
+Validity: Global BackupDestination
+
+=item C<AWSAccessKeyID> I<string> (duplicity only)
+
+Used to set AWS_ACCESS_KEY_ID environment variable which is used by duplicity.
+
+Validity: Global BackupDestination
+
+=item C<AWSSecretAccessKey> I<string> (duplicity only)
+
+Used to set AWS_SECRET_ACCESS_KEY environment variable which is used by duplicity.
+
+Validity: Global BackupDestination
+
+=item C<SignKey> I<keyid> (duplicity only)
+
+Passed to duplicity using the --sign-key command line option.
+
+Validity: Global BackupDestination
+
+=item C<EncryptKey> I<keyid> (duplicity only)
+
+Passed to duplicity using the --encrypt-key command line option.
+
+Validity: Global BackupDestination
+
+=item C<Trickle> I<integer> {B<--trickle> I<integer>}
+
+For rsync backups this value is passed to the --bwlimit option.
+
+For other backup types, the backup software is invoked with
+C</usr/bin/trickle -s -u X>, which should serve to limit the usable
+bandwidth.
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
+=item C<ZfsCreate> I<yes|no|on|off|0|1|true|false>
+
+Create a zfs for the path, if the directory doesn't already exist.
+
+Validity: Global BackupDestination
+
+=item C<ZfsSnapshot> I<yes|no|on|off|0|1|true|false>
+
+Create a zfs snapshot of the destination path, if possible.
+
+=item C<Inplace> I<yes|no|on|off|0|1|true|false> {B<--inplace|--no-inplace|--noinplace>
+
+Passes the --inplace and --partial options to rsync (instead of
+--sparse) for this destination.  Assumed to be true every day of the
+week except Sunday unless explicitly set.  If you always want
+--inplace, set this to true, if you always want --sparse set this to
+false.
+
+=item C<Checksum> I<yes|no|on|off|0|1|true|false> {B<-c|--checksum|--no-checksum>} (rsync only)
+
+Passes the --checksum (-c) option to rsync.
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
+=item C<SSHCompress> I<yes|no|on|off|0|1|true|false> {B<--sshcompress|--no-sshcompress>} (rdiff-backup only)
+
+Passes --ssh-no-compression if set to a false value.
+
+This also mistakenly I believe passes -z to rsync to disable compression.
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
 =item {B<--maxinc> I<integer>}
 
 Acts as if the MaxInc config option were applied to every backup in
@@ -298,14 +370,6 @@ Default: 86400
 Maximum number of seconds to wait for a lock on any given per-host
 lock file.
 See MaxWait global config option.
-
-=item {B<--inplace|--no-inplace|--noinplace> - Boolean (true|t|yes|on|1), optional, rsync only
-
-Corresponds to the Inplace configuration item, see below.
-
-=item {B<-c|--checksum>} (rsync only)
-
-Passes the --checksum (-c) option to rsync.
 
 =item {B<--skipfs> I<filesystem>}
 
@@ -402,8 +466,6 @@ path. Defaults to not pass any temp options therefore probably uses
 =item I<DefaultBackupDestination> - Which backup destination to use if
 none is specified.
 
-=item I<MaxProcs> - Maxiumum number of backups to run simultaneously.
-
 =item I<MaxWait> - Maxiumum number of seconds to wait for a host lock.
 
 =item I<AllowFS> - String, Optional
@@ -441,13 +503,6 @@ byte blocks (because I could reliably get df to report this value.) It
 will do so before running backups and will not run backups if it
 cannot free this much space.
 
-=item I<Inplace> - Boolean (true|t|yes|on|1), optional, rsync only
-
-Passes the --inplace and --partial options to rsync (instead of
---sparse) for this destination.  Assumed to be true every day of the
-week except Sunday unless explicitly set.  If you always want
---inplace, set this to true, if you always want --sparse set this to
-false.
 
 =back
 
@@ -533,23 +588,6 @@ Used by the --tidy option to remove all increments older than
 specified age.  Ultimately this is passed to the remove-older-than
 options of rdiff-backup or duplicity so see those manpages for
 details.
-
-=item I<ZfsCreate> - Boolean, optional
-
-Create a zfs for the path, if the directory doesn't already exist.
-Can be set at the BackupDestination level as well.
-
-=item I<ZfsSnapshot> - Boolean, optional
-
-Create a zfs snapshot of the destination path, if possible.
-Can be set at the BackupDestination level as well.
-
-=item I<Inplace> - Boolean (true|t|yes|on|1|false|f|no|off|0), optional
-
-Passes the --inplace and --partial options to rsync for this
-destination.  Assumed to be false unless Inplace is set to one of the
-above parameters. Defaults to false.
-Can be set at the BackupDestination level as well.
 
 =item I<AllowFS> - String, optional
 
