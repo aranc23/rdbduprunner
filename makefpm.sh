@@ -38,7 +38,7 @@ fpm -n $pkg --version ${version} --iteration ${iteration} -m arancox@gmail.com -
 rm -rf $build_dir
 
 # create the packages for the Backup::rdbduprunner module
-fpm --verbose --no-cpan-test $common_opts $common_deps $rpm_deps -t rpm --rpm-summary "${summary}" --description "${description}" .
+fpm --verbose --no-cpan-test $common_opts $common_deps $rpm_deps -t rpm --rpm-summary "${summary}" --description "${description}" --name perl-Backup-rdbduprunner .
 fpm --verbose --no-cpan-test $common_opts $common_deps $deb_deps -t deb --rpm-summary "${summary}" --description "${description}" --cpan-package-name-prefix lib --cpan-package-name-postfix -perl .
 
 # build two packages missing on Ubuntu 20.04 needed by Backup::rdbduprunner:
