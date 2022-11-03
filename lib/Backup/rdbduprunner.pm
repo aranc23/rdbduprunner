@@ -86,7 +86,6 @@ $LOG_DIR
 $EXCLUDE_PATH
 %config_definition
 @SKIP_FS
-$MAXWAIT
 $SKIP_FS_REGEX
 @INCREMENTS
 $DEST
@@ -199,7 +198,6 @@ our @CONFIG_FILES =
     );
 
 our $TEST=1;
-our $MAXWAIT; # sleep no longer than this value (in seconds)
 our %children; # store children for master backup loop
 our $RUNTIME; # storing the start time so we can calculate run time
 
@@ -540,10 +538,17 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli global backupdestination backupset)],
     },
-            # defaultbackupdestination =>
+    # 'maxwait=i'              => \$MAXWAIT,
+    maxwait => {
+        getopt => 'maxwait=i',
+        default => 86400,
+        type => "integer",
+        min => 1,
+        optional => "true",
+        sections => [qw(cli global)],
+    },
+    # defaultbackupdestination =>
             #     { type => "string", optional => "true" },
-            # maxwait =>
-            #     { type => "integer", min => 1, optional => "true" },
             # { type => "string", optional => "true" },
             # allowfs =>
             # { type => "list?(string)", optional => "true" },
@@ -678,8 +683,6 @@ our %config_definition = (
         fields => {
             defaultbackupdestination =>
                 { type => "string", optional => "true" },
-            maxwait =>
-                { type => "integer", min => 1, optional => "true" },
             backupdestination => {
                 type     => 'table(valid(backupdestination))',
                 optional => "true",
@@ -733,7 +736,6 @@ our %get_options=
    'test!'                  => \$TEST,
    'skipfs=s'               => \@SKIP_FS,
    'allowfs=s'              => \@ALLOW_FS,
-   'maxwait=i'              => \$MAXWAIT,
   );
 
 my $callback_clean = sub { my %t=@_;
@@ -1380,15 +1382,18 @@ sub lock_pid_file {
   my $LOCK;
   my $waittime=time();
   my $locked=0;
-
+  my $maxwait = key_select('maxwait',
+                           hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                           \%CONFIG, # config file, top level
+                           \%CLI_CONFIG);
   unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
     error("unable to open pid file: $LOCK_FILE for writing");
     return 0; # false or fail
   }
-  debug("setting alarm for ${MAXWAIT} seconds and locking ${LOCK_FILE}");
+  debug("setting alarm for ${maxwait} seconds and locking ${LOCK_FILE}");
   eval {
     local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
-    alarm $MAXWAIT;
+    alarm $maxwait;
     if(flock($LOCK,LOCK_EX)) {
       $locked=1;
     }
@@ -1396,7 +1401,7 @@ sub lock_pid_file {
   };
   if ($@) {
     die unless $@ eq "alarm\n";   # propagate unexpected errors
-    notice("receieved ALRM waiting to lock ${LOCK_FILE}: alarm: ${MAXWAIT} elapsed time:".(time()-$waittime) );
+    notice("receieved ALRM waiting to lock ${LOCK_FILE}: alarm: ${maxwait} elapsed time:".(time()-$waittime) );
   }
   else {
     if($locked) {
@@ -1964,7 +1969,7 @@ sub parse_config_backups {
                                      $config_definition{'cli'}{fields}),
             keys(%DEFAULT_CONFIG))) {
         # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
-            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full));
+            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait));
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
@@ -2171,14 +2176,6 @@ if(not defined $TEMPDIR) {
   if(defined $CONFIG{tempdir}) {
     $TEMPDIR=$CONFIG{tempdir};
   }
-}
-
-if(not defined $MAXWAIT) {
-    if(defined $CONFIG{maxwait}) {
-	$MAXWAIT=$CONFIG{maxwait};
-    } else {
-	$MAXWAIT=86400; # one day's worth of seconds
-    }
 }
 
 # combine the list of filesystems to skip into a regex
