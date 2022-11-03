@@ -85,8 +85,6 @@ $LOG_DIR
 @ALLOW_FS
 $EXCLUDE_PATH
 %config_definition
-@SKIP_FS
-$SKIP_FS_REGEX
 @INCREMENTS
 $DEST
 $HOST
@@ -197,56 +195,6 @@ our $TEST=1;
 our %children; # store children for master backup loop
 our $RUNTIME; # storing the start time so we can calculate run time
 
-our @SKIP_FS=qw(
-                autofs
-                binfmt_misc
-                bpf
-                cgroup
-                cgroup2
-                cifs
-                configfs
-                debugfs
-                devpts
-                devtmpfs
-                efivarfs
-                exfat
-                fuse
-                fuse.encfs
-                fuse.glusterfs
-                fuse.gvfs-fuse-daemon
-                fuse.gvfsd-fuse
-                fuse.lxcfs
-                fuse.portal
-                fuse.sshfs
-                fuse.vmware-vmblock
-                fuse.xrdp-chansrv
-                fuseblk
-                fusectl
-                htfs
-                hugetlbfs
-                ipathfs
-                iso9660
-                mqueue
-                nfs
-                nfs4
-                nfsd
-                nsfs
-                ntfs
-                proc
-                pstore
-                rootfs
-                rpc_pipefs
-                securityfs
-                selinuxfs
-                squashfs
-                sysfs
-                tmpfs
-                tracefs
-                usbfs
-                vfat
-                zfs
-             );
-our $SKIP_FS_REGEX;
 our @ALLOW_FS;
 
 # read the config file into this hash:
@@ -558,6 +506,62 @@ our %DEFAULT_CONFIG = (
         sections => [qw(cli global backupdestination backupset)],
         match => qr{^(\d+[smhDWMY]){1,}$},
     },
+    'skipfstype' => {
+        getopt   => 'skipfstype|skipfs=s@',
+        type     => 'list?(string)',
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+        default  => [qw(
+            autofs
+            binfmt_misc
+            bpf
+            cgroup
+            cgroup2
+            cifs
+            configfs
+            debugfs
+            devpts
+            devtmpfs
+            efivarfs
+            exfat
+            fuse
+            fuse.encfs
+            fuse.glusterfs
+            fuse.gvfs-fuse-daemon
+            fuse.gvfsd-fuse
+            fuse.lxcfs
+            fuse.portal
+            fuse.sshfs
+            fuse.vmware-vmblock
+            fuse.xrdp-chansrv
+            fuseblk
+            fusectl
+            htfs
+            hugetlbfs
+            ipathfs
+            iso9660
+            mqueue
+            nfs
+            nfs4
+            nfsd
+            nsfs
+            ntfs
+            proc
+            pstore
+            rootfs
+            rpc_pipefs
+            securityfs
+            selinuxfs
+            squashfs
+            sysfs
+            tmpfs
+            tracefs
+            usbfs
+            vfat
+            zfs
+                   )],
+    },
+
             # allowfs =>
             # { type => "list?(string)", optional => "true" },
             # 'excludepath' =>
@@ -731,7 +735,6 @@ our %get_options=
    'exclude-path=s'         => \$EXCLUDE_PATH,
    'localhost=s'            => \$LOCALHOST,
    'test!'                  => \$TEST,
-   'skipfs=s'               => \@SKIP_FS,
    'allowfs=s'              => \@ALLOW_FS,
   );
 
@@ -1758,7 +1761,6 @@ sub which_zfs {
 # $LOCALHOST
 # $HOST
 # @ALLOW_FS .... this looks like a bug as it overwrites it
-# $SKIP_FS_REGEX
 # $EXCLUDE_PATH
 # these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
 sub parse_config_backups {
@@ -1770,7 +1772,7 @@ sub parse_config_backups {
   print STDERR Dumper \%DEFAULT_CONFIG if $DEBUG;
   print STDERR Dumper \%CONFIG if $DEBUG;
   print STDERR Dumper \%CLI_CONFIG if $DEBUG;
-  print STDERR Dumper [$LOCALHOST,$HOST,\@ALLOW_FS,$SKIP_FS_REGEX,$EXCLUDE_PATH] if $DEBUG;
+  print STDERR Dumper [$LOCALHOST,$HOST,\@ALLOW_FS,$EXCLUDE_PATH] if $DEBUG;
   for my $bstag (keys(%{$CONFIG{backupset}})) {
       my @bslist=($CONFIG{backupset}{$bstag});
       if (
@@ -1834,6 +1836,12 @@ sub parse_config_backups {
       }
 
       if ((defined $$bs{inventory} and $$bs{inventory}) and not (defined $$bs{'disabled'} and $$bs{'disabled'})) {
+          my @skipfstype = hashref_key_array_combine('skipfstype',
+                                                     hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                                     \%CONFIG, # config file, top level
+                                                     $CONFIG{backupdestination}{$backupdest}, # from the destination
+                                                     $bs, # ourselves
+                                                     \%CLI_CONFIG);
         # perform inventory
         debug("performing inventory on $host");
         my $inventory_command='cat /proc/mounts';
@@ -1856,7 +1864,7 @@ sub parse_config_backups {
                 debug("filesystem type is not allowd via the allow list: ${e[2]}");
                 next;
               }
-            } elsif ( $e[2] =~ /$SKIP_FS_REGEX/ ) {
+          } elsif ( string_any($e[2],@skipfstype) ) {
               debug("filesystem type is not allowd via the skip list: ${e[2]}");
               next;
             }
@@ -1952,7 +1960,7 @@ sub parse_config_backups {
                                      $config_definition{'cli'}{fields}),
             keys(%DEFAULT_CONFIG))) {
         # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
-            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait));
+            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait skipfstype));
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
@@ -2160,9 +2168,6 @@ if(not defined $TEMPDIR) {
     $TEMPDIR=$CONFIG{tempdir};
   }
 }
-
-# combine the list of filesystems to skip into a regex
-$SKIP_FS_REGEX='^('.join('|',map(quotemeta,@SKIP_FS)).')$';
 
 dlog('debug','config',\%CONFIG,{'config_file' => $CONFIG_FILE});
 
@@ -2439,6 +2444,23 @@ sub hashref_key_filter_array {
         }
     }
     print STDERR Data::Dumper->Dump([\%a],[qw(hashref_key_filter_array)]) if $DEBUG;
+    return keys(%a);
+}
+
+sub hashref_key_array_combine {
+    my $key = shift;
+    my %a;
+    foreach my $m (@_) {
+        if (defined $$m{$key} and reftype $$m{$key} eq reftype []) {
+            for my $e (@{$$m{$key}}) {
+                $a{$e} =1;
+            }
+        }
+        else {
+            $a{$$m{$key}} = 1; # assume it's a scalar;
+        }
+    }
+    print STDERR Data::Dumper->Dump([\%a],[qw(hashref_key_filter_combine)]) if $DEBUG;
     return keys(%a);
 }
 

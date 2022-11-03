@@ -26,7 +26,6 @@ sub big_globals {
         'exclude-path'          => $EXCLUDE_PATH,
         'localhost'             => $LOCALHOST,
         'test'                  => $TEST,
-        'skipfs'                => \@SKIP_FS,
         'allowfs'               => \@ALLOW_FS,
     };
 }
@@ -41,56 +40,6 @@ my $defaults = {
     'exclude-path'          => undef,
     'localhost'             => undef,
     'test'                  => 1,
-    'skipfs'                => [
-        qw(
-            autofs
-            binfmt_misc
-            bpf
-            cgroup
-            cgroup2
-            cifs
-            configfs
-            debugfs
-            devpts
-            devtmpfs
-            efivarfs
-            exfat
-            fuse
-            fuse.encfs
-            fuse.glusterfs
-            fuse.gvfs-fuse-daemon
-            fuse.gvfsd-fuse
-            fuse.lxcfs
-            fuse.portal
-            fuse.sshfs
-            fuse.vmware-vmblock
-            fuse.xrdp-chansrv
-            fuseblk
-            fusectl
-            htfs
-            hugetlbfs
-            ipathfs
-            iso9660
-            mqueue
-            nfs
-            nfs4
-            nfsd
-            nsfs
-            ntfs
-            proc
-            pstore
-            rootfs
-            rpc_pipefs
-            securityfs
-            selinuxfs
-            squashfs
-            sysfs
-            tmpfs
-            tracefs
-            usbfs
-            vfat
-            zfs)
-    ],
     'allowfs'  => [],
 };
 

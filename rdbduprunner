@@ -404,6 +404,70 @@ Validity: CLI, Global, BackupDestination, BackupSet
 
 Example: MaxAge 1Y2W4D7s
 
+=item C<SkipFSType> I<fstype> {B<--skipfstype> I<fstype>}
+
+Only applies during inventory, skips every filesystem with the types specified.
+Currently there is a default list and you can only add to it, not reset it.
+
+--skipfs reiserfs
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
+Default list:
+
+=over 2
+
+autofs
+binfmt_misc
+bpf
+cgroup
+cgroup2
+cifs
+configfs
+debugfs
+devpts
+devtmpfs
+efivarfs
+exfat
+fuse
+fuse.encfs
+fuse.glusterfs
+fuse.gvfs-fuse-daemon
+fuse.gvfsd-fuse
+fuse.lxcfs
+fuse.portal
+fuse.sshfs
+fuse.vmware-vmblock
+fuse.xrdp-chansrv
+fuseblk
+fusectl
+htfs
+hugetlbfs
+ipathfs
+iso9660
+mqueue
+nfs
+nfs4
+nfsd
+nsfs
+ntfs
+proc
+pstore
+rootfs
+rpc_pipefs
+securityfs
+selinuxfs
+squashfs
+sysfs
+tmpfs
+tracefs
+usbfs
+vfat
+zfs
+
+=back
+
+
 =item {B<--tempdir> I<path>}
 
 Pass the --tempdir or --temp-dir options to underlying binaries in the
@@ -417,13 +481,6 @@ never do more than one backup from any given host at a time but if
 there are multiple hosts multiple backups should occur at once.
 See MaxProcs global config option.
 
-
-=item {B<--skipfs> I<filesystem>}
-
-Adds the specified filesystem to the list of filesystems to be ignored
-during inventory.
-
---skipfs reiserfs
 
 =item {B<--allowfs> I<filesystem>}
 
