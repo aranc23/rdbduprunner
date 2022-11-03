@@ -25,7 +25,7 @@ deb_deps="-d liburi-perl"
 common_deps="-d perl -d rsync"
 summary="script and module for making backups with rsync, rdiff-backup, and duplicity"
 description="runs backup programs per a configuration file"
-common_opts="--version ${version} --iteration ${iteration} -m arancox@gmail.com --architecture noarch -s cpan --prefix /usr --replaces perl-backup-rdbduprunner --cpan-perl-lib-path /usr/share/perl5 --url ${url}"
+common_opts="--version ${version} --iteration ${iteration} -m arancox@gmail.com --architecture noarch -s cpan --prefix /usr --cpan-perl-lib-path /usr/share/perl5 --url ${url}"
 
 cpan_reject=(Config vars warnings strict Encode Carp IO::Select IO::Handle Fcntl POSIX Sys::Hostname URI::Escape Scalar::Util File::Basename Data::Dumper Log::Dispatch::Screen Log::Dispatch::Syslog Log::Dispatch::File AnyDBM-File)
 for mod in ${cpan_reject[@]}; do
