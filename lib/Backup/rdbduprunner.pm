@@ -2394,6 +2394,7 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
   # here we will eventually just perform the backups
   # first we check for space on rdiff-backup destinations and free some up,
   # before forking away in perform_backups
+ BACKUP:
   foreach my $bh (@BACKUPS) {
     if($$bh{btype} eq 'rdiff-backup') {
       if($$bh{dest} =~ /\:\:/) {
