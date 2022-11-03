@@ -16,20 +16,6 @@ use Hash::Merge qw(merge);
 
 sub big_globals {
     return {
-        'calculate-average'     => $AVERAGE,
-        cleanup                 => $CLEANUP,
-        'check'                 => $CLEANUP,
-        compare                 => $COMPARE,
-        'verify'                => $COMPARE,
-        'dump'                  => $DUMP,
-        'list-oldest'           => $LISTOLDEST,
-        'remove-oldest'         => $REMOVE,
-        'status'                => $STATUS,
-        'tidy'                  => $TIDY,
-        'list'                  => $LIST,
-        'orphans'               => $ORPHANS,
-        'status_json'           => $STATUS_JSON,
-        'status_delete'         => \@STATUS_DELETE,
         'maxage'                => $MAXAGE,
         'maxinc'                => $MAXINC,
         'u'                     => $USEAGENT,
@@ -52,20 +38,6 @@ sub big_globals {
     };
 }
 my $defaults = {
-    'calculate-average'     => 0,
-    cleanup                 => 0,
-    'check'                 => 0,
-    compare                 => 0,
-    'verify'                => 0,
-    'dump'                  => 0,
-    'list-oldest'           => 0,
-    'remove-oldest'         => 0,
-    'status'                => 0,
-    'tidy'                  => 0,
-    'list'                  => 0,
-    'orphans'               => 0,
-    'status_json'           => undef,
-    'status_delete'         => [],
     'maxage'                => undef,
     'maxinc'                => undef,
     'u'                     => undef,
@@ -226,13 +198,24 @@ my $defaults = {
          level => 'debug',
          force => 1,
          full => 1,
+         'calculate-average' => 1,
+         cleanup => 1,
+         compare => 1,
+         dump => 1,
+         listoldest => 1,
+         remove => 1,
+         status => 1,
+         list => 1,
+         orphans => 1,
+         status_delete => ['pork'],
+         status_json => 1,
+         tidy => 1,
      },
         "nothing passed");
 
-    for(qw(calculate-average cleanup check verify compare dump list-oldest remove-oldest status tidy list orphans status_json allow-source-mismatch dryrun u)) {
+    for(qw(allow-source-mismatch dryrun u)) {
         $$defaults{$_} = 1;
     }
-    $$defaults{'status_delete'} = [qw(pork)];
     $$defaults{'tempdir'} = '/var/tmp';
     $$defaults{'maxage'} = '1d';
     $$defaults{'maxinc'} = '4';

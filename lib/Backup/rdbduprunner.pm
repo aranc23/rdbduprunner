@@ -78,33 +78,21 @@ $RUNTIME
 $TEST
 $USEAGENT
 $DUPLICITY_BINARY
-$LIST
 $RDIFF_BACKUP_BINARY
-$COMPARE
-$AVERAGE
-$TIDY
 $HELP
 $APP_NAME
 $LOG_FILE
 $LOG_DIR
 @CONFIG_FILES
-$DUMP
 $RSYNC_BINARY
 $ZFS_BINARY
 @ALLOW_FS
 $EXCLUDE_PATH
 %config_definition
 @SKIP_FS
-@STATUS_DELETE
 $MAXWAIT
 $SKIP_FS_REGEX
-$STATUS_JSON
-$STATUS
-$LISTOLDEST
 @INCREMENTS
-$REMOVE
-$ORPHANS
-$CLEANUP
 $DEST
 $HOST
 $PATH
@@ -172,19 +160,7 @@ our $HELP=0;
 
 Readonly our $USER => $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(getpwuid($<));
 
-# these are command line options, and in some cases config file options
-# the following changes the major mode of operation for rdbduprunner:
-our $AVERAGE=0;
-our $CLEANUP=0;
-our $COMPARE=0;
 our $DRYRUN=0;
-our $DUMP=0;
-our $LISTOLDEST=0;
-our $REMOVE=0;
-our $STATUS=0;
-our $TIDY=0;
-our $LIST=0;
-our $ORPHANS=0;
 # the following affect what options are passed to rdiff-backup and/or duplicity
 our $MAXAGE;
 our $MAXINC;
@@ -201,8 +177,6 @@ our $RDIFF_BACKUP_BINARY;
 our $RSYNC_BINARY;
 our $ZFS_BINARY;
 our $EXCLUDE_PATH;
-our $STATUS_JSON;
-our @STATUS_DELETE;
 our $LOCALHOST;
 Readonly our $STATE_DIR =>
     $USER eq 'root'                 ? File::Spec->catfile('/var/lib', $APP_NAME)
@@ -448,6 +422,94 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli)],
     },
+    # the following changes the major mode of operation for rdbduprunner:
+    # 'calculate-average'      => \$AVERAGE,
+    'calculate-average' => {
+        getopt => 'calculate-average',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # 'cleanup'                => \$CLEANUP,
+    # 'check'                  => \$CLEANUP,
+    'cleanup' => {
+        getopt => 'cleanup|check',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # 'compare'                => \$COMPARE,
+    # 'verify'                 => \$COMPARE,
+    'compare' => {
+        getopt => 'compare|verify',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # 'dump'                   => \$DUMP,
+    'dump' => {
+        getopt => 'dump',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # 'list-oldest'            => \$LISTOLDEST,
+    'listoldest' => {
+        getopt => 'listoldest|list-oldest',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # 'remove-oldest'          => \$REMOVE,
+    'remove' => {
+        getopt => 'remove|remove-oldest',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # 'status'                 => \$STATUS,
+    'status' => {
+        getopt => 'status',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # 'tidy'                   => \$TIDY,
+    'tidy' => {
+        getopt => 'tidy',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # 'list'                   => \$LIST,
+    'list' => {
+        getopt => 'list',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # 'orphans'                => \$ORPHANS,
+    'orphans' => {
+        getopt => 'orphans',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # maintain the status database:
+    # 'status_json|status-json!'       => \$STATUS_JSON,
+    'status_json' => {
+        getopt => 'status_json|status-json',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # 'status_delete|status-delete=s@' => \@STATUS_DELETE,
+    'status_delete' => {
+        getopt => 'status_delete|status-delete=s@',
+        type     => "list?(string)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
             # defaultbackupdestination =>
             #     { type => "string", optional => "true" },
             # maxwait =>
@@ -635,22 +697,6 @@ our %get_options=
    # can be overridden from the command line, but not the config
    'config=s'               => \$CONFIG_FILE, # config file
 
-   # the following changes the major mode of operation for rdbduprunner:
-   'calculate-average'      => \$AVERAGE,
-   'cleanup'                => \$CLEANUP,
-   'check'                  => \$CLEANUP,
-   'compare'                => \$COMPARE,
-   'verify'                 => \$COMPARE,
-   'dump'                   => \$DUMP,
-   'list-oldest'            => \$LISTOLDEST,
-   'remove-oldest'          => \$REMOVE,
-   'status'                 => \$STATUS,
-   'tidy'                   => \$TIDY,
-   'list'                   => \$LIST,
-   'orphans'                => \$ORPHANS,
-   # maintain the status database:
-   'status_json|status-json!'       => \$STATUS_JSON,
-   'status_delete|status-delete=s@' => \@STATUS_DELETE,
    # the following affect what options are passed to rdiff-backup and/or duplicity
    'maxage=s'               => \$MAXAGE,
    'maxinc=s'               => \$MAXINC,
@@ -2082,9 +2128,11 @@ unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
                                   \%CONFIG, # config file, top level
                                   \%CLI_CONFIG),
                        $LOG_FILE );
-if($DUMP) {
-  print Dumper \%CONFIG;
-}
+
+    if(dtruefalse(\%CLI_CONFIG, 'dump')) {
+        print Dumper \%CONFIG;
+    }
+
     $config_validator->validate(\%CONFIG,'global');
 
 # set some global options using the config file global options???
@@ -2159,23 +2207,25 @@ $SKIP_FS_REGEX='^('.join('|',map(quotemeta,@SKIP_FS)).')$';
 
 dlog('debug','config',\%CONFIG,{'config_file' => $CONFIG_FILE});
 
-if ( @STATUS_DELETE and scalar @STATUS_DELETE > 0 ) {
-    status_delete(@STATUS_DELETE);
+    if ( defined $CLI_CONFIG{status_delete}
+         and reftype $CLI_CONFIG{status_delete} eq reftype []
+         and scalar @{$CLI_CONFIG{status_delete}} > 0 ) {
+    status_delete(@{$CLI_CONFIG{status_delete}});
     exit;
 }
-elsif ( basename($PROGRAM_NAME) eq 'check_rdbduprunner' or $STATUS_JSON ) {
+elsif ( basename($PROGRAM_NAME) eq 'check_rdbduprunner' or dtruefalse(\%CLI_CONFIG, 'status_json') ) {
     status_json();
     exit;
 }
 
 @BACKUPS = parse_config_backups(\%DEFAULT_CONFIG, \%CONFIG, \%CLI_CONFIG);
-if($DUMP) {
+if(dtruefalse(\%CLI_CONFIG, 'dump')) {
   print Dumper \@BACKUPS;
   notice("you asked me to dump and exit!");
   exit(0);
 }
 
-if($STATUS) {
+if(dtruefalse(\%CLI_CONFIG, 'status')) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
     my @com;
     if($$bh{btype} eq 'duplicity') {
@@ -2202,16 +2252,16 @@ if($STATUS) {
       unlock_pid_file($lock);
     }
   }
-} elsif($LISTOLDEST) {
+} elsif(dtruefalse(\%CLI_CONFIG, 'listoldest')) {
     build_increment_list();
     foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
         print localtime($$ih{inctime}).' '.$$ih{bh}{dest}.' '.$$ih{tag}."\n";
     }
-} elsif($REMOVE) {
+} elsif(dtruefalse(\%CLI_CONFIG, 'remove')) {
     build_increment_list();
     remove_oldest('any');
 }
-elsif($ORPHANS) {
+elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
     if($$bh{btype} eq 'rdiff-backup') {
       my @com=('find',$$bh{dest},'-type','f','-name','rdiff-backup.tmp.*');
@@ -2219,7 +2269,7 @@ elsif($ORPHANS) {
       system(@com);
     }
   }
-} elsif($CLEANUP) {
+} elsif(dtruefalse(\%CLI_CONFIG, 'cleanup')) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
         my @com;
         if($$bh{btype} eq 'duplicity') {
@@ -2257,7 +2307,7 @@ elsif($ORPHANS) {
             unlock_pid_file($lock);
         }
     }
-} elsif ($TIDY) {
+} elsif (dtruefalse(\%CLI_CONFIG, 'tidy')) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
       my $lock;
       unless($TEST) {
@@ -2268,7 +2318,7 @@ elsif($ORPHANS) {
 	unlock_pid_file($lock);
       }
     }
-} elsif($AVERAGE) {
+} elsif(dtruefalse(\%CLI_CONFIG, 'average')) {
     my $avcom="$RDIFF_BACKUP_BINARY --calculate-average";
     foreach my $bh (sort backup_sort (@BACKUPS)) {
         unless($$bh{btype} eq 'rdiff-backup') {
@@ -2278,7 +2328,7 @@ elsif($ORPHANS) {
         $avcom.=" $$bh{dest}/rdiff-backup-data/session_statistics.*.data";
     }
     exec($avcom);
-} elsif($COMPARE) {
+} elsif(dtruefalse(\%CLI_CONFIG, 'compare')) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
     my @com;
     if ($$bh{btype} eq 'duplicity') {
@@ -2318,7 +2368,7 @@ elsif($ORPHANS) {
       unlock_pid_file($lock);
     }
   }
-} elsif($LIST) {
+} elsif(dtruefalse(\%CLI_CONFIG, 'list')) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
     my @com;
     unless($$bh{btype} eq 'duplicity') {
