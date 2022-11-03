@@ -1816,7 +1816,7 @@ sub parse_config_backups {
         $btype='rsync';
       }
       if ($btype eq 'duplicity' and $host ne $LOCALHOST) {
-        error("$bstag is a duplicity backup with host set to $host: duplicity backups must have a local source!");
+        error("$bstag is a duplicity backup with host set to $host and LOCALHOST: ${LOCALHOST}: duplicity backups must have a local source!");
         next;
       }
 
