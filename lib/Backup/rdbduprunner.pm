@@ -141,6 +141,9 @@ Readonly our $EXIT_CODE => {
     },
 };
 
+# we could use a list but regexp works in Validator
+our $VALID_BACKUP_TYPE_REGEX = qr{^ ( rdiff [-] backup | rsync | duplicity ) $}xms;
+
 # dispatcher needs a handle to write to:
 our $DISPATCHER;
 
@@ -656,7 +659,7 @@ our %config_definition = (
             type => {
                 type => "string",
                 optional => "true",
-                match => qr{^(rdiff-backup|rsync|duplicity)$}xmsi,
+                match => $VALID_BACKUP_TYPE_REGEX,
             },
             busted => {
                 type => "valid(truefalse)",
@@ -1809,7 +1812,7 @@ sub parse_config_backups {
 
       # this should already by validated by the config
       if (defined $CONFIG{backupdestination}{$backupdest}{type} and
-          $CONFIG{backupdestination}{$backupdest}{type} =~ /^(rdiff\-backup|duplicity|rsync)$/) {
+          $CONFIG{backupdestination}{$backupdest}{type} =~ $VALID_BACKUP_TYPE_REGEX) {
         # check to make sure that if the type isn't set, we set it to rsync
         $btype=$CONFIG{backupdestination}{$backupdest}{type};
       } else {
