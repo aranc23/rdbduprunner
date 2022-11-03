@@ -467,15 +467,18 @@ zfs
 
 =back
 
-=item C<AllowFS> I<fstype> {B<--allowfs> I<fstype>}
+=item C<AllowFSType> I<fstype> {B<--allowfstype|--allowfs> I<fstype>}
 
 Allows this filesystem type to be included during inventory.  When
-AllowFS is used, the skipfstype list is disregarded.  Only filesystem
-types specified this way will be included during inventory if any are
-specified at all. Because the default is for this parameter to be an
-empty list, the SkipFSType list will be used to exclude.
+AllowFSType is used, the skipfstype list is disregarded.  Only
+filesystem types specified this way will be included during inventory
+if any are specified at all. Because the default is for this parameter
+to be an empty list, the SkipFSType list will be used to exclude.
 
-Example: --allowfs reiserfs --allowfs ext4
+Example: --allowfs reiserfs --allowfstype ext4
+
+The above would (when inventory is enabled) only add filesystems to
+the list to be backed up if they are of type resiferfs or ext4.
 
 Validity: CLI, Global, BackupDestination, BackupSet
 

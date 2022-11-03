@@ -558,8 +558,8 @@ our %DEFAULT_CONFIG = (
             zfs
                    )],
     },
-    allowfs => {
-        getopt   => 'allowfs=s@',
+    allowfstype => {
+        getopt   => 'allowfstype|allowfs=s@',
         type     => 'list?(string)',
         optional => "true",
         sections => [qw(cli global backupdestination backupset)],
@@ -1833,12 +1833,12 @@ sub parse_config_backups {
                                                      $CONFIG{backupdestination}{$backupdest}, # from the destination
                                                      $bs, # ourselves
                                                      \%CLI_CONFIG);
-          my @allowfs = hashref_key_array_combine('allowfs',
-                                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                                                  \%CONFIG, # config file, top level
-                                                  $CONFIG{backupdestination}{$backupdest}, # from the destination
-                                                  $bs, # ourselves
-                                                  \%CLI_CONFIG);
+          my @allowfstype = hashref_key_array_combine('allowfstype',
+                                                      hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                                      \%CONFIG, # config file, top level
+                                                      $CONFIG{backupdestination}{$backupdest}, # from the destination
+                                                      $bs, # ourselves
+                                                      \%CLI_CONFIG);
         # perform inventory
         debug("performing inventory on $host");
         my $inventory_command='cat /proc/mounts';
@@ -1856,8 +1856,8 @@ sub parse_config_backups {
         M:
           foreach my $m (sort(@a)) {
             my @e=split(/\s+/,$m);
-            if ( scalar @allowfs > 0 ) {
-              if ( not string_any($e[2],@allowfs) ) {
+            if ( scalar @allowfstype > 0 ) {
+              if ( not string_any($e[2],@allowfstype) ) {
                   debug("filesystem type is not allowd via the allow list: ${e[2]}");
                   next;
               }
@@ -1957,7 +1957,7 @@ sub parse_config_backups {
                                      $config_definition{'cli'}{fields}),
             keys(%DEFAULT_CONFIG))) {
         # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
-            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait skipfstype));
+            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait skipfstype allowfstype));
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
