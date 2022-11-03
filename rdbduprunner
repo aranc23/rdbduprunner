@@ -369,7 +369,19 @@ Default: trickle
 
 Validity: CLI, Global, BackupDestination, BackupSet
 
+=item C<MaxWait> I<integer> {B<--maxwait> I<integer>}
 
+Maximum number of seconds to wait for a lock on any given per-host
+lock file or the global per-process lock file.
+
+Default: 86400
+
+Validity: CLI, Global
+
+=item C<DefaultBackupDestination> I<backupdestinationname>
+
+Specify the name of the backupdestination to use if one isn't
+specified in the BackupSet.
 
 =item {B<--maxinc> I<integer>}
 
@@ -396,12 +408,6 @@ never do more than one backup from any given host at a time but if
 there are multiple hosts multiple backups should occur at once.
 See MaxProcs global config option.
 
-=item {B<--maxwait> I<integer>}
-
-Default: 86400
-Maximum number of seconds to wait for a lock on any given per-host
-lock file.
-See MaxWait global config option.
 
 =item {B<--skipfs> I<filesystem>}
 
@@ -487,10 +493,6 @@ Passes the --use-agent option to duplicity.
 path. Defaults to not pass any temp options therefore probably uses
 /tmp.
 
-=item I<DefaultBackupDestination> - Which backup destination to use if
-none is specified.
-
-=item I<MaxWait> - Maxiumum number of seconds to wait for a host lock.
 
 =item I<AllowFS> - String, Optional
 
