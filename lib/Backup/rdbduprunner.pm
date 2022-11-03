@@ -91,8 +91,6 @@ $SKIP_FS_REGEX
 $DEST
 $HOST
 $PATH
-$MAXAGE
-$MAXINC
 $DRYRUN
 $ALLOWSOURCEMISMATCH
 &perform_backups
@@ -156,8 +154,6 @@ Readonly our $USER => $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(ge
 
 our $DRYRUN=0;
 # the following affect what options are passed to rdiff-backup and/or duplicity
-our $MAXAGE;
-our $MAXINC;
 our $USEAGENT;
 our $ALLOWSOURCEMISMATCH=0;
 our $TEMPDIR;
@@ -547,9 +543,21 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli global)],
     },
-    # defaultbackupdestination =>
-            #     { type => "string", optional => "true" },
-            # { type => "string", optional => "true" },
+    # only valid for duplicity/rdiff-backup types
+    maxinc => {
+        getopt   => 'maxinc=i',
+        type     => "integer",
+        min      => 0,
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
+    maxage => {
+        getopt => 'maxage=s',
+        type => "string",
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+        match => qr{^(\d+[smhDWMY]){1,}$},
+    },
             # allowfs =>
             # { type => "list?(string)", optional => "true" },
             # 'excludepath' =>
@@ -617,15 +625,6 @@ our %config_definition = (
                 optional => "true"
             },
 
-            # only valid for duplicity/rdiff-backup types
-            maxinc => {
-                type     => "integer",
-                min      => 0,
-                max      => 100,
-                optional => "true",
-            },
-            maxage =>
-            { type => "string", optional => "true" },
             prerun => {
                 type => "string",
                 optional => "true",
@@ -716,8 +715,6 @@ our %get_options=
    'config=s'               => \$CONFIG_FILE, # config file
 
    # the following affect what options are passed to rdiff-backup and/or duplicity
-   'maxage=s'               => \$MAXAGE,
-   'maxinc=s'               => \$MAXINC,
    'u|use-agent!'           => \$USEAGENT,
    'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
    'tempdir=s'              => \$TEMPDIR,
@@ -1763,8 +1760,6 @@ sub which_zfs {
 # @ALLOW_FS .... this looks like a bug as it overwrites it
 # $SKIP_FS_REGEX
 # $EXCLUDE_PATH
-# $MAXAGE
-# $MAXINC
 # these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
 sub parse_config_backups {
     my %DEFAULT_CONFIG = %{shift(@_)};
@@ -1775,7 +1770,7 @@ sub parse_config_backups {
   print STDERR Dumper \%DEFAULT_CONFIG if $DEBUG;
   print STDERR Dumper \%CONFIG if $DEBUG;
   print STDERR Dumper \%CLI_CONFIG if $DEBUG;
-  print STDERR Dumper [$LOCALHOST,$HOST,\@ALLOW_FS,$SKIP_FS_REGEX,$EXCLUDE_PATH,$MAXAGE,$MAXINC] if $DEBUG;
+  print STDERR Dumper [$LOCALHOST,$HOST,\@ALLOW_FS,$SKIP_FS_REGEX,$EXCLUDE_PATH] if $DEBUG;
   for my $bstag (keys(%{$CONFIG{backupset}})) {
       my @bslist=($CONFIG{backupset}{$bstag});
       if (
@@ -1945,18 +1940,6 @@ sub parse_config_backups {
           if (defined $exc and length $exc > 0) {
             push(@{$$bh{exclude}},$exc);
           }
-        }
-        if (defined $MAXAGE) {
-          $$bh{maxage}=$MAXAGE;
-        } elsif (not defined $$bh{maxage} and
-                 defined $CONFIG{maxage}) {
-          $$bh{maxage}=$CONFIG{maxage};
-        }
-        if (defined $MAXINC) {
-          $$bh{maxinc}=$MAXINC;
-        } elsif (not defined $$bh{maxinc} and
-                 defined $CONFIG{maxinc}) {
-          $$bh{maxinc}=$CONFIG{maxinc};
         }
         print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
     KEY:
