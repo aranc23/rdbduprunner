@@ -565,7 +565,19 @@ our %DEFAULT_CONFIG = (
         sections => [qw(cli global backupdestination backupset)],
     },
 
-            # 'excludepath' =>
+    skip => {
+        getopt => 'skip=s@',
+        type => "list?(string)",
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
+    skipre => {
+        getopt => 'skipre=s@',
+        type => "list?(string)",
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
+    # 'excludepath' =>
             # { type => "string", optional => "true" },
             #  useagent =>
             # { type => "valid(truefalse)", optional => "true" },
@@ -616,10 +628,6 @@ our %config_definition = (
             path =>
             { type => "list?(string)", optional => "true" },
             exclude =>
-            { type => "list?(string)", optional => "true" },
-            skip =>
-            { type => "list?(string)", optional => "true" },
-            skipre =>
             { type => "list?(string)", optional => "true" },
             disabled => {
                 type => "valid(truefalse)",
@@ -1827,18 +1835,16 @@ sub parse_config_backups {
       }
 
       if ((defined $$bs{inventory} and $$bs{inventory}) and not (defined $$bs{'disabled'} and $$bs{'disabled'})) {
-          my @skipfstype = hashref_key_array_combine('skipfstype',
-                                                     hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                                                     \%CONFIG, # config file, top level
-                                                     $CONFIG{backupdestination}{$backupdest}, # from the destination
-                                                     $bs, # ourselves
-                                                     \%CLI_CONFIG);
-          my @allowfs = hashref_key_array_combine('allowfs',
-                                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                                                  \%CONFIG, # config file, top level
-                                                  $CONFIG{backupdestination}{$backupdest}, # from the destination
-                                                  $bs, # ourselves
-                                                  \%CLI_CONFIG);
+          my %filters;
+          for my $k (qw(skipfstype allowfs skip skipre)) {
+              $filters{$k} = [hashref_key_array_combine($k,
+                                                       hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                                       \%CONFIG, # config file, top level
+                                                       $CONFIG{backupdestination}{$backupdest}, # from the destination
+                                                       $bs, # ourselves
+                                                       \%CLI_CONFIG)];
+          }
+          print STDERR Dumper \%filters if $DEBUG;
         # perform inventory
         debug("performing inventory on $host");
         my $inventory_command='cat /proc/mounts';
@@ -1853,38 +1859,35 @@ sub parse_config_backups {
         my @a=`${inventory_command}`;
         if ($? == 0) {
           my @seen;
-        M:
+      M:
           foreach my $m (sort(@a)) {
-            my @e=split(/\s+/,$m);
-            if ( scalar @allowfs > 0 ) {
-              if ( not string_any($e[2],@allowfs) ) {
-                  debug("filesystem type is not allowd via the allow list: ${e[2]}");
-                  next;
-              }
-          } elsif ( string_any($e[2],@skipfstype) ) {
-              debug("filesystem type is not allowd via the skip list: ${e[2]}");
-              next;
-            }
-            if (defined $$bs{skip}) {
-              foreach my $skip (ref($$bs{skip}) eq "ARRAY" ? @{$$bs{skip}} : ($$bs{skip})) {
-                if ($e[1] eq $skip) {
+              my @e=split(/\s+/,$m);
+              if ( defined $filters{allowfs}
+                   and scalar @{$filters{allowfs}} > 0 ) {
+                  if ( not string_any($e[2], @{$filters{allowfs}}) ) {
+                      debug("filesystem type is not allowd via the allow list: ${e[2]}");
+                      next M;
+                  }
+              } elsif ( defined $filters{skipfstype} and string_any($e[2], @{$filters{skipfstype}}) ) {
+                  debug("filesystem type is not allowd via the skip list: ${e[2]}");
                   next M;
-                }
               }
-            }
-            if (defined $$bs{skipre}) {
-              foreach my $skipre (ref($$bs{skipre}) eq "ARRAY" ? @{$$bs{skipre}} : ($$bs{skipre})) {
-                if ($e[1] =~ /$skipre/) {
-                  next M;
-                }
+              if (defined $filters{skip}) {
+                  next M if string_any($e[1], (ref($filters{skip}) eq "ARRAY" ? @{$filters{skip}} : ($filters{skip})));
               }
-            }
-            # skip seen devices
-            grep(/^$e[0]$/,@seen) and next;
-            push(@seen,$e[0]);
-            push(@paths,$e[1]);
+              if (defined $filters{skipre}) {
+                  foreach my $skipre (ref($filters{skipre}) eq "ARRAY" ? @{$filters{skipre}} : ($filters{skipre})) {
+                      if ($e[1] =~ /$skipre/) {
+                          next M;
+                      }
+                  }
+              }
+              # skip seen devices
+              grep(/^$e[0]$/,@seen) and next;
+              push(@seen,$e[0]);
+              push(@paths,$e[1]);
           }
-        } else {
+      } else {
           error("unable to inventory ${host}");
         }
       }
@@ -2444,13 +2447,15 @@ sub hashref_key_array_combine {
     my $key = shift;
     my %a;
     foreach my $m (@_) {
-        if (defined $$m{$key} and reftype $$m{$key} eq reftype []) {
-            for my $e (@{$$m{$key}}) {
-                $a{$e} =1;
+        if (defined $$m{$key} ) {
+            if ( reftype $$m{$key} eq reftype []) {
+                for my $e (@{$$m{$key}}) {
+                    $a{$e} =1;
+                }
             }
-        }
-        else {
-            $a{$$m{$key}} = 1; # assume it's a scalar;
+            else {
+                $a{$$m{$key}} = 1; # assume it's a scalar;
+            }
         }
     }
     print STDERR Data::Dumper->Dump([\%a],[qw(hashref_key_filter_combine)]) if $DEBUG;
