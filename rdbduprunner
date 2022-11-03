@@ -381,19 +381,28 @@ Validity: CLI, Global
 =item C<DefaultBackupDestination> I<backupdestinationname>
 
 Specify the name of the backupdestination to use if one isn't
-specified in the BackupSet.
+specified in the BackupSet.  Can only be specified in the config file
+at the type level.
 
-=item {B<--maxinc> I<integer>}
+Validity: Global
 
-Acts as if the MaxInc config option were applied to every backup in
-the configuration, but the backup specific MaxInc still takes
-precendence for any given backup.
+=item C<MaxInc> I<integer> {B<--maxinc> I<integer>} (rdiff-backup only)
 
-=item {B<--maxage> I<timespec>}
+Used by the --tidy option to remove all but the most recent X
+increments.
 
-Acts as if the MaxAge config option were applied to every backup in
-the configuration, but the backup specific MaxAge still takes
-precendence for any given backup.
+Validity: CLI, Global, BackupDestination, BackupSet
+
+=item C<MaxAge> I<timespec> {B<--maxage> I<timespec>} (rdiff-backup/duplicity only)
+
+Used by the --tidy option to remove all increments older than
+specified age.  Ultimately this is passed to the remove-older-than
+options of rdiff-backup or duplicity so see those manpages for
+details.
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
+Example: MaxAge 1Y2W4D7s
 
 =item {B<--tempdir> I<path>}
 
@@ -603,17 +612,6 @@ be backed up unless it it's own mountpoint.  It does not work as an
 exclude directive as documented above above, it only matches
 filesystem mount points:
 
-=item I<MaxInc> - Integer, optional
-
-Used by the --tidy option to remove all but the most recent X
-increments.
-
-=item I<MaxAge> - String, optional (rdiff-backup/duplicity only)
-
-Used by the --tidy option to remove all increments older than
-specified age.  Ultimately this is passed to the remove-older-than
-options of rdiff-backup or duplicity so see those manpages for
-details.
 
 =item I<AllowFS> - String, optional
 
