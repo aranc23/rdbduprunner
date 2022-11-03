@@ -82,7 +82,6 @@ $APP_NAME
 $LOG_FILE
 $LOG_DIR
 @CONFIG_FILES
-@ALLOW_FS
 $EXCLUDE_PATH
 %config_definition
 @INCREMENTS
@@ -194,8 +193,6 @@ our @CONFIG_FILES =
 our $TEST=1;
 our %children; # store children for master backup loop
 our $RUNTIME; # storing the start time so we can calculate run time
-
-our @ALLOW_FS;
 
 # read the config file into this hash:
 our %CONFIG;
@@ -561,9 +558,13 @@ our %DEFAULT_CONFIG = (
             zfs
                    )],
     },
+    allowfs => {
+        getopt   => 'allowfs=s@',
+        type     => 'list?(string)',
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
 
-            # allowfs =>
-            # { type => "list?(string)", optional => "true" },
             # 'excludepath' =>
             # { type => "string", optional => "true" },
             #  useagent =>
@@ -669,8 +670,6 @@ our %config_definition = (
                 min      => 0,
                 optional => "true",
             },
-            allowfs =>
-            { type => "list?(string)", optional => "true" },
         },
     },
     truefalse => {
@@ -694,8 +693,6 @@ our %config_definition = (
                 type     => 'table(valid(backupset))',
                 optional => "true",
             },
-            allowfs =>
-            { type => "list?(string)", optional => "true" },
             excludepath =>
             { type => "string", optional => "true" },
              useagent =>
@@ -735,7 +732,6 @@ our %get_options=
    'exclude-path=s'         => \$EXCLUDE_PATH,
    'localhost=s'            => \$LOCALHOST,
    'test!'                  => \$TEST,
-   'allowfs=s'              => \@ALLOW_FS,
   );
 
 my $callback_clean = sub { my %t=@_;
@@ -1760,7 +1756,6 @@ sub which_zfs {
 # %CONFIG
 # $LOCALHOST
 # $HOST
-# @ALLOW_FS .... this looks like a bug as it overwrites it
 # $EXCLUDE_PATH
 # these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
 sub parse_config_backups {
@@ -1772,7 +1767,7 @@ sub parse_config_backups {
   print STDERR Dumper \%DEFAULT_CONFIG if $DEBUG;
   print STDERR Dumper \%CONFIG if $DEBUG;
   print STDERR Dumper \%CLI_CONFIG if $DEBUG;
-  print STDERR Dumper [$LOCALHOST,$HOST,\@ALLOW_FS,$EXCLUDE_PATH] if $DEBUG;
+  print STDERR Dumper [$LOCALHOST,$HOST,$EXCLUDE_PATH] if $DEBUG;
   for my $bstag (keys(%{$CONFIG{backupset}})) {
       my @bslist=($CONFIG{backupset}{$bstag});
       if (
@@ -1830,10 +1825,6 @@ sub parse_config_backups {
       if (defined $$bs{path}) {
         @paths=ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path});
       }
-      if (defined $$bs{allowfs}) {
-        debug("setting the list of allowed filesystems in the backup set, which will override the global options");
-        @ALLOW_FS=ref($$bs{allowfs}) eq "ARRAY" ? @{$$bs{allowfs}} : ($$bs{allowfs});
-      }
 
       if ((defined $$bs{inventory} and $$bs{inventory}) and not (defined $$bs{'disabled'} and $$bs{'disabled'})) {
           my @skipfstype = hashref_key_array_combine('skipfstype',
@@ -1842,6 +1833,12 @@ sub parse_config_backups {
                                                      $CONFIG{backupdestination}{$backupdest}, # from the destination
                                                      $bs, # ourselves
                                                      \%CLI_CONFIG);
+          my @allowfs = hashref_key_array_combine('allowfs',
+                                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                                  \%CONFIG, # config file, top level
+                                                  $CONFIG{backupdestination}{$backupdest}, # from the destination
+                                                  $bs, # ourselves
+                                                  \%CLI_CONFIG);
         # perform inventory
         debug("performing inventory on $host");
         my $inventory_command='cat /proc/mounts';
@@ -1859,10 +1856,10 @@ sub parse_config_backups {
         M:
           foreach my $m (sort(@a)) {
             my @e=split(/\s+/,$m);
-            if ( scalar @ALLOW_FS > 0 ) {
-              if ( not grep(/^$e[2]$/,@ALLOW_FS) ) {
-                debug("filesystem type is not allowd via the allow list: ${e[2]}");
-                next;
+            if ( scalar @allowfs > 0 ) {
+              if ( not string_any($e[2],@allowfs) ) {
+                  debug("filesystem type is not allowd via the allow list: ${e[2]}");
+                  next;
               }
           } elsif ( string_any($e[2],@skipfstype) ) {
               debug("filesystem type is not allowd via the skip list: ${e[2]}");
@@ -2142,10 +2139,6 @@ unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
 
     $config_validator->validate(\%CONFIG,'global');
 
-
-if(defined $CONFIG{allowfs}) {
-  @ALLOW_FS = ref($CONFIG{allowfs}) eq "ARRAY" ? @{$CONFIG{allowfs}} : ($CONFIG{allowfs} );
-}
 
 if(defined $EXCLUDE_PATH) {
   # leave it alone, it comes from the command line

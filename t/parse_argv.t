@@ -26,7 +26,6 @@ sub big_globals {
         'exclude-path'          => $EXCLUDE_PATH,
         'localhost'             => $LOCALHOST,
         'test'                  => $TEST,
-        'allowfs'               => \@ALLOW_FS,
     };
 }
 my $defaults = {
@@ -40,7 +39,6 @@ my $defaults = {
     'exclude-path'          => undef,
     'localhost'             => undef,
     'test'                  => 1,
-    'allowfs'  => [],
 };
 
 {
