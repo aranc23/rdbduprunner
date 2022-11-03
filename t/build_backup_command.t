@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 use Test2::V0;
-use Backup::rdbduprunner qw(build_backup_command %CONFIG $USEAGENT $ALLOWSOURCEMISMATCH $TEMPDIR $DUPLICITY_BINARY $RDIFF_BACKUP_BINARY $DRYRUN $RSYNC_BINARY $LOG_DIR %CLI_CONFIG);
+use Backup::rdbduprunner qw(build_backup_command %CONFIG $USEAGENT $ALLOWSOURCEMISMATCH $TEMPDIR $DRYRUN $LOG_DIR %CLI_CONFIG);
 
 use Data::Dumper;
 
@@ -31,6 +31,9 @@ use Data::Dumper;
         verbose           => 1,
         verbosity         => 5,
         terminalverbosity => 9,
+        duplicitybinary   => 'duplicity',
+        rsyncbinary       => 'rsync',
+        rdiffbackupbinary => 'rdiff-backup',
     };
     { # disabled backup
         local $bh = $bh;
@@ -53,7 +56,6 @@ use Data::Dumper;
     $USEAGENT = 1;
     $ALLOWSOURCEMISMATCH = 1;
     $TEMPDIR = '/var/tmp';
-    $DUPLICITY_BINARY = 'duplicity';
     $$bh{disabled} = 0;
     $CONFIG{default}{busted}=0;
 
@@ -73,7 +75,6 @@ use Data::Dumper;
     # start of "rdiff-backup"
     $$bh{btype} = 'rdiff-backup';
     $$bh{stats} = 0;
-    $RDIFF_BACKUP_BINARY = 'rdiff-backup';
     is([build_backup_command($bh)],
        [qw(rdiff-backup --verbosity 5 --terminal-verbosity 9 --exclude-device-files --exclude-other-filesystems --no-eas --ssh-no-compression --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "rdiff-backup");
@@ -87,8 +88,9 @@ use Data::Dumper;
 
     # start of "rdiff-backup with stats and disable ssh compression"
     $$bh{sshcompress} = 0;
+    $$bh{rdiffbackupbinary} = '/opt/bin/rdiff-backup';
     is([build_backup_command($bh)],
-       [qw(rdiff-backup --verbosity 5 --terminal-verbosity 9 --exclude-device-files --exclude-other-filesystems --no-eas --ssh-no-compression --print-statistics --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       [qw(/opt/bin/rdiff-backup --verbosity 5 --terminal-verbosity 9 --exclude-device-files --exclude-other-filesystems --no-eas --ssh-no-compression --print-statistics --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "rdiff-backup with stats and disable ssh compression");
 
     # start of "rsync"
@@ -99,7 +101,6 @@ use Data::Dumper;
     $$bh{sshcompress} = 1;
 
     $DRYRUN = 1;
-    $RSYNC_BINARY='rsync';
     $LOG_DIR = '/var/log';
 
     is([build_backup_command($bh)],

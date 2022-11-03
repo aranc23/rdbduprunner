@@ -77,15 +77,11 @@ $RUNTIME
 @BACKUPS
 $TEST
 $USEAGENT
-$DUPLICITY_BINARY
-$RDIFF_BACKUP_BINARY
 $HELP
 $APP_NAME
 $LOG_FILE
 $LOG_DIR
 @CONFIG_FILES
-$RSYNC_BINARY
-$ZFS_BINARY
 @ALLOW_FS
 $EXCLUDE_PATH
 %config_definition
@@ -99,7 +95,6 @@ $PATH
 $MAXAGE
 $MAXINC
 $DRYRUN
-$RSYNC_BINARY
 $ALLOWSOURCEMISMATCH
 &perform_backups
 &parse_config_backups
@@ -172,10 +167,6 @@ our $DEST;
 our $HOST;
 our $PATH;
 # configuring rdbduprunner:
-our $DUPLICITY_BINARY;
-our $RDIFF_BACKUP_BINARY;
-our $RSYNC_BINARY;
-our $ZFS_BINARY;
 our $EXCLUDE_PATH;
 our $LOCALHOST;
 Readonly our $STATE_DIR =>
@@ -510,17 +501,49 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli)],
     },
+    #'duplicity-binary=s'     => \$DUPLICITY_BINARY,
+    'duplicitybinary' => {
+        getopt => 'duplicitybinary|duplicity-binary=s',
+        default => 'duplicity',
+        type     => "string",
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
+    # 'rdiff-backup-binary=s'  => \$RDIFF_BACKUP_BINARY,
+    lc 'RdiffBackupBinary' => {
+        getopt => 'rdiffbackupbinary|rdiff-backup-binary=s',
+        default => 'rdiff-backup',
+        type     => "string",
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
+    # 'rsync-binary=s'         => \$RSYNC_BINARY,
+    'rsyncbinary' => {
+        getopt => 'rsyncbinary|rsync-binary=s',
+        default => 'rsync',
+        type     => "string",
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
+    #'zfs-binary=s'           => \$ZFS_BINARY,
+    'zfsbinary' => {
+        getopt => 'zfsbinary|zfs-binary=s',
+        default => 'zfs',
+        type     => "string",
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
+    'tricklebinary' => {
+        getopt => 'tricklebinary|trickle-binary=s',
+        default => 'trickle',
+        type     => "string",
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
             # defaultbackupdestination =>
             #     { type => "string", optional => "true" },
             # maxwait =>
             #     { type => "integer", min => 1, optional => "true" },
-            # duplicitybinary =>
-            # { type => "string", optional => "true" },
-            # rdiffbackupbinary =>
-            # { type => "string", optional => "true" },
-            # rsyncbinary =>
-            # { type => "string", optional => "true" },
-            # zfsbinary =>
             # { type => "string", optional => "true" },
             # allowfs =>
             # { type => "list?(string)", optional => "true" },
@@ -665,14 +688,6 @@ our %config_definition = (
                 type     => 'table(valid(backupset))',
                 optional => "true",
             },
-            duplicitybinary =>
-            { type => "string", optional => "true" },
-            rdiffbackupbinary =>
-            { type => "string", optional => "true" },
-            rsyncbinary =>
-            { type => "string", optional => "true" },
-            zfsbinary =>
-            { type => "string", optional => "true" },
             allowfs =>
             { type => "list?(string)", optional => "true" },
             excludepath =>
@@ -713,10 +728,6 @@ our %get_options=
    'path=s'                 => \$PATH,
 
    # configuring rdbduprunner:
-   'duplicity-binary=s'     => \$DUPLICITY_BINARY,
-   'rdiff-backup-binary=s'  => \$RDIFF_BACKUP_BINARY,
-   'rsync-binary=s'         => \$RSYNC_BINARY,
-   'zfs-binary=s'           => \$ZFS_BINARY,
    'exclude-path=s'         => \$EXCLUDE_PATH,
    'localhost=s'            => \$LOCALHOST,
    'test!'                  => \$TEST,
@@ -893,7 +904,7 @@ sub build_backup_command {
   }
 
   if($$bh{btype} eq 'duplicity') {
-    @com=($DUPLICITY_BINARY);
+    @com=($$bh{duplicitybinary});
     push(@com,'full') if dtruefalse(\%CLI_CONFIG, 'full');
     if($DRYRUN) {
       push(@com,'--dry-run');
@@ -911,7 +922,7 @@ sub build_backup_command {
     }
     push(@com,'--exclude-other-filesystems');
   } elsif($$bh{btype} eq 'rdiff-backup') { # must be rdiff-backup
-    @com=($RDIFF_BACKUP_BINARY,
+    @com=($$bh{rdiffbackupbinary},
           '--exclude-device-files',
           '--exclude-other-filesystems',
           '--no-eas',
@@ -923,7 +934,7 @@ sub build_backup_command {
       push(@com,'--print-statistics');
     }
   } elsif($$bh{btype} eq 'rsync') {
-    @com=($RSYNC_BINARY,
+    @com=($$bh{rsyncbinary},
           '--archive',
           '--one-file-system',
           '--hard-links',
@@ -986,7 +997,7 @@ sub build_backup_command {
 
   # if Trickle is set for a destination, use the trickle binary to slow upload rates to the value given
   if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/ and $$bh{btype} ne 'rsync') {
-    unshift(@com,'/usr/bin/trickle','-s','-u',$$bh{trickle});
+    unshift(@com,$$bh{tricklebinary},'-s','-u',$$bh{trickle});
   }
   return @com;
 }
@@ -1108,7 +1119,7 @@ sub perform_backup {
         debug("skipping zfs creation, directory exists: ".$$bh{'dest'});
       }
       elsif(my $zfs=which_zfs($zfs_parent)) {
-        my @com=($ZFS_BINARY,
+        my @com=($$bh{zfsbinary},
                  'create',
                  "${zfs}/${zfs_child}",
                 );
@@ -1220,7 +1231,7 @@ sub perform_backup {
         # snapshot is zfs plus a name
         my $snap=$zfs.'@rdbduprunner-'.( $mainret == 0 ? 'success-' : 'failure-').strftime("%FT%T%z",localtime());
         # snapshot commmand is straightforward
-        my @com=($ZFS_BINARY,
+        my @com=($$bh{zfsbinary},
                  'snapshot',
                  $snap);
         info(join(' ',@com));
@@ -1415,7 +1426,7 @@ sub tidy {
     my $tag=$$bh{tag};
     my @com;
     if($$bh{btype} eq 'rdiff-backup') {
-      @com=($RDIFF_BACKUP_BINARY,
+      @com=($$bh{rdiffbackupbinary},
             verbargs($bh),
             '--force',
             '--remove-older-than',
@@ -1464,7 +1475,7 @@ sub tidy {
         debug("max age is not defined for $$bh{tag}, so we cannot tidy it");
         return;
       }
-      my @com=($DUPLICITY_BINARY,
+      my @com=($$bh{duplicitybinary},
                'remove-older-than',
                $$bh{maxage},
                '--force');
@@ -1558,7 +1569,7 @@ sub build_increment_list {
 sub list_increments {
     my $bp=$_[0];
 
-    my $c="$RDIFF_BACKUP_BINARY -l --parsable-output ".$$bp{dest};
+    my $c="$$bp{rdiffbackupbinary} -l --parsable-output ".$$bp{dest};
     debug($c);
     my @res=`$c`;
     #@res == 1 and next; # if there is only one increment, don't consider it for removal
@@ -1592,7 +1603,7 @@ sub remove_oldest {
 	    next;
 	}
 	my $t=$$ih{inctime};
-	my @com=($RDIFF_BACKUP_BINARY,
+	my @com=($$ih{rdiffbackupbinary},
              verbargs($$ih{bh}),
 		 '--remove-older-than',($t+1), # do I really need to add 1?
 		 $$ih{bh}{dest});
@@ -2135,38 +2146,6 @@ unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
 
     $config_validator->validate(\%CONFIG,'global');
 
-# set some global options using the config file global options???
-if(not defined $DUPLICITY_BINARY) {
-    if(defined $CONFIG{duplicitybinary}) {
-	$DUPLICITY_BINARY=$CONFIG{duplicitybinary};
-    } else {
-	$DUPLICITY_BINARY='duplicity'; # in our path we hope
-    }
-}
-
-if(not defined $RDIFF_BACKUP_BINARY) {
-    if(defined $CONFIG{rdiffbackupbinary}) {
-	$RDIFF_BACKUP_BINARY=$CONFIG{rdiffbackupbinary};
-    } else {
-	$RDIFF_BACKUP_BINARY='rdiff-backup'; # in our path we hope
-    }
-}
-
-if(not defined $RSYNC_BINARY) {
-  if(defined $CONFIG{rsyncbinary}) {
-	$RSYNC_BINARY=$CONFIG{rsyncbinary};
-  } else {
-	$RSYNC_BINARY='rsync'; # in our path we hope
-  }
-}
-
-if(not defined $ZFS_BINARY) {
-  if(defined $CONFIG{zfsbinary}) {
-	$ZFS_BINARY=$CONFIG{zfsbinary};
-  } else {
-	$ZFS_BINARY='zfs'; # in our path we hope
-  }
-}
 
 if(defined $CONFIG{allowfs}) {
   @ALLOW_FS = ref($CONFIG{allowfs}) eq "ARRAY" ? @{$CONFIG{allowfs}} : ($CONFIG{allowfs} );
@@ -2229,10 +2208,10 @@ if(dtruefalse(\%CLI_CONFIG, 'status')) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
     my @com;
     if($$bh{btype} eq 'duplicity') {
-      @com=($DUPLICITY_BINARY,'collection-status');
+      @com=($$bh{duplicitybinary},'collection-status');
       $USEAGENT and push(@com,'--use-agent');
     } elsif($$bh{btype} eq 'rdiff-backup') {
-      @com=($RDIFF_BACKUP_BINARY,'--list-increment-sizes');
+      @com=($$bh{rdiffbackupbinary},'--list-increment-sizes');
     } elsif($$bh{btype} eq 'rsync') {
       @com=('du','-cshx');
     }
@@ -2273,11 +2252,11 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
         my @com;
         if($$bh{btype} eq 'duplicity') {
-            push(@com,$DUPLICITY_BINARY,'cleanup');
+            push(@com,$$bh{duplicitybinary},'cleanup');
             $USEAGENT and push(@com,'--use-agent');
             push(@com,'--force') if dtruefalse(\%CLI_CONFIG, 'force');
         } elsif($$bh{btype} eq 'rdiff-backup') {
-            push(@com,$RDIFF_BACKUP_BINARY,'--check-destination-dir');
+            push(@com,$$bh{rdiffbackupbinary},'--check-destination-dir');
         }
         else {
           warn("cleanup function only implmented for duplicity and rdiff-backup");
@@ -2319,8 +2298,9 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
       }
     }
 } elsif(dtruefalse(\%CLI_CONFIG, 'average')) {
-    my $avcom="$RDIFF_BACKUP_BINARY --calculate-average";
+    my $avcom;
     foreach my $bh (sort backup_sort (@BACKUPS)) {
+        $avcom="$$bh{rdiffbackupbinary} --calculate-average";
         unless($$bh{btype} eq 'rdiff-backup') {
           warn("average function only applies to rdiff-backup type backupes");
             next;
@@ -2332,11 +2312,11 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
   foreach my $bh (sort backup_sort (@BACKUPS)) {
     my @com;
     if ($$bh{btype} eq 'duplicity') {
-      @com=($DUPLICITY_BINARY,'verify');
+      @com=($$bh{duplicitybinary},'verify');
       $USEAGENT and push(@com,'--use-agent');
     }
     elsif($$bh{btype} eq 'rdiff-backup') {
-      @com=($RDIFF_BACKUP_BINARY,'--compare','--no-eas');
+      @com=($$$bh{rdiffbackupbinary},'--compare','--no-eas');
     }
     else {
       warn("verify function not implemented for rsync backups");
@@ -2375,7 +2355,7 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
       warn("list function only applies to duplicity type backups");
       next;
     }
-    @com=($DUPLICITY_BINARY,'list-current-files');
+    @com=($$bh{duplicitybinary},'list-current-files');
     $USEAGENT and push(@com,'--use-agent');
     push(@com,verbargs($bh));
     push(@com,$$bh{dest});

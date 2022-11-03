@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 use Test2::V0;
-use Backup::rdbduprunner qw(build_backup_command %CONFIG $USEAGENT $ALLOWSOURCEMISMATCH $TEMPDIR $DUPLICITY_BINARY $RDIFF_BACKUP_BINARY $DRYRUN $RSYNC_BINARY $LOG_DIR parse_config_backups $LOCALHOST $EXCLUDE_PATH %CLI_CONFIG %DEFAULT_CONFIG);
+use Backup::rdbduprunner qw(build_backup_command %CONFIG $USEAGENT $ALLOWSOURCEMISMATCH $TEMPDIR $DRYRUN $LOG_DIR parse_config_backups $LOCALHOST $EXCLUDE_PATH %CLI_CONFIG %DEFAULT_CONFIG);
 
 use Data::Dumper;
 
