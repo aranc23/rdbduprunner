@@ -339,6 +339,38 @@ This also mistakenly I believe passes -z to rsync to disable compression.
 
 Validity: CLI, Global, BackupDestination, BackupSet
 
+=item C<DuplicityBinary> I<executable> {B<--duplicity-binary> I<executable>}
+
+Default: duplicity
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
+=item C<RsyncBinary> I<executable> {B<--rsync-binary> I<executable>}
+
+Default: rsync
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
+=item C<RdiffBackupBinary> I<executable> {B<--rdiff-backup-binary> I<executable>}
+
+Default: rdiff-backup
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
+=item C<ZfsBinary> I<executable> {B<--zfs-binary> I<executable>}
+
+Default: zfs
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
+=item C<TrickleBinary> I<executable> {B<--trickle-binary> I<executable>}
+
+Default: trickle
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
+
+
 =item {B<--maxinc> I<integer>}
 
 Acts as if the MaxInc config option were applied to every backup in
@@ -444,14 +476,6 @@ The precendence is as follows:
 =head3 Global Options
 
 =over 4
-
-=item I<DuplicityBinary> - path to duplicity
-
-=item I<RdiffBackupBinary> - path to rdiff-backup
-
-=item I<RsyncBinary> - path to rsync
-
-=item I<ZfsBinary> - path to zfs
 
 =item I<ExcludePath> - What directory to look for exclude
 files. Defaults to F</etc/rdbduprunner>
