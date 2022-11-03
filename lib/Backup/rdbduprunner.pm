@@ -41,6 +41,7 @@ use Clone qw(clone);
 use Carp;
 #from a standard perl distribution, on UNIX at least
 use Pod::Usage;
+use Sys::Hostname;
 
 our @ISA = qw(Exporter);
 

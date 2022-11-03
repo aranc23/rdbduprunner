@@ -27,7 +27,7 @@ summary="script and module for making backups with rsync, rdiff-backup, and dupl
 description="runs backup programs per a configuration file"
 common_opts="--version ${version} --iteration ${iteration} -m arancox@gmail.com --architecture noarch -s cpan --prefix /usr --cpan-perl-lib-path /usr/share/perl5 --url ${url}"
 
-cpan_reject=(Config vars warnings strict Encode Carp IO::Select IO::Handle Fcntl POSIX Sys::Hostname URI::Escape Scalar::Util File::Basename Data::Dumper Log::Dispatch::Screen Log::Dispatch::Syslog Log::Dispatch::File AnyDBM-File)
+cpan_reject=(Config vars warnings strict Encode Carp IO::Select IO::Handle Fcntl POSIX Sys::Hostname URI::Escape Scalar::Util File::Basename Data::Dumper Log::Dispatch::Screen Log::Dispatch::Syslog Log::Dispatch::File AnyDBM-File Sys::Hostname)
 for mod in ${cpan_reject[@]}; do
     deb_deps="${deb_deps} --cpan-package-reject-from-depends ${mod}"
 done
