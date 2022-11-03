@@ -16,8 +16,6 @@ use Hash::Merge qw(merge);
 
 sub big_globals {
     return {
-        'maxage'                => $MAXAGE,
-        'maxinc'                => $MAXINC,
         'u'                     => $USEAGENT,
         'allow-source-mismatch' => $ALLOWSOURCEMISMATCH,
         'tempdir'               => $TEMPDIR,
@@ -33,8 +31,6 @@ sub big_globals {
     };
 }
 my $defaults = {
-    'maxage'                => undef,
-    'maxinc'                => undef,
     'u'                     => undef,
     'allow-source-mismatch' => 0,
     'tempdir'               => undef,
@@ -156,7 +152,7 @@ my $defaults = {
               --status-delete pork
               --force
               --full
-              --maxage 1d
+              --maxage 1D1W2Y4s
               --maxinc 4
               --verbosity 5
               -t 5
@@ -202,6 +198,8 @@ my $defaults = {
          status_json => 1,
          tidy => 1,
          maxwait => 32000,
+         maxinc => 4,
+         maxage => '1D1W2Y4s',
      },
         "nothing passed");
 
@@ -209,8 +207,6 @@ my $defaults = {
         $$defaults{$_} = 1;
     }
     $$defaults{'tempdir'} = '/var/tmp';
-    $$defaults{'maxage'} = '1d';
-    $$defaults{'maxinc'} = '4';
 
     is( big_globals(),
         $defaults,
