@@ -30,7 +30,6 @@ sub big_globals {
         'test'                  => $TEST,
         'skipfs'                => \@SKIP_FS,
         'allowfs'               => \@ALLOW_FS,
-        'maxwait'               => $MAXWAIT,
     };
 }
 my $defaults = {
@@ -97,7 +96,6 @@ my $defaults = {
             zfs)
     ],
     'allowfs'  => [],
-    'maxwait'  => undef,
 };
 
 {
@@ -173,6 +171,7 @@ my $defaults = {
               --maxprocs 2
               --facility daemon
               --level debug
+              --maxwait 32000
       )], \%get_options,@options);
     ok(lives {
         $cv->validate($results,"cli");
@@ -202,6 +201,7 @@ my $defaults = {
          status_delete => ['pork'],
          status_json => 1,
          tidy => 1,
+         maxwait => 32000,
      },
         "nothing passed");
 
