@@ -69,7 +69,6 @@ $STATE_DIR
 $CONFIG_DIR
 $LOCK_DIR
 $LOG_DIR
-$LOCALHOST
 %get_options
 %CONFIG
 $CONFIG_FILE
@@ -164,7 +163,6 @@ our $HOST;
 our $PATH;
 # configuring rdbduprunner:
 our $EXCLUDE_PATH;
-our $LOCALHOST;
 Readonly our $STATE_DIR =>
     $USER eq 'root'                 ? File::Spec->catfile('/var/lib', $APP_NAME)
     : exists $ENV{'XDG_STATE_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
@@ -581,6 +579,15 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli global backupdestination backupset)],
     },
+    # 'localhost=s'            => \$LOCALHOST,
+    localhost => {
+        getopt => 'localhost=s',
+        type => "string",
+        optional => "true",
+        sections => [qw(cli global )],
+        default => shortname(),
+    },
+
     # 'excludepath' =>
             # { type => "string", optional => "true" },
             #  useagent =>
@@ -742,7 +749,6 @@ our %get_options=
 
    # configuring rdbduprunner:
    'exclude-path=s'         => \$EXCLUDE_PATH,
-   'localhost=s'            => \$LOCALHOST,
    'test!'                  => \$TEST,
   );
 
@@ -1676,7 +1682,11 @@ sub log_exit_status {
                  {'exit' => $exit},
                  $bh);
   $msg =~ s/\"/\\\"/g;
-  if($$bh{host} ne $LOCALHOST) {
+  my $localhost = key_select('localhost',
+                             hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                             \%CONFIG, # config file, top level
+                             \%CLI_CONFIG);
+  if($$bh{host} ne $localhost) {
       my $facility =
           key_select('facility',
                      hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
@@ -1766,7 +1776,6 @@ sub which_zfs {
 # @BACKUPS array:
 # global variables used:
 # %CONFIG
-# $LOCALHOST
 # $HOST
 # $EXCLUDE_PATH
 # these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
@@ -1779,7 +1788,7 @@ sub parse_config_backups {
   print STDERR Dumper \%DEFAULT_CONFIG if $DEBUG;
   print STDERR Dumper \%CONFIG if $DEBUG;
   print STDERR Dumper \%CLI_CONFIG if $DEBUG;
-  print STDERR Dumper [$LOCALHOST,$HOST,$EXCLUDE_PATH] if $DEBUG;
+  print STDERR Dumper [$HOST,$EXCLUDE_PATH] if $DEBUG;
   for my $bstag (keys(%{$CONFIG{backupset}})) {
       my @bslist=($CONFIG{backupset}{$bstag});
       if (
@@ -1791,7 +1800,11 @@ sub parse_config_backups {
           die("multiple backupsets with the same name: ${bstag}, this cannot happen");
       }
     foreach my $bs (@bslist) {
-      my $host=(defined $$bs{host} ? $$bs{host} : $LOCALHOST);
+      my $localhost = key_select('localhost',
+                                 hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                 \%CONFIG, # config file, top level
+                                 \%CLI_CONFIG);
+      my $host=(defined $$bs{host} ? $$bs{host} : $localhost);
       my $btype;
       my $backupdest;
 
@@ -1819,8 +1832,8 @@ sub parse_config_backups {
       } else {
         $btype='rsync';
       }
-      if ($btype eq 'duplicity' and $host ne $LOCALHOST) {
-        error("$bstag is a duplicity backup with host set to $host and LOCALHOST: ${LOCALHOST}: duplicity backups must have a local source!");
+      if ($btype eq 'duplicity' and $host ne $localhost) {
+        error("$bstag is a duplicity backup with host set to $host and localhost: ${localhost}: duplicity backups must have a local source!");
         next;
       }
 
@@ -1852,7 +1865,7 @@ sub parse_config_backups {
         # perform inventory
         debug("performing inventory on $host");
         my $inventory_command='cat /proc/mounts';
-        if ($host ne $LOCALHOST) {
+        if ($host ne $localhost) {
           $inventory_command="ssh -x -o BatchMode=yes ${host} ${inventory_command} < /dev/null";
         }
         if (-x '/usr/bin/waitmax') {
@@ -1964,7 +1977,7 @@ sub parse_config_backups {
                                      $config_definition{'cli'}{fields}),
             keys(%DEFAULT_CONFIG))) {
         # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
-            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait skipfstype));
+            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait skipfstype localhost));
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
@@ -1975,7 +1988,12 @@ sub parse_config_backups {
         }
         print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
         my @split_host = split(/\./,$$bh{host});
-        $$bh{'src'} = ($$bh{host} eq $LOCALHOST or $split_host[0] eq $LOCALHOST ) ? $$bh{path} : $$bh{host}.($$bh{btype} eq 'rsync' ? ':' : '::').$$bh{path};
+        $$bh{'src'}
+            = ( $$bh{host} eq $localhost or $split_host[0] eq $localhost )
+            ? $$bh{path}
+            : $$bh{host}
+            . ( $$bh{btype} eq 'rsync' ? ':' : '::' )
+            . $$bh{path};
         dlog('debug','backup',$bh);
         push(@BACKUPS,$bh);
       }
@@ -2085,17 +2103,6 @@ sub rdbduprunner {
 
 # print the SYNOPSIS section and exit
 pod2usage(-1) if $HELP;
-
-if(not defined $LOCALHOST) {
-  if(defined $CONFIG{localhost}) {
-    $LOCALHOST=$CONFIG{localhost};
-  } else {
-    $LOCALHOST=`hostname`;
-    chomp $LOCALHOST;
-    my @a=split(/\./,$LOCALHOST);
-    @a > 1 and $LOCALHOST=$a[0];
-  }
-}
 
 
     create_dispatcher( $APP_NAME,
@@ -2489,6 +2496,12 @@ sub dtruefalse {
         return 0;
     }
     return;
+}
+
+sub shortname {
+    my $h = hostname();
+    my @split_host = split(/\./, $h);
+    return $split_host[0];
 }
 
 # Preloaded methods go here.

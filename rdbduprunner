@@ -512,6 +512,25 @@ filesystem mount points
 
 Validity: CLI, Global, BackupDestination, BackupSet
 
+=item C<LocalHost> I<hostname> {B<--localhost> I<hostname>}
+
+rdbduprunner sets this to the shortname of the system.  This is then
+used when setting the C<host> parameter for BackupSets that don't
+specify one.  The host value is then used in generating the output
+path of the backup programs.  This means that purely local backups
+will have names like C<server1-home> and remote systems if you specify
+the FQDN will have output directories named like:
+C<server1.example.com-home>.
+
+This should probably be the output of the hostname() sub from
+L<Sys::Hostname> by default, however changing it now would change the
+names of some backups, at least potentially.
+
+See L<https://github.com/aranc23/rdbduprunner/issues/12>
+
+Advice: don't change this.
+
+Validity: CLI, Global
 
 =item {B<--tempdir> I<path>}
 

@@ -24,7 +24,6 @@ sub big_globals {
         'host'                  => $HOST,
         'path'                  => $PATH,
         'exclude-path'          => $EXCLUDE_PATH,
-        'localhost'             => $LOCALHOST,
         'test'                  => $TEST,
     };
 }
@@ -37,7 +36,6 @@ my $defaults = {
     'host'                  => undef,
     'path'                  => undef,
     'exclude-path'          => undef,
-    'localhost'             => undef,
     'test'                  => 1,
 };
 
