@@ -84,7 +84,6 @@ $LOG_DIR
 $DEST
 $HOST
 $PATH
-$DRYRUN
 &perform_backups
 &parse_config_backups
 &status_json
@@ -147,7 +146,6 @@ our $HELP=0;
 
 Readonly our $USER => $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(getpwuid($<));
 
-our $DRYRUN=0;
 # the next three options limit which backups get acted upon
 our $DEST;
 our $HOST;
@@ -611,6 +609,12 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli global)],
     },
+    'dryrun' => {
+        getopt => 'dryrun|dry-run|n',
+        type => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    }
 );
 
 our %config_definition = (
@@ -743,9 +747,6 @@ our %get_options=
    'h|help'                 => \$HELP,
    # can be overridden from the command line, but not the config
    'config=s'               => \$CONFIG_FILE, # config file
-
-   # rsync specific options
-   'n|dry-run'              => \$DRYRUN,
 
    # the next three options limit which backups get acted upon
    'dest=s'                 => \$DEST,
@@ -924,7 +925,7 @@ sub build_backup_command {
   if($$bh{btype} eq 'duplicity') {
     @com=($$bh{duplicitybinary});
     push(@com,'full') if dtruefalse(\%CLI_CONFIG, 'full');
-    if($DRYRUN) {
+    if($$bh{dryrun}) {
       push(@com,'--dry-run');
     }
     $$bh{useagent} and push(@com,'--use-agent');
@@ -963,7 +964,7 @@ sub build_backup_command {
     if( defined $$bh{wholefile} ) {
       push(@com, $$bh{wholefile} ? '--whole-file' : '--no-whole-file');
     }
-    if($DRYRUN) {
+    if($$bh{dryrun}) {
       push(@com,'--dry-run');
     }
     if($$bh{checksum}) {
@@ -1129,7 +1130,7 @@ sub perform_backup {
       dlog('debug','empty backup command',$bh);
       next BACKUP;
     }
-    if (defined $$bh{zfscreate} and bool_parse($$bh{zfscreate}) == 1 and not $DRYRUN) {
+    if (defined $$bh{zfscreate} and bool_parse($$bh{zfscreate}) == 1 and not $$bh{dryrun}) {
       # this seems messy, but we want the parent dir of the real destination
       my @all_dirs = File::Spec->splitdir( $$bh{'dest'} );
       my $zfs_child = pop @all_dirs;
@@ -1176,7 +1177,7 @@ sub perform_backup {
         next;
       }
     }
-    if (defined $$bh{prerun} and not $DRYRUN) {
+    if (defined $$bh{prerun} and not $$bh{dryrun}) {
       info($$bh{prerun});
       unless($CLI_CONFIG{test}) {
         set_env($bh);
@@ -1220,7 +1221,7 @@ sub perform_backup {
     }
     # if there is no postrun, return the log_exit_status using $mainret
     # if there is a postrun, return that value instead regardless of failure
-    if (defined $$bh{postrun} and not $DRYRUN) {
+    if (defined $$bh{postrun} and not $$bh{dryrun}) {
       info($$bh{postrun});
       unless($CLI_CONFIG{test}) {
         set_env($bh);
@@ -1244,7 +1245,7 @@ sub perform_backup {
       }
     }
     # attempt to create a snapshot of the destination filesystem
-    if (defined $$bh{zfssnapshot} and bool_parse($$bh{zfssnapshot}) == 1 and not $DRYRUN) {
+    if (defined $$bh{zfssnapshot} and bool_parse($$bh{zfssnapshot}) == 1 and not $$bh{dryrun}) {
       # zfs is path minus leading /
       if(my $zfs = find_zfs($$bh{'dest'})) {
         # snapshot is zfs plus a name

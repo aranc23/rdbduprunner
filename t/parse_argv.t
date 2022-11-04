@@ -16,14 +16,12 @@ use Hash::Merge qw(merge);
 
 sub big_globals {
     return {
-        dryrun                  => $DRYRUN,
         'dest'                  => $DEST,
         'host'                  => $HOST,
         'path'                  => $PATH,
     };
 }
 my $defaults = {
-    dryrun                  => 0,
     'dest'                  => undef,
     'host'                  => undef,
     'path'                  => undef,
@@ -137,12 +135,9 @@ my $defaults = {
          allowsourcemismatch => 1,
          test => 0,
          tempdir => '/var/tmp',
+         dryrun => 1,
      },
         "nothing passed");
-
-    for(qw(dryrun)) {
-        $$defaults{$_} = 1;
-    }
 
     is( big_globals(),
         $defaults,

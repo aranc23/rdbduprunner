@@ -211,7 +211,6 @@ Passes the --dry-run option to rsync or duplicity.  rdbduprunner will
 not run the prerun, postrun or zfs create and zfs snapshot commands
 (when applicable.)  rdiff-backup does not have a dry-run option.
 
-
 =back
 
 =head2 CONFIGURATION FILE PARAMETERS

@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 use Test2::V0;
-use Backup::rdbduprunner qw(build_backup_command %CONFIG $DRYRUN $LOG_DIR %CLI_CONFIG);
+use Backup::rdbduprunner qw(build_backup_command %CONFIG $LOG_DIR %CLI_CONFIG);
 
 use Data::Dumper;
 
@@ -99,8 +99,8 @@ use Data::Dumper;
     $$bh{trickle} = 4;
     $$bh{stats} = 0;
     $$bh{sshcompress} = 1;
+    $$bh{dryrun} = 1;
 
-    $DRYRUN = 1;
     $LOG_DIR = '/var/log';
 
     is([build_backup_command($bh)],
@@ -110,7 +110,7 @@ use Data::Dumper;
     $$bh{stats} = 1;
     $$bh{wholefile} = 0;
     $$bh{exclude} = [qw(nope not this)];
-    $DRYRUN = 0;
+    $$bh{dryrun} = 0;
 
     is([build_backup_command($bh)],
        [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --bwlimit=4 -z --stats --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
