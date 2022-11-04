@@ -80,9 +80,6 @@ $LOG_DIR
 @CONFIG_FILES
 %config_definition
 @INCREMENTS
-$DEST
-$HOST
-$PATH
 &perform_backups
 &parse_config_backups
 &status_json
@@ -142,10 +139,6 @@ our $DISPATCHER;
 
 Readonly our $USER => $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(getpwuid($<));
 
-# the next three options limit which backups get acted upon
-our $DEST;
-our $HOST;
-our $PATH;
 # configuring rdbduprunner:
 Readonly our $STATE_DIR =>
     $USER eq 'root'                 ? File::Spec->catfile('/var/lib', $APP_NAME)
@@ -619,6 +612,37 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli)],
     },
+    # can be overridden from the command line, but not the config
+    # 'config=s'               => \$CONFIG_FILE, # config file
+    'config' => {
+        getopt => 'config|config-file|config_file=s',
+        type => "string",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    # the next three options limit which backups get acted upon
+    #'dest=s'                 => \$DEST,
+    #'host=s'                 => \$HOST,
+    #'path=s'                 => \$PATH,
+    'filterdest' => {
+        getopt => 'filterdest|dest=s',
+        type => "string",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    'filterpath' => {
+        getopt => 'filterpath|path=s',
+        type => "string",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    'filterhost' => {
+        getopt => 'filterhost|host=s',
+        type => "string",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+
 );
 
 our %config_definition = (
@@ -747,14 +771,6 @@ our %config_definition = (
 
 our %get_options=
   (
-   # can be overridden from the command line, but not the config
-   'config=s'               => \$CONFIG_FILE, # config file
-
-   # the next three options limit which backups get acted upon
-   'dest=s'                 => \$DEST,
-   'host=s'                 => \$HOST,
-   'path=s'                 => \$PATH,
-
   );
 
 my $callback_clean = sub { my %t=@_;
@@ -1782,7 +1798,6 @@ sub which_zfs {
 # @BACKUPS array:
 # global variables used:
 # %CONFIG
-# $HOST
 # these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
 sub parse_config_backups {
     my %DEFAULT_CONFIG = %{shift(@_)};
@@ -1793,7 +1808,6 @@ sub parse_config_backups {
   print STDERR Dumper \%DEFAULT_CONFIG if $DEBUG;
   print STDERR Dumper \%CONFIG if $DEBUG;
   print STDERR Dumper \%CLI_CONFIG if $DEBUG;
-  print STDERR Dumper [$HOST] if $DEBUG;
   for my $bstag (keys(%{$CONFIG{backupset}})) {
       my @bslist=($CONFIG{backupset}{$bstag});
       if (
@@ -1813,7 +1827,7 @@ sub parse_config_backups {
       my $btype;
       my $backupdest;
 
-      if (defined $HOST and $host !~ /$HOST/) {
+      if (defined $CLI_CONFIG{filterhost} and $host !~ /$CLI_CONFIG{filterhost}/) {
         next;
       }
       dlog('debug','backupset',
@@ -1842,7 +1856,7 @@ sub parse_config_backups {
         next;
       }
 
-      if (defined $DEST and $backupdest !~ /$DEST/) {
+      if (defined $CLI_CONFIG{filterdest} and $backupdest !~ /$CLI_CONFIG{filterdest}/) {
         next;
       }
       unless (exists $CONFIG{backupdestination}{$backupdest} and exists $CONFIG{backupdestination}{$backupdest}{path}) {
@@ -1916,7 +1930,7 @@ sub parse_config_backups {
       foreach my $path (@paths) {
         $path =~ s/.+\/$//; # remove any trailing slash, but only if there is something before it!
         my $bh={};
-        if (defined $PATH and $path !~ /$PATH/) {
+        if (defined $CLI_CONFIG{filterpath} and $path !~ /$CLI_CONFIG{filterpath}/) {
           next;
         }
         my $dest;
@@ -1986,7 +2000,7 @@ sub parse_config_backups {
                                      $config_definition{'cli'}{fields}),
             keys(%DEFAULT_CONFIG))) {
         # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
-            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait skipfstype localhost test excludepath));
+            next KEY if string_any($key, qw(filterpath filterdest filterhost defaultbackupdestination type maxprocs level facility force full maxwait skipfstype localhost test excludepath));
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
@@ -2124,7 +2138,7 @@ sub rdbduprunner {
 $RUNTIME=time();
 dlog('info','starting',{});
 
-unless ( $CONFIG_FILE ) {
+unless ( defined $CLI_CONFIG{config} ) {
  FILE:
     foreach my $c (@CONFIG_FILES) {
         # loop through the candidates, choose the first existing one

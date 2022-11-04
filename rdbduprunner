@@ -196,9 +196,33 @@ Passess the full option to duplicity backup.
 
 Passess the --force option to duplicity cleanup mode.
 
-=item {B<--config> I<path>}
+=item {B<--config|config-file|config_file> I<path>}
 
-Change path to configuration file.
+Change the path to the configuration file.  By default rdbduprunner looks in a number of standard locations.  When run as root:
+
+=over 2
+
+=item /root/.rdbduprunner.rc
+
+=item /etc/rdbduprunner.rc
+
+=item /etc/rdbduprunner/rdbduprunner.conf
+
+=back
+
+For non root users:
+
+=over 2
+
+=item ~/.rdbduprunner.rc
+
+=item ~/.config/rdbduprunner/config
+
+=back
+
+The .rc files are search for first for compatibility with existing
+installs, use C</etc/rdbduprunner/rdbduprunner.conf> for root and
+C<~/.config/rdbduprunner/config> for non-root users.
 
 =item {B<--allow-source-mismatch>} (duplicity only)
 
@@ -709,10 +733,11 @@ normalize the paths for any given method of specifiying exclusions.
 
 =head1 NOTES
 
-rdbduprunner *should* prefer to use configuration items in this order,
+rdbduprunner prefers to use configuration items in the following order
 with later entries superseding the prior level. This assumes that the
 option itself is applicable all the way down to the individual
-invocations of the backup software.
+invocations of the backup software.  The Validity entry for each
+configuration option indicates which level the options are valid at.
 
 =over 4
 

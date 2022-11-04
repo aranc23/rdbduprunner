@@ -14,19 +14,6 @@ use Backup::rdbduprunner qw(:all);
 use Data::Dumper;
 use Hash::Merge qw(merge);
 
-sub big_globals {
-    return {
-        'dest'                  => $DEST,
-        'host'                  => $HOST,
-        'path'                  => $PATH,
-    };
-}
-my $defaults = {
-    'dest'                  => undef,
-    'host'                  => undef,
-    'path'                  => undef,
-};
-
 {
     for my $section (qw(cli global backupdestination backupset)) {
         $config_definition{$section}{fields} = merge(
@@ -50,20 +37,12 @@ my $defaults = {
     is( $results,
         {},
         "nothing passed");
-    is( big_globals(),
-        $defaults,
-        "no options global vars",
-    );
 
     $results = parse_argv([qw(--notest --stats)], \%get_options,@options);
     ok(lives { $cv->validate($results, 'cli'); }, 'unparaseable');
     is( $results,
         {stats => 1, test => 0},
         "options: notest and stats");
-    is( big_globals(),
-        $defaults,
-        "old options: notest and stats");
-
     # start of "everything"
     $results = parse_argv([
         qw(
@@ -138,10 +117,6 @@ my $defaults = {
          dryrun => 1,
      },
         "nothing passed");
-
-    is( big_globals(),
-        $defaults,
-        "everything");
 
 }
 
