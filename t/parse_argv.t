@@ -32,13 +32,13 @@ use Hash::Merge qw(merge);
     my @options = hashref_key_array(\%DEFAULT_CONFIG,
                                     'getopt');
     my $results;
-    $results = parse_argv([], \%get_options,@options);
+    $results = parse_argv([], @options);
     ok(lives { $cv->validate($results, 'cli'); }, 'unparaseable');
     is( $results,
         {},
         "nothing passed");
 
-    $results = parse_argv([qw(--notest --stats)], \%get_options,@options);
+    $results = parse_argv([qw(--notest --stats)], @options);
     ok(lives { $cv->validate($results, 'cli'); }, 'unparaseable');
     is( $results,
         {stats => 1, test => 0},
@@ -79,7 +79,7 @@ use Hash::Merge qw(merge);
               --level debug
               --maxwait 32000
               --no-test
-      )], \%get_options,@options);
+      )], @options);
     ok(lives {
         $cv->validate($results,"cli");
     }, "unparaseable");

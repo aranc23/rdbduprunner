@@ -21,7 +21,7 @@ use File::Basename;
 use File::Spec::Functions;
 use File::Path qw(make_path);
 use English qw( -no_match_vars );
-use Getopt::Long qw(GetOptionsFromArray :config pass_through) ; # use this to pull out the config file
+use Getopt::Long qw(GetOptionsFromArray);
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Storable qw( freeze thaw dclone );
 use Scalar::Util qw/reftype/;
@@ -69,7 +69,6 @@ $STATE_DIR
 $CONFIG_DIR
 $LOCK_DIR
 $LOG_DIR
-%get_options
 %CONFIG
 $CONFIG_FILE
 $RUNTIME
@@ -763,15 +762,6 @@ our %config_definition = (
         },
     },
 );
-
-# Readonly our %cli_alias => (
-#     duplicitybinary => [ 'duplicity-binary', 'duplicity_binary' ],
-# );
-
-
-our %get_options=
-  (
-  );
 
 my $callback_clean = sub { my %t=@_;
                            chomp $t{message};
@@ -2041,15 +2031,12 @@ sub key_select {
 # parse all the args using specified options, return hash config?
 sub parse_argv {
     my $argv = shift;
-    my $options = shift;
     my @options_array = @_;
     my $cli_config = {};
 
-    print STDERR Dumper $argv,$options,\@options_array if $DEBUG;
-    print STDERR Dumper $options if $DEBUG;
+    print STDERR Dumper $argv,\@options_array if $DEBUG;
     GetOptionsFromArray($argv, $cli_config, @options_array);
     print STDERR Dumper $argv if $DEBUG;
-    GetOptionsFromArray($argv, %{$options});
     print STDERR Dumper $cli_config if $DEBUG;
     return $cli_config;
 }
@@ -2116,7 +2103,7 @@ sub rdbduprunner {
                                     'getopt');
     print STDERR Dumper \@options if $DEBUG;
 
-    %CLI_CONFIG = %{parse_argv(\@ARGV,\%get_options,@options)};
+    %CLI_CONFIG = %{parse_argv(\@ARGV, @options)};
     $CLI_CONFIG{test} = 1 unless defined $CLI_CONFIG{test};
     $config_validator->validate(\%CLI_CONFIG,'cli');
 
