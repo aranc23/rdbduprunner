@@ -74,7 +74,6 @@ $LOG_DIR
 $CONFIG_FILE
 $RUNTIME
 @BACKUPS
-$HELP
 $APP_NAME
 $LOG_FILE
 $LOG_DIR
@@ -140,9 +139,6 @@ our $VALID_BACKUP_TYPE_REGEX = qr{^ ( rdiff [-] backup | rsync | duplicity ) $}x
 
 # dispatcher needs a handle to write to:
 our $DISPATCHER;
-
-# print usage and exit
-our $HELP=0;
 
 Readonly our $USER => $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(getpwuid($<));
 
@@ -614,7 +610,15 @@ our %DEFAULT_CONFIG = (
         type => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
-    }
+    },
+    # show usage
+    #'h|help'                 => \$HELP,
+    'help' => {
+        getopt => 'help|h',
+        type => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
 );
 
 our %config_definition = (
@@ -743,8 +747,6 @@ our %config_definition = (
 
 our %get_options=
   (
-   # show usage
-   'h|help'                 => \$HELP,
    # can be overridden from the command line, but not the config
    'config=s'               => \$CONFIG_FILE, # config file
 
@@ -2108,9 +2110,8 @@ sub rdbduprunner {
         die "unparsed options on the command line: ".join(' ',@ARGV);
     }
 
-# print the SYNOPSIS section and exit
-pod2usage(-1) if $HELP;
-
+    # print the SYNOPSIS section and exit
+    pod2usage(-1) if $CLI_CONFIG{help};
 
     create_dispatcher( $APP_NAME,
                        key_select('facility',
