@@ -15,7 +15,7 @@ use Data::Dumper;
 
 {
     local *Backup::rdbduprunner::dlog = sub {};
-    #$LOCALHOST = 'a-lnx005';
+    $CLI_CONFIG{localhost} = 'a-lnx005';
     $EXCLUDE_PATH = '/etc/rdbduprunner/xxx';
     is( [parse_config_backups(\%DEFAULT_CONFIG,
                               {
@@ -130,6 +130,7 @@ use Data::Dumper;
                   checksum => 0,
                   progress => 1,
                   verbose => 1,
+                  localhost => 'a-lnx005',
                 },
             )
         ],
