@@ -2117,6 +2117,7 @@ sub rdbduprunner {
     print STDERR Dumper \@options if $DEBUG;
 
     %CLI_CONFIG = %{parse_argv(\@ARGV,\%get_options,@options)};
+    $CLI_CONFIG{test} = 1 unless defined $CLI_CONFIG{test};
     $config_validator->validate(\%CLI_CONFIG,'cli');
 
     if ( scalar @ARGV ) {
