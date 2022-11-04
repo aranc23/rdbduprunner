@@ -75,7 +75,6 @@ $CONFIG_FILE
 $TEMPDIR
 $RUNTIME
 @BACKUPS
-$TEST
 $HELP
 $APP_NAME
 $LOG_FILE
@@ -188,7 +187,6 @@ our @CONFIG_FILES =
         "${CONFIG_DIR}/config",
     );
 
-our $TEST=1;
 our %children; # store children for master backup loop
 our $RUNTIME; # storing the start time so we can calculate run time
 
@@ -597,7 +595,13 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli)],
     },
-
+    'test' => {
+        getopt => 'test!',
+        type => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+        default => 1,
+    },
     # 'excludepath' =>
             # { type => "string", optional => "true" },
             # tempdir =>
@@ -753,7 +757,6 @@ our %get_options=
 
    # configuring rdbduprunner:
    'exclude-path=s'         => \$EXCLUDE_PATH,
-   'test!'                  => \$TEST,
   );
 
 my $callback_clean = sub { my %t=@_;
@@ -1105,7 +1108,7 @@ sub perform_backup {
   my $lock1;
   # store the results of each backup in this hash:
   # like { '/var', 'failure', 1684884888 )
-  unless($TEST) {
+  unless($CLI_CONFIG{test}) {
     unless ($lock1=lock_pid_file($host)) {
       dlog('error','lock failure',$_[0]);
       exit;
@@ -1144,7 +1147,7 @@ sub perform_backup {
                  "${zfs}/${zfs_child}",
                 );
         info(join(' ',@com));
-        unless($TEST) {
+        unless($CLI_CONFIG{test}) {
           set_env($bh);
           system(@com);
           unless($? == 0) {
@@ -1156,7 +1159,7 @@ sub perform_backup {
                     'exit'  => int(POSIX::WEXITSTATUS($CHILD_ERROR)),
                     'time'  => time(),
                 }
-            ) unless $TEST;
+            ) unless $CLI_CONFIG{test};
             log_exit_status($bh,$?);
             next BACKUP;
           }
@@ -1172,14 +1175,14 @@ sub perform_backup {
                 'errno' => $msg,
                 'time'  => time(),
             }
-        ) unless $TEST;
+        ) unless $CLI_CONFIG{test};
         log_exit_status( $bh, $? );
         next;
       }
     }
     if (defined $$bh{prerun} and not $DRYRUN) {
       info($$bh{prerun});
-      unless($TEST) {
+      unless($CLI_CONFIG{test}) {
         set_env($bh);
         system($$bh{prerun});
         unless ( $? == 0 ) {
@@ -1193,7 +1196,7 @@ sub perform_backup {
                     'errno' => $msg,
                     'time'  => time(),
                 }
-            ) unless $TEST;
+            ) unless $CLI_CONFIG{test};
             log_exit_status( $bh, $? );
             next;
         }
@@ -1201,7 +1204,7 @@ sub perform_backup {
     }
     info(join(" ",@{$$bh{com}}));
     my $mainret=0;
-    unless($TEST) {
+    unless($CLI_CONFIG{test}) {
       set_env($bh);
       $$bh{runtime}=time();
       system(@{$$bh{com}});
@@ -1223,7 +1226,7 @@ sub perform_backup {
     # if there is a postrun, return that value instead regardless of failure
     if (defined $$bh{postrun} and not $DRYRUN) {
       info($$bh{postrun});
-      unless($TEST) {
+      unless($CLI_CONFIG{test}) {
         set_env($bh);
         system( $$bh{postrun} );
         unless ( $? == 0 ) {
@@ -1238,7 +1241,7 @@ sub perform_backup {
                     'errno' => $msg,
                     'time'  => time(),
                 }
-            ) unless $TEST;
+            ) unless $CLI_CONFIG{test};
             log_exit_status( $bh, $? );
             next;
         }
@@ -1255,7 +1258,7 @@ sub perform_backup {
                  'snapshot',
                  $snap);
         info(join(' ',@com));
-        unless($TEST) {
+        unless($CLI_CONFIG{test}) {
           set_env($bh);
           # execute snapshot command
           system(@com);
@@ -1277,8 +1280,8 @@ sub perform_backup {
             'time'    => time(),
             'runtime' => $$bh{runtime},
         }
-    ) unless $TEST;
-    log_exit_status($bh,$mainret) unless $TEST;
+    ) unless $CLI_CONFIG{test};
+    log_exit_status($bh,$mainret) unless $CLI_CONFIG{test};
   }
   exit;
 }
@@ -1471,7 +1474,7 @@ sub tidy {
 
           push(@icom,$$bh{dest});
           info(join(" ",@icom));
-          unless($TEST) {
+          unless($CLI_CONFIG{test}) {
             system(@icom);
             unless($? == 0) {
               error("unable to execute rdiff-backup!");
@@ -1486,7 +1489,7 @@ sub tidy {
         push(@icom,$$bh{dest});
 
         info(join(" ",@icom));
-        unless($TEST) {
+        unless($CLI_CONFIG{test}) {
           system(@icom);
           unless($? == 0) {
             error("unable to execute rdiff-backup!");
@@ -1507,7 +1510,7 @@ sub tidy {
            $$bh{dest});
 
       info(join(" ",@com));
-      unless($TEST) {
+      unless($CLI_CONFIG{test}) {
         set_env($bh);
         system(@com);
         unless($? == 0) {
@@ -1631,7 +1634,7 @@ sub remove_oldest {
 		 '--remove-older-than',($t+1), # do I really need to add 1?
 		 $$ih{bh}{dest});
 	info(join(" ",@com));
-	unless($TEST) {
+	unless($CLI_CONFIG{test}) {
 	    system(@com);
 	    unless($? == 0) {
 		error("rdiff-backup did not exit cleanly!");
@@ -1981,7 +1984,7 @@ sub parse_config_backups {
                                      $config_definition{'cli'}{fields}),
             keys(%DEFAULT_CONFIG))) {
         # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
-            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait skipfstype localhost));
+            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait skipfstype localhost test));
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
@@ -2209,7 +2212,7 @@ if(dtruefalse(\%CLI_CONFIG, 'status')) {
     }
     push(@com,$$bh{dest});
     info(join(" ",@com));
-    unless($TEST) {
+    unless($CLI_CONFIG{test}) {
       my $lock=lock_pid_file($$bh{host});
       set_env($bh);
       system(@com);
@@ -2264,7 +2267,7 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
         push(@com,verbargs($bh),
              $$bh{dest});
         info(join(" ",@com));
-        unless($TEST) {
+        unless($CLI_CONFIG{test}) {
             my $lock=lock_pid_file($$bh{host});
             set_env($bh);
             system(@com);
@@ -2277,11 +2280,11 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
 } elsif (dtruefalse(\%CLI_CONFIG, 'tidy')) {
     foreach my $bh (sort backup_sort (@BACKUPS)) {
       my $lock;
-      unless($TEST) {
+      unless($CLI_CONFIG{test}) {
 	$lock=lock_pid_file($$bh{host});
       }
         tidy($bh);
-      unless($TEST) {
+      unless($CLI_CONFIG{test}) {
 	unlock_pid_file($lock);
       }
     }
@@ -2325,7 +2328,7 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
     }
 	
     info(join(" ",@com));
-    unless($TEST) {
+    unless($CLI_CONFIG{test}) {
       my $lock=lock_pid_file($$bh{host});
       set_env($bh);
       system(@com);
@@ -2348,7 +2351,7 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
     push(@com,verbargs($bh));
     push(@com,$$bh{dest});
     info(join(" ",@com));
-    unless($TEST) {
+    unless($CLI_CONFIG{test}) {
       my $lock=lock_pid_file($$bh{host});
       set_env($bh);
       system(@com);

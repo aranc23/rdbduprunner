@@ -22,7 +22,6 @@ sub big_globals {
         'host'                  => $HOST,
         'path'                  => $PATH,
         'exclude-path'          => $EXCLUDE_PATH,
-        'test'                  => $TEST,
     };
 }
 my $defaults = {
@@ -32,7 +31,6 @@ my $defaults = {
     'host'                  => undef,
     'path'                  => undef,
     'exclude-path'          => undef,
-    'test'                  => 1,
 };
 
 {
@@ -66,15 +64,13 @@ my $defaults = {
     $results = parse_argv([qw(--notest --stats)], \%get_options,@options);
     ok(lives { $cv->validate($results, 'cli'); }, 'unparaseable');
     is( $results,
-        {stats => 1},
+        {stats => 1, test => 0},
         "options: notest and stats");
-    $$defaults{test} = 0;
     is( big_globals(),
         $defaults,
         "old options: notest and stats");
 
     # start of "everything"
-    $TEST = 1;
     $results = parse_argv([
         qw(
               --calculate-average
@@ -109,11 +105,11 @@ my $defaults = {
               --facility daemon
               --level debug
               --maxwait 32000
+              --no-test
       )], \%get_options,@options);
     ok(lives {
         $cv->validate($results,"cli");
     }, "unparaseable");
-    $$defaults{test} = 1;
     is( $results,
         {wholefile => 1,
          checksum => 1,
@@ -143,6 +139,7 @@ my $defaults = {
          maxage => '1D1W2Y4s',
          useagent => 1,
          allowsourcemismatch => 1,
+         test => 0,
      },
         "nothing passed");
 
