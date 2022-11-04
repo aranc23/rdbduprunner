@@ -21,7 +21,6 @@ sub big_globals {
         'dest'                  => $DEST,
         'host'                  => $HOST,
         'path'                  => $PATH,
-        'exclude-path'          => $EXCLUDE_PATH,
     };
 }
 my $defaults = {
@@ -30,7 +29,6 @@ my $defaults = {
     'dest'                  => undef,
     'host'                  => undef,
     'path'                  => undef,
-    'exclude-path'          => undef,
 };
 
 {

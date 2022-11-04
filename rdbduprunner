@@ -538,10 +538,18 @@ Passes the --use-agent option to duplicity.
 
 Validity: CLI, Global, BackupDestination, BackupSet
 
-=item {B<--tempdir> I<path>}
+=item C<ExcludePath> I<path> {B<--exclude-path> I<path>}
 
-Pass the --tempdir or --temp-dir options to underlying binaries in the
-same manner as if the TempDir global config option had been specified.
+rdbduprunner will look in this directory for a sub-directory named
+rdb-excludes or excludes and match the backup tags with files.  rsync
+and rdiff-backup/duplicity have different syntax for their exclude
+files which is why they are seperated.  See the man pages for details.
+This is a poorly thoughtout and confusing feature so maybe don't use
+it.
+
+Default: /etc/rdbduprunner.
+
+Validity: CLI, Global
 
 =item {B<--maxprocs> I<integer>} {C<maxprocs> = I<integer>}
 
@@ -552,6 +560,11 @@ there are multiple hosts multiple backups should occur at once.
 Default: 1
 
 Validity: CLI, Global
+
+=item {B<--tempdir> I<path>}
+
+Pass the --tempdir or --temp-dir options to underlying binaries in the
+same manner as if the TempDir global config option had been specified.
 
 =back
 
@@ -611,9 +624,6 @@ The precendence is as follows:
 =head3 Global Options
 
 =over 4
-
-=item I<ExcludePath> - What directory to look for exclude
-files. Defaults to F</etc/rdbduprunner>
 
 
 =item I<TempDir> - Passed to some binaries as an alternate temp dir

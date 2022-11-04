@@ -9,14 +9,13 @@ use strict;
 use warnings;
 
 use Test2::V0;
-use Backup::rdbduprunner qw(build_backup_command %CONFIG $TEMPDIR $DRYRUN $LOG_DIR parse_config_backups $EXCLUDE_PATH %CLI_CONFIG %DEFAULT_CONFIG);
+use Backup::rdbduprunner qw(build_backup_command %CONFIG $TEMPDIR $DRYRUN $LOG_DIR parse_config_backups %CLI_CONFIG %DEFAULT_CONFIG);
 
 use Data::Dumper;
 
 {
     local *Backup::rdbduprunner::dlog = sub {};
     $CLI_CONFIG{localhost} = 'a-lnx005';
-    $EXCLUDE_PATH = '/etc/rdbduprunner/xxx';
     is( [parse_config_backups(\%DEFAULT_CONFIG,
                               {
                                   'backupset' => {
@@ -159,7 +158,7 @@ use Data::Dumper;
     );
 
     # start of tick-tock
-    $EXCLUDE_PATH = './tests';
+    ${CLI_CONFIG}{excludepath} = './tests';
     is( [   sort { $$a{dest} cmp $$b{dest} } parse_config_backups(
                 \%DEFAULT_CONFIG,
                 {   'backupset' => {

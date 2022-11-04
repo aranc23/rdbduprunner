@@ -80,7 +80,6 @@ $APP_NAME
 $LOG_FILE
 $LOG_DIR
 @CONFIG_FILES
-$EXCLUDE_PATH
 %config_definition
 @INCREMENTS
 $DEST
@@ -157,7 +156,6 @@ our $DEST;
 our $HOST;
 our $PATH;
 # configuring rdbduprunner:
-our $EXCLUDE_PATH;
 Readonly our $STATE_DIR =>
     $USER eq 'root'                 ? File::Spec->catfile('/var/lib', $APP_NAME)
     : exists $ENV{'XDG_STATE_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
@@ -602,8 +600,14 @@ our %DEFAULT_CONFIG = (
         sections => [qw(cli)],
         default => 1,
     },
-    # 'excludepath' =>
-            # { type => "string", optional => "true" },
+    #'exclude-path=s'         => \$EXCLUDE_PATH,
+    'excludepath' => {
+        getopt => 'excludepath|exclude-path=s',
+        type => "string",
+        optional => "true",
+        default => '/etc/rdbduprunner',
+        sections => [qw(cli global)],
+    },
             # tempdir =>
             # { type => "string", optional => "true" },
             # # these are duplicity options:
@@ -755,8 +759,6 @@ our %get_options=
    'host=s'                 => \$HOST,
    'path=s'                 => \$PATH,
 
-   # configuring rdbduprunner:
-   'exclude-path=s'         => \$EXCLUDE_PATH,
   );
 
 my $callback_clean = sub { my %t=@_;
@@ -1784,7 +1786,6 @@ sub which_zfs {
 # global variables used:
 # %CONFIG
 # $HOST
-# $EXCLUDE_PATH
 # these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
 sub parse_config_backups {
     my %DEFAULT_CONFIG = %{shift(@_)};
@@ -1795,7 +1796,7 @@ sub parse_config_backups {
   print STDERR Dumper \%DEFAULT_CONFIG if $DEBUG;
   print STDERR Dumper \%CONFIG if $DEBUG;
   print STDERR Dumper \%CLI_CONFIG if $DEBUG;
-  print STDERR Dumper [$HOST,$EXCLUDE_PATH] if $DEBUG;
+  print STDERR Dumper [$HOST] if $DEBUG;
   for my $bstag (keys(%{$CONFIG{backupset}})) {
       my @bslist=($CONFIG{backupset}{$bstag});
       if (
@@ -1952,9 +1953,13 @@ sub parse_config_backups {
           $$bh{path}=$$bh{path}.'/';
           $$bh{path} =~ s/\/\/$/\//; # remove double slashes
         }
+        my $exclude_path = key_select('excludepath',
+                                      hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                      \%CONFIG, # config file, top level
+                                      \%CLI_CONFIG);
         my $epath=( $btype eq 'rsync'
-                    ? catfile($EXCLUDE_PATH,'excludes')
-                    : catfile($EXCLUDE_PATH,'rdb-excludes')
+                    ? catfile($exclude_path,'excludes')
+                    : catfile($exclude_path,'rdb-excludes')
                   );
         if ( -f catfile($epath,'generic') ) {
           push(@{$$bh{excludes}}, catfile($epath,'generic'));
@@ -1984,7 +1989,7 @@ sub parse_config_backups {
                                      $config_definition{'cli'}{fields}),
             keys(%DEFAULT_CONFIG))) {
         # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
-            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait skipfstype localhost test));
+            next KEY if string_any($key, qw(path defaultbackupdestination type maxprocs level facility force full maxwait skipfstype localhost test excludepath));
             my $v = key_select($key,
                                hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
                                \%CONFIG, # config file, top level
@@ -2160,14 +2165,6 @@ unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
 
     $config_validator->validate(\%CONFIG,'global');
 
-
-if(defined $EXCLUDE_PATH) {
-  # leave it alone, it comes from the command line
-} elsif(defined $CONFIG{excludepath}) {
-  $EXCLUDE_PATH=$CONFIG{excludepath};
-} else {
-  $EXCLUDE_PATH='/etc/rdbduprunner';
-}
 
 if(not defined $TEMPDIR) {
   if(defined $CONFIG{tempdir}) {
