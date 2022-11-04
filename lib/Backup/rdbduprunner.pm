@@ -72,7 +72,6 @@ $LOG_DIR
 %get_options
 %CONFIG
 $CONFIG_FILE
-$TEMPDIR
 $RUNTIME
 @BACKUPS
 $HELP
@@ -149,8 +148,6 @@ our $HELP=0;
 Readonly our $USER => $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(getpwuid($<));
 
 our $DRYRUN=0;
-# the following affect what options are passed to rdiff-backup and/or duplicity
-our $TEMPDIR;
 # the next three options limit which backups get acted upon
 our $DEST;
 our $HOST;
@@ -608,9 +605,12 @@ our %DEFAULT_CONFIG = (
         default => '/etc/rdbduprunner',
         sections => [qw(cli global)],
     },
-            # tempdir =>
-            # { type => "string", optional => "true" },
-            # # these are duplicity options:
+    tempdir => {
+        getopt => 'tempdir|temp-dir=s',
+        type => "string",
+        optional => "true",
+        sections => [qw(cli global)],
+    },
 );
 
 our %config_definition = (
@@ -728,10 +728,6 @@ our %config_definition = (
                 type     => 'table(valid(backupset))',
                 optional => "true",
             },
-            excludepath =>
-            { type => "string", optional => "true" },
-            tempdir =>
-            { type => "string", optional => "true" },
         },
     },
 );
@@ -747,9 +743,6 @@ our %get_options=
    'h|help'                 => \$HELP,
    # can be overridden from the command line, but not the config
    'config=s'               => \$CONFIG_FILE, # config file
-
-   # the following affect what options are passed to rdiff-backup and/or duplicity
-   'tempdir=s'              => \$TEMPDIR,
 
    # rsync specific options
    'n|dry-run'              => \$DRYRUN,
@@ -994,15 +987,16 @@ sub build_backup_command {
     # use logging
     push(@com,'--log-file='.catfile($LOG_DIR,$$bh{tag}).'.log')
   }
-  if(defined $TEMPDIR) {
-    if(-d $TEMPDIR) {
-      if($$bh{btype} eq 'rsync') {
-        push(@com,"--temp-dir=$TEMPDIR");
-      } else {
-        push(@com,'--tempdir',$TEMPDIR);
-      }
+
+  if(defined $$bh{tempdir}) {
+      if(-d $$bh{tempdir}) {
+        if($$bh{btype} eq 'rsync') {
+            push(@com,"--temp-dir=$$bh{tempdir}");
+        } else {
+            push(@com,'--tempdir',$$bh{tempdir});
+        }
     } else {
-      warn("specified temporary directory does not exist, not using it");
+        warn("specified temporary directory does not exist, not using it: $$bh{tempdir}");
     }
   }
   unshift(@com,shift @com,verbargs($bh));
@@ -2166,13 +2160,7 @@ unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
     $config_validator->validate(\%CONFIG,'global');
 
 
-if(not defined $TEMPDIR) {
-  if(defined $CONFIG{tempdir}) {
-    $TEMPDIR=$CONFIG{tempdir};
-  }
-}
-
-dlog('debug','config',\%CONFIG,{'config_file' => $CONFIG_FILE});
+    dlog('debug','config',\%CONFIG,{'config_file' => $CONFIG_FILE});
 
     if ( defined $CLI_CONFIG{status_delete}
          and reftype $CLI_CONFIG{status_delete} eq reftype []
@@ -2250,16 +2238,13 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
           warn("cleanup function only implmented for duplicity and rdiff-backup");
           next;
         }
-        if(defined $TEMPDIR) {
-          if(-d $TEMPDIR) {
-            if($$bh{btype} eq 'rsync') {
-              push(@com,"--temp-dir=$TEMPDIR");
-            } else {
-              push(@com,'--tempdir',$TEMPDIR);
+        if ( defined $$bh{tempdir} ) {
+            if ( -d $$bh{tempdir} ) {
+                push( @com, '--tempdir', $$bh{tempdir} );
             }
-          } else {
-            warn("specified temporary directory does not exist, not using it");
-          }
+            else {
+                warn("specified temporary directory does not exist, not using it: $$bh{tempdir}");
+            }
         }
         push(@com,verbargs($bh),
              $$bh{dest});

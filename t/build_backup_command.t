@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 use Test2::V0;
-use Backup::rdbduprunner qw(build_backup_command %CONFIG $TEMPDIR $DRYRUN $LOG_DIR %CLI_CONFIG);
+use Backup::rdbduprunner qw(build_backup_command %CONFIG $DRYRUN $LOG_DIR %CLI_CONFIG);
 
 use Data::Dumper;
 
@@ -55,7 +55,7 @@ use Data::Dumper;
     $CLI_CONFIG{'full'} = 1;
     $$bh{useagent} = 1;
     $$bh{allowsourcemismatch} = 1;
-    $TEMPDIR = '/var/tmp';
+    $$bh{tempdir} = '/var/tmp';
     $$bh{disabled} = 0;
     $CONFIG{default}{busted}=0;
 

@@ -551,7 +551,7 @@ Default: /etc/rdbduprunner.
 
 Validity: CLI, Global
 
-=item {B<--maxprocs> I<integer>} {C<maxprocs> = I<integer>}
+=item C<maxprocs> I<integer> {B<--maxprocs> I<integer>}
 
 Maximum number of simultaneous backups to perform.  rdbduprunner will
 never do more than one backup from any given host at a time but if
@@ -559,12 +559,11 @@ there are multiple hosts multiple backups should occur at once.
 
 Default: 1
 
+=item C<tempdir> I<path> {B<--tempdir|--temp-dir> I<path>}
+
+Pass to underlying backup programs, if set.
+
 Validity: CLI, Global
-
-=item {B<--tempdir> I<path>}
-
-Pass the --tempdir or --temp-dir options to underlying binaries in the
-same manner as if the TempDir global config option had been specified.
 
 =back
 
@@ -624,12 +623,6 @@ The precendence is as follows:
 =head3 Global Options
 
 =over 4
-
-
-=item I<TempDir> - Passed to some binaries as an alternate temp dir
-path. Defaults to not pass any temp options therefore probably uses
-/tmp.
-
 
 
 =back

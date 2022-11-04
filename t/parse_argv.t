@@ -16,7 +16,6 @@ use Hash::Merge qw(merge);
 
 sub big_globals {
     return {
-        'tempdir'               => $TEMPDIR,
         dryrun                  => $DRYRUN,
         'dest'                  => $DEST,
         'host'                  => $HOST,
@@ -24,7 +23,6 @@ sub big_globals {
     };
 }
 my $defaults = {
-    'tempdir'               => undef,
     dryrun                  => 0,
     'dest'                  => undef,
     'host'                  => undef,
@@ -138,13 +136,13 @@ my $defaults = {
          useagent => 1,
          allowsourcemismatch => 1,
          test => 0,
+         tempdir => '/var/tmp',
      },
         "nothing passed");
 
     for(qw(dryrun)) {
         $$defaults{$_} = 1;
     }
-    $$defaults{'tempdir'} = '/var/tmp';
 
     is( big_globals(),
         $defaults,
