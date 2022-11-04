@@ -532,6 +532,12 @@ Advice: don't change this.
 
 Validity: CLI, Global
 
+=item C<UseAgent> I<yes|no|on|off|0|1|true|false> {B<--use-agent|--useagent>} (duplicity only)
+
+Passes the --use-agent option to duplicity.
+
+Validity: CLI, Global, BackupDestination, BackupSet
+
 =item {B<--tempdir> I<path>}
 
 Pass the --tempdir or --temp-dir options to underlying binaries in the
@@ -539,12 +545,13 @@ same manner as if the TempDir global config option had been specified.
 
 =item {B<--maxprocs> I<integer>} {C<maxprocs> = I<integer>}
 
-Default: 1
 Maximum number of simultaneous backups to perform.  rdbduprunner will
 never do more than one backup from any given host at a time but if
 there are multiple hosts multiple backups should occur at once.
-See MaxProcs global config option.
 
+Default: 1
+
+Validity: CLI, Global
 
 =back
 
@@ -608,8 +615,6 @@ The precendence is as follows:
 =item I<ExcludePath> - What directory to look for exclude
 files. Defaults to F</etc/rdbduprunner>
 
-=item I<UseAgent> - Boolean, optional
-Passes the --use-agent option to duplicity.
 
 =item I<TempDir> - Passed to some binaries as an alternate temp dir
 path. Defaults to not pass any temp options therefore probably uses

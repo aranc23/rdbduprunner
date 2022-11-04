@@ -16,8 +16,6 @@ use Hash::Merge qw(merge);
 
 sub big_globals {
     return {
-        'u'                     => $USEAGENT,
-        'allow-source-mismatch' => $ALLOWSOURCEMISMATCH,
         'tempdir'               => $TEMPDIR,
         dryrun                  => $DRYRUN,
         'dest'                  => $DEST,
@@ -28,8 +26,6 @@ sub big_globals {
     };
 }
 my $defaults = {
-    'u'                     => undef,
-    'allow-source-mismatch' => 0,
     'tempdir'               => undef,
     dryrun                  => 0,
     'dest'                  => undef,
@@ -145,10 +141,12 @@ my $defaults = {
          maxwait => 32000,
          maxinc => 4,
          maxage => '1D1W2Y4s',
+         useagent => 1,
+         allowsourcemismatch => 1,
      },
         "nothing passed");
 
-    for(qw(allow-source-mismatch dryrun u)) {
+    for(qw(dryrun)) {
         $$defaults{$_} = 1;
     }
     $$defaults{'tempdir'} = '/var/tmp';

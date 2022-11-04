@@ -9,7 +9,7 @@ use strict;
 use warnings;
 
 use Test2::V0;
-use Backup::rdbduprunner qw(build_backup_command %CONFIG $USEAGENT $ALLOWSOURCEMISMATCH $TEMPDIR $DRYRUN $LOG_DIR %CLI_CONFIG);
+use Backup::rdbduprunner qw(build_backup_command %CONFIG $TEMPDIR $DRYRUN $LOG_DIR %CLI_CONFIG);
 
 use Data::Dumper;
 
@@ -53,8 +53,8 @@ use Data::Dumper;
     # start of "full duplicity"
     $$bh{btype} = 'duplicity';
     $CLI_CONFIG{'full'} = 1;
-    $USEAGENT = 1;
-    $ALLOWSOURCEMISMATCH = 1;
+    $$bh{useagent} = 1;
+    $$bh{allowsourcemismatch} = 1;
     $TEMPDIR = '/var/tmp';
     $$bh{disabled} = 0;
     $CONFIG{default}{busted}=0;

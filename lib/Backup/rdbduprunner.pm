@@ -76,7 +76,6 @@ $TEMPDIR
 $RUNTIME
 @BACKUPS
 $TEST
-$USEAGENT
 $HELP
 $APP_NAME
 $LOG_FILE
@@ -89,7 +88,6 @@ $DEST
 $HOST
 $PATH
 $DRYRUN
-$ALLOWSOURCEMISMATCH
 &perform_backups
 &parse_config_backups
 &status_json
@@ -154,8 +152,6 @@ Readonly our $USER => $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(ge
 
 our $DRYRUN=0;
 # the following affect what options are passed to rdiff-backup and/or duplicity
-our $USEAGENT;
-our $ALLOWSOURCEMISMATCH=0;
 our $TEMPDIR;
 # the next three options limit which backups get acted upon
 our $DEST;
@@ -587,11 +583,23 @@ our %DEFAULT_CONFIG = (
         sections => [qw(cli global )],
         default => shortname(),
     },
+    #$USEAGENT and push(@com,'--use-agent');
+    useagent => {
+        getopt => 'useagent|use-agent|u',
+        type => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
+    #$ALLOWSOURCEMISMATCH and push(@com,'--allow-source-mismatch');
+    lc "AllowSourceMismatch" => {
+        getopt => 'allowsourcemismatch|allow-source-mismatch',
+        type => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
 
     # 'excludepath' =>
             # { type => "string", optional => "true" },
-            #  useagent =>
-            # { type => "valid(truefalse)", optional => "true" },
             # tempdir =>
             # { type => "string", optional => "true" },
             # # these are duplicity options:
@@ -714,8 +722,6 @@ our %config_definition = (
             },
             excludepath =>
             { type => "string", optional => "true" },
-             useagent =>
-            { type => "valid(truefalse)", optional => "true" },
             tempdir =>
             { type => "string", optional => "true" },
         },
@@ -735,8 +741,6 @@ our %get_options=
    'config=s'               => \$CONFIG_FILE, # config file
 
    # the following affect what options are passed to rdiff-backup and/or duplicity
-   'u|use-agent!'           => \$USEAGENT,
-   'allow-source-mismatch!' => \$ALLOWSOURCEMISMATCH,
    'tempdir=s'              => \$TEMPDIR,
 
    # rsync specific options
@@ -925,8 +929,8 @@ sub build_backup_command {
     if($DRYRUN) {
       push(@com,'--dry-run');
     }
-    $USEAGENT and push(@com,'--use-agent');
-    $ALLOWSOURCEMISMATCH and push(@com,'--allow-source-mismatch');
+    $$bh{useagent} and push(@com,'--use-agent');
+    $$bh{allowsourcemismatch} and push(@com,'--allow-source-mismatch');
     if(defined $$bh{signkey}) {
       push(@com,'--sign-key',$$bh{signkey});
     }
@@ -1498,7 +1502,7 @@ sub tidy {
                'remove-older-than',
                $$bh{maxage},
                '--force');
-      $USEAGENT and push(@com,'--use-agent');
+      $$bh{useagent} and push(@com,'--use-agent');
       push(@com,verbargs($bh),
            $$bh{dest});
 
@@ -2162,14 +2166,6 @@ if(defined $EXCLUDE_PATH) {
   $EXCLUDE_PATH='/etc/rdbduprunner';
 }
 
-if(not defined $USEAGENT) {
-  if(defined $CONFIG{useagent}) {
-    $USEAGENT=1;
-  } else {
-    $USEAGENT=0;
-  }
-}
-
 if(not defined $TEMPDIR) {
   if(defined $CONFIG{tempdir}) {
     $TEMPDIR=$CONFIG{tempdir};
@@ -2201,7 +2197,7 @@ if(dtruefalse(\%CLI_CONFIG, 'status')) {
     my @com;
     if($$bh{btype} eq 'duplicity') {
       @com=($$bh{duplicitybinary},'collection-status');
-      $USEAGENT and push(@com,'--use-agent');
+      $$bh{useagent} and push(@com,'--use-agent');
     } elsif($$bh{btype} eq 'rdiff-backup') {
       @com=($$bh{rdiffbackupbinary},'--list-increment-sizes');
     } elsif($$bh{btype} eq 'rsync') {
@@ -2245,7 +2241,7 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
         my @com;
         if($$bh{btype} eq 'duplicity') {
             push(@com,$$bh{duplicitybinary},'cleanup');
-            $USEAGENT and push(@com,'--use-agent');
+            $$bh{useagent} and push(@com,'--use-agent');
             push(@com,'--force') if dtruefalse(\%CLI_CONFIG, 'force');
         } elsif($$bh{btype} eq 'rdiff-backup') {
             push(@com,$$bh{rdiffbackupbinary},'--check-destination-dir');
@@ -2305,7 +2301,7 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
     my @com;
     if ($$bh{btype} eq 'duplicity') {
       @com=($$bh{duplicitybinary},'verify');
-      $USEAGENT and push(@com,'--use-agent');
+      $$bh{useagent} and push(@com,'--use-agent');
     }
     elsif($$bh{btype} eq 'rdiff-backup') {
       @com=($$$bh{rdiffbackupbinary},'--compare','--no-eas');
@@ -2348,7 +2344,7 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
       next;
     }
     @com=($$bh{duplicitybinary},'list-current-files');
-    $USEAGENT and push(@com,'--use-agent');
+    $$bh{useagent} and push(@com,'--use-agent');
     push(@com,verbargs($bh));
     push(@com,$$bh{dest});
     info(join(" ",@com));
