@@ -1111,11 +1111,12 @@ sub perform_backup {
  BACKUP:
   foreach my $bh (sort backup_sort (@_)) {
     foreach my $key (qw( src dest tag path host ) ) {
+      my $env_var = join('_',$APP_NAME,'BACKUP',uc($key));
       if ( exists $$bh{$key} ) {
-        $ENV{'RDBDUPRUNNER_BACKUP_'.uc($key)}=$$bh{$key};
+        $ENV{$env_var}=$$bh{$key};
       }
-      elsif ( exists $ENV{'RDBDUPRUNNER_BACKUP_'.uc($key)} ) {
-        delete $ENV{'RDBDUPRUNNER_BACKUP_'.uc($key)};
+      elsif ( exists $ENV{$env_var} ) {
+        delete $ENV{$env_var};
       }
     }
     if(exists $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted} == 1) {
