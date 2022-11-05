@@ -1764,9 +1764,6 @@ sub which_zfs {
 
 # use what is in %CONFIG and global config options to create the
 # @BACKUPS array:
-# global variables used:
-# %CONFIG
-# these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
 sub parse_config_backups {
     local %DEFAULT_CONFIG = %{shift(@_)};
     local %CONFIG = %{shift(@_)};
