@@ -1060,10 +1060,9 @@ sub perform_backups {
       debug("waitpid returned child ${pid}");
       delete $children{$pid};
     }
-    my $maxprocs = key_select('maxprocs',
-                              hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                              \%CONFIG, # config file, top level
-                              \%CLI_CONFIG);
+    my $maxprocs = key_selector('maxprocs');
+    die unless $maxprocs;
+    
     while ( scalar(keys(%children)) < $maxprocs
             and scalar(keys(%BACKUPS)) > 0 ) {
       my $host=(keys %BACKUPS)[0];
@@ -1096,18 +1095,8 @@ sub perform_backup {
   # to set the pid, may not work correctly
   create_dispatcher(
       $APP_NAME,
-      key_select(
-          'facility',
-          hashref_key_hash( \%DEFAULT_CONFIG, 'default' ),
-          \%CONFIG,    # config file, top level
-          \%CLI_CONFIG
-      ),
-      key_select(
-          'level',
-          hashref_key_hash( \%DEFAULT_CONFIG, 'default' ),
-          \%CONFIG,    # config file, top level
-          \%CLI_CONFIG
-      ),
+      key_selector('facility'),
+      key_selector('level'),
       $LOG_FILE
   );
   my $lock1;
@@ -1408,10 +1397,7 @@ sub lock_pid_file {
   my $LOCK;
   my $waittime=time();
   my $locked=0;
-  my $maxwait = key_select('maxwait',
-                           hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                           \%CONFIG, # config file, top level
-                           \%CLI_CONFIG);
+  my $maxwait = key_selector('maxwait');
   unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
     error("unable to open pid file: $LOCK_FILE for writing");
     return 0; # false or fail
@@ -1694,17 +1680,9 @@ sub log_exit_status {
                  {'exit' => $exit},
                  $bh);
   $msg =~ s/\"/\\\"/g;
-  my $localhost = key_select('localhost',
-                             hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                             \%CONFIG, # config file, top level
-                             \%CLI_CONFIG);
+  my $localhost = key_selector('localhost');
   if($$bh{host} ne $localhost) {
-      my $facility =
-          key_select('facility',
-                     hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                     \%CONFIG, # config file, top level
-                     \%CLI_CONFIG);
-
+      my $facility = key_selector('facility');
     my $com="ssh -x -o BatchMode=yes $$bh{host} \"logger -t rdbduprunner -p ${facility}.notice '${msg}'\" < /dev/null";
     #print $com."\n";
     system($com);
@@ -1790,29 +1768,27 @@ sub which_zfs {
 # %CONFIG
 # these are sub-keys in backupdestination and/or backupset?: GPGPassPhrase AWSAccessKeyID AWSSecretAccessKey SignKey EncryptKey Trickle ZfsCreate ZfsSnapshot
 sub parse_config_backups {
-    my %DEFAULT_CONFIG = %{shift(@_)};
-    my %CONFIG = %{shift(@_)};
-    my %CLI_CONFIG = %{shift(@_)};
+    local %DEFAULT_CONFIG = %{shift(@_)};
+    local %CONFIG = %{shift(@_)};
+    local %CLI_CONFIG = %{shift(@_)};
 
-  my @BACKUPS;
-  print STDERR Dumper \%DEFAULT_CONFIG if $DEBUG;
-  print STDERR Dumper \%CONFIG if $DEBUG;
-  print STDERR Dumper \%CLI_CONFIG if $DEBUG;
-  for my $bstag (keys(%{$CONFIG{backupset}})) {
-      my @bslist=($CONFIG{backupset}{$bstag});
-      if (
-          reftype($CONFIG{'backupset'}{$bstag})
-          eq reftype([])
-      ) {
-          @bslist=@{$CONFIG{backupset}{$bstag}};
-          # this case can no longer happen because of the config validator
-          die("multiple backupsets with the same name: ${bstag}, this cannot happen");
-      }
-    foreach my $bs (@bslist) {
-      my $localhost = key_select('localhost',
-                                 hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                                 \%CONFIG, # config file, top level
-                                 \%CLI_CONFIG);
+    my @BACKUPS;
+    print STDERR Dumper \%DEFAULT_CONFIG if $DEBUG;
+    print STDERR Dumper \%CONFIG if $DEBUG;
+    print STDERR Dumper \%CLI_CONFIG if $DEBUG;
+    for my $bstag (keys(%{$CONFIG{backupset}})) {
+        my @bslist=($CONFIG{backupset}{$bstag});
+        if (
+            reftype($CONFIG{'backupset'}{$bstag})
+            eq reftype([])
+        ) {
+            @bslist=@{$CONFIG{backupset}{$bstag}};
+            # this case can no longer happen because of the config validator
+            die("multiple backupsets with the same name: ${bstag}, this cannot happen");
+        }
+        foreach my $bs (@bslist) {
+            my $localhost = key_selector('localhost');
+
       my $host=(defined $$bs{host} ? $$bs{host} : $localhost);
       my $btype;
       my $backupdest;
@@ -1954,10 +1930,8 @@ sub parse_config_backups {
           $$bh{path}=$$bh{path}.'/';
           $$bh{path} =~ s/\/\/$/\//; # remove double slashes
         }
-        my $exclude_path = key_select('excludepath',
-                                      hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                                      \%CONFIG, # config file, top level
-                                      \%CLI_CONFIG);
+        my $exclude_path = key_selector('excludepath');
+
         my $epath=( $btype eq 'rsync'
                     ? catfile($exclude_path,'excludes')
                     : catfile($exclude_path,'rdb-excludes')
@@ -1991,12 +1965,7 @@ sub parse_config_backups {
             keys(%DEFAULT_CONFIG))) {
         # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
             next KEY if string_any($key, qw(filterpath filterdest filterhost defaultbackupdestination type maxprocs level facility force full maxwait skipfstype localhost test excludepath));
-            my $v = key_select($key,
-                               hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                               \%CONFIG, # config file, top level
-                               $CONFIG{backupdestination}{$$bh{backupdestination}}, # from the destination
-                               $bh, # ourselves
-                               \%CLI_CONFIG);
+            my $v = key_selector($key,$bh);
             $$bh{$key} = $v if defined $v;
         }
         print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
@@ -2116,12 +2085,8 @@ sub rdbduprunner {
     pod2usage(-1) if $CLI_CONFIG{help};
 
     create_dispatcher( $APP_NAME,
-                       key_select('facility',
-                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                                  \%CLI_CONFIG),
-                       key_select('level',
-                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                                  \%CLI_CONFIG),
+                       key_selector('facility'),
+                       key_selector('level'),
                        $LOG_FILE );
 $RUNTIME=time();
 dlog('info','starting',{});
@@ -2147,14 +2112,8 @@ unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
 			    -LowerCaseNames => 1)->getall() or die "unable to parse $CONFIG_FILE";
 
     create_dispatcher( $APP_NAME,
-                       key_select('facility',
-                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                                  \%CONFIG, # config file, top level
-                                  \%CLI_CONFIG),
-                       key_select('level',
-                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                                  \%CONFIG, # config file, top level
-                                  \%CLI_CONFIG),
+                       key_selector('facility'),
+                       key_selector('level'),
                        $LOG_FILE );
 
     if(dtruefalse(\%CLI_CONFIG, 'dump')) {
@@ -2488,6 +2447,34 @@ sub shortname {
     my @split_host = split(/\./, $h);
     return $split_host[0];
 }
+
+sub key_selector {
+    my $key = shift;
+    my $bh = shift;
+    my @hashes = (hashref_key_hash(\%DEFAULT_CONFIG,'default'));
+
+    if ( exists $DEFAULT_CONFIG{$key} and string_any('global', @{$DEFAULT_CONFIG{$key}{sections}}) ) {
+        push(@hashes, \%CONFIG);
+    }
+    if ( $bh
+         and exists $DEFAULT_CONFIG{$key}
+         and string_any('backupdestination', @{$DEFAULT_CONFIG{$key}{sections}})
+         and exists $CONFIG{backupdestination}{$$bh{backupdestination}} ) {
+        push(@hashes, $CONFIG{backupdestination}{$$bh{backupdestination}});
+    }
+    if ( $bh
+         and exists $DEFAULT_CONFIG{$key}
+         and string_any('backupset', @{$DEFAULT_CONFIG{$key}{sections}})) {
+        push(@hashes, $bh);
+    }
+    if ( string_any('cli', @{$DEFAULT_CONFIG{$key}{sections}}) ) {
+        push(@hashes, \%CLI_CONFIG);
+    }
+    print STDERR Data::Dumper->Dump([\@hashes],
+                                    [qw(key_selector)]) if $DEBUG;
+    return key_select($key, @hashes);
+}
+
 
 # Preloaded methods go here.
 
