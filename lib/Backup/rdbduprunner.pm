@@ -1847,62 +1847,8 @@ sub parse_config_backups {
         @paths=ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path});
       }
 
-      if ((defined $$bs{inventory} and $$bs{inventory}) and not (defined $$bs{'disabled'} and $$bs{'disabled'})) {
-          my %filters;
-          for my $k (qw(skipfstype allowfs skip skipre)) {
-              $filters{$k} = [hashref_key_array_combine($k,
-                                                       hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
-                                                       \%CONFIG, # config file, top level
-                                                       $CONFIG{backupdestination}{$backupdest}, # from the destination
-                                                       $bs, # ourselves
-                                                       \%CLI_CONFIG)];
-          }
-          print STDERR Dumper \%filters if $DEBUG;
-        # perform inventory
-        debug("performing inventory on $host");
-        my $inventory_command='cat /proc/mounts';
-        if ($host ne $localhost) {
-          $inventory_command="ssh -x -o BatchMode=yes ${host} ${inventory_command} < /dev/null";
-        }
-        if (-x '/usr/bin/waitmax') {
-          $inventory_command="/usr/bin/waitmax 30 ${inventory_command}";
-        } elsif ( -x '/bin/waitmax') {
-          $inventory_command="/bin/waitmax 30 ${inventory_command}";
-        }
-        my @a=`${inventory_command}`;
-        if ($? == 0) {
-          my @seen;
-      M:
-          foreach my $m (sort(@a)) {
-              my @e=split(/\s+/,$m);
-              if ( defined $filters{allowfs}
-                   and scalar @{$filters{allowfs}} > 0 ) {
-                  if ( not string_any($e[2], @{$filters{allowfs}}) ) {
-                      debug("filesystem type is not allowd via the allow list: ${e[2]}");
-                      next M;
-                  }
-              } elsif ( defined $filters{skipfstype} and string_any($e[2], @{$filters{skipfstype}}) ) {
-                  debug("filesystem type is not allowd via the skip list: ${e[2]}");
-                  next M;
-              }
-              if (defined $filters{skip}) {
-                  next M if string_any($e[1], (ref($filters{skip}) eq "ARRAY" ? @{$filters{skip}} : ($filters{skip})));
-              }
-              if (defined $filters{skipre}) {
-                  foreach my $skipre (ref($filters{skipre}) eq "ARRAY" ? @{$filters{skipre}} : ($filters{skipre})) {
-                      if ($e[1] =~ /$skipre/) {
-                          next M;
-                      }
-                  }
-              }
-              # skip seen devices
-              grep(/^$e[0]$/,@seen) and next;
-              push(@seen,$e[0]);
-              push(@paths,$e[1]);
-          }
-      } else {
-          error("unable to inventory ${host}");
-        }
+            if ((defined $$bs{inventory} and $$bs{inventory}) and not (defined $$bs{'disabled'} and $$bs{'disabled'})) {
+          push(@paths,inventory_host($host,$localhost,$backupdest,$bs));
       }
       foreach my $path (@paths) {
         $path =~ s/.+\/$//; # remove any trailing slash, but only if there is something before it!
@@ -1996,6 +1942,73 @@ sub parse_config_backups {
   return @BACKUPS;
 }
 # end of parse_config_backups
+
+sub inventory_host {
+    my $host = shift;
+    my $localhost = shift;
+    my $backupdest = shift;
+    my $bs = shift;
+    my @paths;
+
+    my %filters;
+    for my $k (qw(skipfstype allowfs skip skipre)) {
+        $filters{$k} = [hashref_key_array_combine($k,
+                                                  hashref_key_hash(\%DEFAULT_CONFIG,'default'), # defaults
+                                                  \%CONFIG, # config file, top level
+                                                  $CONFIG{backupdestination}{$backupdest}, # from the destination
+                                                  $bs, # ourselves
+                                                  \%CLI_CONFIG)];
+    }
+    print STDERR Dumper \%filters if $DEBUG;
+    # perform inventory
+    debug("performing inventory on $host");
+    my $inventory_command='cat /proc/mounts';
+    if ($host ne $localhost) {
+        $inventory_command="ssh -x -o BatchMode=yes ${host} ${inventory_command} < /dev/null";
+    }
+    if (-x '/usr/bin/waitmax') {
+        $inventory_command="/usr/bin/waitmax 30 ${inventory_command}";
+    } elsif ( -x '/bin/waitmax') {
+        $inventory_command="/bin/waitmax 30 ${inventory_command}";
+    }
+    my @a=`${inventory_command}`;
+    print STDERR Dumper \@a if $DEBUG;
+    if ($? == 0) {
+        my @seen;
+    M:
+        foreach my $m (sort(@a)) {
+            my @e=split(/\s+/,$m);
+            if ( defined $filters{allowfs}
+                 and scalar @{$filters{allowfs}} > 0 ) {
+                if ( not string_any($e[2], @{$filters{allowfs}}) ) {
+                    debug("filesystem type is not allowd via the allow list: ${e[2]}");
+                    next M;
+                }
+            } elsif ( defined $filters{skipfstype} and string_any($e[2], @{$filters{skipfstype}}) ) {
+                debug("filesystem type is not allowd via the skip list: ${e[2]}");
+                next M;
+            }
+            if (defined $filters{skip}) {
+                next M if string_any($e[1], (ref($filters{skip}) eq "ARRAY" ? @{$filters{skip}} : ($filters{skip})));
+            }
+            if (defined $filters{skipre}) {
+                foreach my $skipre (ref($filters{skipre}) eq "ARRAY" ? @{$filters{skipre}} : ($filters{skipre})) {
+                    if ($e[1] =~ /$skipre/) {
+                        next M;
+                    }
+                }
+            }
+            # skip seen devices
+            grep(/^$e[0]$/,@seen) and next;
+            push(@seen,$e[0]);
+            push(@paths,$e[1]);
+        }
+    } else {
+        error("unable to inventory ${host}");
+    }
+    return @paths;
+}
+
 
 sub key_select {
     print STDERR Dumper \@_ if $DEBUG;
