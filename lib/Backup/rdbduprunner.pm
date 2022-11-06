@@ -2274,7 +2274,7 @@ sub average_mode {
     foreach my $bh (sort backup_sort (BACKUPS())) {
         $avcom="$$bh{rdiffbackupbinary} --calculate-average";
         unless($$bh{btype} eq 'rdiff-backup') {
-          warn("average function only applies to rdiff-backup type backupes");
+          warn("average function only applies to rdiff-backup type backups");
             next;
         }
         $avcom.=" $$bh{dest}/rdiff-backup-data/session_statistics.*.data";
