@@ -24,7 +24,9 @@ use Hash::Merge qw(merge);
                                         $section),
                 'default',
                 'getopt',
-                'sections')
+                'sections',
+                'mode'
+            )
         );
     }
 
@@ -95,7 +97,7 @@ use Hash::Merge qw(merge);
          level => 'debug',
          force => 1,
          full => 1,
-         'calculate-average' => 1,
+         'average' => 1,
          cleanup => 1,
          compare => 1,
          dump => 1,

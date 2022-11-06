@@ -331,11 +331,12 @@ our %DEFAULT_CONFIG = (
     },
     # the following changes the major mode of operation for rdbduprunner:
     # 'calculate-average'      => \$AVERAGE,
-    'calculate-average' => {
-        getopt => 'calculate-average',
+    'average' => {
+        getopt => 'average|calculate-average',
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&average_mode,
     },
     # 'cleanup'                => \$CLEANUP,
     # 'check'                  => \$CLEANUP,
@@ -344,6 +345,7 @@ our %DEFAULT_CONFIG = (
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&cleanup_mode,
     },
     # 'compare'                => \$COMPARE,
     # 'verify'                 => \$COMPARE,
@@ -352,34 +354,39 @@ our %DEFAULT_CONFIG = (
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&compare_mode,
     },
     # 'dump'                   => \$DUMP,
     'dump' => {
-        getopt => 'dump',
+        getopt   => 'dump',
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&dump_mode,
     },
     # 'list-oldest'            => \$LISTOLDEST,
     'listoldest' => {
-        getopt => 'listoldest|list-oldest',
+        getopt   => 'listoldest|list-oldest',
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&listoldest_mode,
     },
     # 'remove-oldest'          => \$REMOVE,
     'remove' => {
-        getopt => 'remove|remove-oldest',
+        getopt   => 'remove|remove-oldest',
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&remove_mode,
     },
     # 'status'                 => \$STATUS,
     'status' => {
-        getopt => 'status',
+        getopt   => 'status',
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&status_mode,
     },
     # 'tidy'                   => \$TIDY,
     'tidy' => {
@@ -387,6 +394,7 @@ our %DEFAULT_CONFIG = (
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&tidy_mode,
     },
     # 'list'                   => \$LIST,
     'list' => {
@@ -394,6 +402,7 @@ our %DEFAULT_CONFIG = (
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&list_mode,
     },
     # 'orphans'                => \$ORPHANS,
     'orphans' => {
@@ -401,6 +410,7 @@ our %DEFAULT_CONFIG = (
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&orphans_mode,
     },
     # maintain the status database:
     # 'status_json|status-json!'       => \$STATUS_JSON,
@@ -409,6 +419,7 @@ our %DEFAULT_CONFIG = (
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&status_json,
     },
     # 'status_delete|status-delete=s@' => \@STATUS_DELETE,
     'status_delete' => {
@@ -416,6 +427,7 @@ our %DEFAULT_CONFIG = (
         type     => "list?(string)",
         optional => "true",
         sections => [qw(cli)],
+        mode     => \&status_delete,
     },
     #'duplicity-binary=s'     => \$DUPLICITY_BINARY,
     'duplicitybinary' => {
@@ -1540,7 +1552,7 @@ sub set_env {
 }
 
 sub build_increment_list {
-  foreach my $bp (@BACKUPS) {
+  foreach my $bp (BACKUPS()) {
     my $tag=$$bp{tag};
     unless($$bp{btype} eq 'rdiff-backup') {
       next;
@@ -2059,7 +2071,8 @@ sub rdbduprunner {
                                         $section),
                 'default',
                 'getopt',
-                'sections')
+                'sections',
+                'mode',)
         );
     }
 
@@ -2075,6 +2088,13 @@ sub rdbduprunner {
     $CLI_CONFIG{test} = 1 unless defined $CLI_CONFIG{test};
     $config_validator->validate(\%CLI_CONFIG,'cli');
 
+    # major mode command line options are denoted by having a mode
+    # key, and those options are mutually exclusive:
+    Config::Validator::mutex(\%CLI_CONFIG,
+                             keys(%{hashref_key_hash(\%DEFAULT_CONFIG,
+                                                     'mode')}
+                                )
+                              );
     if ( scalar @ARGV ) {
         print STDERR Dumper \@ARGV;
         die "unparsed options on the command line: ".join(' ',@ARGV);
@@ -2087,63 +2107,69 @@ sub rdbduprunner {
                        key_selector('facility'),
                        key_selector('level'),
                        $LOG_FILE );
-$RUNTIME=time();
-dlog('info','starting',{});
+    $RUNTIME=time();
+    dlog('info','starting',{});
 
-unless ( defined $CLI_CONFIG{config} ) {
- FILE:
-    foreach my $c (@CONFIG_FILES) {
-        # loop through the candidates, choose the first existing one
-        if ( -f $c ) {
-            $CONFIG_FILE = $c;
-            last FILE;
+    unless ( defined $CLI_CONFIG{config} ) {
+    FILE:
+        foreach my $c (@CONFIG_FILES) {
+            # loop through the candidates, choose the first existing one
+            if ( -f $c ) {
+                $CONFIG_FILE = $c;
+                last FILE;
+            }
         }
     }
-}
-unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
-    my $msg= "no config files found in any locations, unable to continue!";
-    critical($msg);
-    die $msg;
-}
-%CONFIG=new Config::General(-ConfigFile => $CONFIG_FILE,
-			    -IncludeGlob => 1,
-			    -AutoTrue => 1,
-			    -LowerCaseNames => 1)->getall() or die "unable to parse $CONFIG_FILE";
+    unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
+        my $msg= "no config files found in any locations, unable to continue!";
+        critical($msg);
+        die $msg;
+    }
+    %CONFIG=new Config::General(-ConfigFile => $CONFIG_FILE,
+                                -IncludeGlob => 1,
+                                -AutoTrue => 1,
+                                -LowerCaseNames => 1)->getall() or die "unable to parse $CONFIG_FILE";
 
     create_dispatcher( $APP_NAME,
                        key_selector('facility'),
                        key_selector('level'),
                        $LOG_FILE );
 
-    if(dtruefalse(\%CLI_CONFIG, 'dump')) {
-        print Dumper \%CONFIG;
-    }
-
     $config_validator->validate(\%CONFIG,'global');
-
 
     dlog('debug','config',\%CONFIG,{'config_file' => $CONFIG_FILE});
 
-    if ( defined $CLI_CONFIG{status_delete}
-         and reftype $CLI_CONFIG{status_delete} eq reftype []
-         and scalar @{$CLI_CONFIG{status_delete}} > 0 ) {
-    status_delete(@{$CLI_CONFIG{status_delete}});
-    exit;
-}
-elsif ( basename($PROGRAM_NAME) eq 'check_rdbduprunner' or dtruefalse(\%CLI_CONFIG, 'status_json') ) {
-    status_json();
-    exit;
+    my $mode='backup';
+ MODE:
+    for my $m (keys(%{hashref_key_hash(\%DEFAULT_CONFIG,
+                                       'mode')})) {
+        if(exists $CLI_CONFIG{$m} and $CLI_CONFIG{$m}) {
+            $mode = $m;
+            last MODE;
+        }
+    }
+    if ($mode eq 'backup') {
+        backup_mode();
+    }
+    else {
+        print STDERR Dumper [$mode, $DEFAULT_CONFIG{$mode} ] if $DEBUG;
+        $DEFAULT_CONFIG{$mode}{mode}->();
+    }
+
+    dlog('info',
+         'exiting',
+         {'total_run_time_seconds' => time()-$RUNTIME});
 }
 
-@BACKUPS = parse_config_backups(\%DEFAULT_CONFIG, \%CONFIG, \%CLI_CONFIG);
-if(dtruefalse(\%CLI_CONFIG, 'dump')) {
-  print Dumper \@BACKUPS;
-  notice("you asked me to dump and exit!");
-  exit(0);
+sub dump_mode {
+    print Dumper \%CONFIG;
+    #@BACKUPS = parse_config_backups(\%DEFAULT_CONFIG, \%CONFIG, \%CLI_CONFIG);
+    print Dumper [BACKUPS()];
+    notice("you asked me to dump and exit!");
 }
 
-if(dtruefalse(\%CLI_CONFIG, 'status')) {
-  foreach my $bh (sort backup_sort (@BACKUPS)) {
+sub status_mode {
+  foreach my $bh (sort backup_sort (BACKUPS())) {
     my @com;
     if($$bh{btype} eq 'duplicity') {
       @com=($$bh{duplicitybinary},'collection-status');
@@ -2169,25 +2195,32 @@ if(dtruefalse(\%CLI_CONFIG, 'status')) {
       unlock_pid_file($lock);
     }
   }
-} elsif(dtruefalse(\%CLI_CONFIG, 'listoldest')) {
+}
+
+sub listoldest_mode {
     build_increment_list();
     foreach my $ih (sort { $$a{inctime} <=> $$b{inctime} } (@INCREMENTS)) {
         print localtime($$ih{inctime}).' '.$$ih{bh}{dest}.' '.$$ih{tag}."\n";
     }
-} elsif(dtruefalse(\%CLI_CONFIG, 'remove')) {
+}
+
+sub remove_mode {
     build_increment_list();
     remove_oldest('any');
 }
-elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
-  foreach my $bh (sort backup_sort (@BACKUPS)) {
+
+sub orphans_mode {
+  foreach my $bh (sort backup_sort (BACKUPS())) {
     if($$bh{btype} eq 'rdiff-backup') {
       my @com=('find',$$bh{dest},'-type','f','-name','rdiff-backup.tmp.*');
       info(join(" ",@com));
       system(@com);
     }
   }
-} elsif(dtruefalse(\%CLI_CONFIG, 'cleanup')) {
-    foreach my $bh (sort backup_sort (@BACKUPS)) {
+}
+
+sub cleanup_mode {
+    foreach my $bh (sort backup_sort (BACKUPS())) {
         my @com;
         if($$bh{btype} eq 'duplicity') {
             push(@com,$$bh{duplicitybinary},'cleanup');
@@ -2221,8 +2254,10 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
             unlock_pid_file($lock);
         }
     }
-} elsif (dtruefalse(\%CLI_CONFIG, 'tidy')) {
-    foreach my $bh (sort backup_sort (@BACKUPS)) {
+}
+
+sub tidy_mode {
+    foreach my $bh (sort backup_sort (BACKUPS())) {
       my $lock;
       unless($CLI_CONFIG{test}) {
 	$lock=lock_pid_file($$bh{host});
@@ -2232,9 +2267,11 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
 	unlock_pid_file($lock);
       }
     }
-} elsif(dtruefalse(\%CLI_CONFIG, 'average')) {
+}
+
+sub average_mode {
     my $avcom;
-    foreach my $bh (sort backup_sort (@BACKUPS)) {
+    foreach my $bh (sort backup_sort (BACKUPS())) {
         $avcom="$$bh{rdiffbackupbinary} --calculate-average";
         unless($$bh{btype} eq 'rdiff-backup') {
           warn("average function only applies to rdiff-backup type backupes");
@@ -2243,8 +2280,10 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
         $avcom.=" $$bh{dest}/rdiff-backup-data/session_statistics.*.data";
     }
     exec($avcom);
-} elsif(dtruefalse(\%CLI_CONFIG, 'compare')) {
-  foreach my $bh (sort backup_sort (@BACKUPS)) {
+}
+
+sub compare_mode {
+  foreach my $bh (sort backup_sort (BACKUPS())) {
     my @com;
     if ($$bh{btype} eq 'duplicity') {
       @com=($$bh{duplicitybinary},'verify');
@@ -2283,8 +2322,9 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
       unlock_pid_file($lock);
     }
   }
-} elsif(dtruefalse(\%CLI_CONFIG, 'list')) {
-  foreach my $bh (sort backup_sort (@BACKUPS)) {
+}
+sub list_mode {
+  foreach my $bh (sort backup_sort (BACKUPS())) {
     my @com;
     unless($$bh{btype} eq 'duplicity') {
       warn("list function only applies to duplicity type backups");
@@ -2305,12 +2345,15 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
       unlock_pid_file($lock);
     }
   }
-} else {
+}
+
+sub backup_mode {
   # here we will eventually just perform the backups
   # first we check for space on rdiff-backup destinations and free some up,
   # before forking away in perform_backups
+  my @b=BACKUPS();
  BACKUP:
-  foreach my $bh (@BACKUPS) {
+  foreach my $bh (@b) {
     if($$bh{btype} eq 'rdiff-backup') {
       if($$bh{dest} =~ /\:\:/) {
         info("we are assuming the destination $$bh{dest} is remote and will not attempt to manage it's disk space");
@@ -2340,14 +2383,9 @@ elsif(dtruefalse(\%CLI_CONFIG, 'orphans')) {
       }
     }
   }
-  perform_backups(@BACKUPS);
+  perform_backups(@b);
 }
 
-dlog('info',
-     'exiting',
-     {'total_run_time_seconds' => time()-$RUNTIME});
-
-}
 
 sub hashref_key_array {
     my $m = shift;
@@ -2474,6 +2512,12 @@ sub key_selector {
     return key_select($key, @hashes);
 }
 
+sub BACKUPS {
+    unless ( scalar @BACKUPS > 0 ) {
+        @BACKUPS = parse_config_backups(\%DEFAULT_CONFIG, \%CONFIG, \%CLI_CONFIG);
+    }
+    return @BACKUPS;
+}
 
 # Preloaded methods go here.
 
