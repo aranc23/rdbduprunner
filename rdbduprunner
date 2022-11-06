@@ -588,6 +588,25 @@ Pass to underlying backup programs, if set.
 
 Validity: CLI, Global
 
+=item C<prerun> I<command>
+
+Command to run I<before> each backup is executed.  If this command
+fails (exits with any error code other than 0) then the backup will
+bot be run.  Various environment variables will be set before
+executing the prerun command.  See the L<ENVIRONMENT> section for
+details.
+
+Validity: Global BackupDestination BackupSet
+
+=item C<postrun> I<command>
+
+Command to run I<after> each backup is executed.  If the backup
+command fails, this command will bot be run.  Various environment
+variables will be set before executing the postrun command.  See the
+L<ENVIRONMENT> section for details.
+
+Validity: Global BackupDestination BackupSet
+
 =back
 
 =head1 RETURN VALUE
@@ -599,6 +618,25 @@ Validity: CLI, Global
 =head1 EXAMPLES
 
 =head1 ENVIRONMENT
+
+Before executing the post and pre run commands, the following
+environment variables will be set:
+
+=over 2
+
+=item RDBDUPRUNNER_BACKUP_src
+
+=item RDBDUPRUNNER_BACKUP_dest
+
+=item RDBDUPRUNNER_BACKUP_tag
+
+=item RDBDUPRUNNER_BACKUP_path
+
+=item RDBDUPRUNNER_BACKUP_host
+
+=back
+
+These values are taken from the details of the backup being performed.
 
 =head1 FILES
 

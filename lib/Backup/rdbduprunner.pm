@@ -641,7 +641,16 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli)],
     },
-
+    prerun => {
+        type => "string",
+        optional => "true",
+        sections => [qw(global backupdestination backupset)],
+    },
+    postrun => {
+        type => "string",
+        optional => "true",
+        sections => [qw(global backupdestination backupset)],
+    },
 );
 
 our %config_definition = (
@@ -696,14 +705,6 @@ our %config_definition = (
                 optional => "true"
             },
 
-            prerun => {
-                type => "string",
-                optional => "true",
-            },
-            postrun => {
-                type => "string",
-                optional => "true",
-            },
         },
     },
     backupdestination => {
