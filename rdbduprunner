@@ -668,26 +668,6 @@ The precendence is as follows:
 
 =back
 
-
-=over 4
-
-=item Command line options
-
-=item BackupSet options
-
-=item BackupDestination options
-
-=item Global options
-
-=back
-
-=head3 Global Options
-
-=over 4
-
-
-=back
-
 =head3 BackupDestination Options
 
 Items enclosed in a <BackupDestination X> configuration block. The
