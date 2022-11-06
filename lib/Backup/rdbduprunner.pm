@@ -2271,16 +2271,18 @@ sub tidy_mode {
 
 sub average_mode {
     my $avcom;
+ BACKUP:
     foreach my $bh (sort backup_sort (BACKUPS())) {
+        print STDERR Dumper $bh if $DEBUG;
         $avcom="$$bh{rdiffbackupbinary} --calculate-average";
         unless($$bh{btype} eq 'rdiff-backup') {
           warn("average function only applies to rdiff-backup type backups");
-            next;
+            next BACKUP;
         }
         $avcom.=" $$bh{dest}/rdiff-backup-data/session_statistics.*.data";
+        debug("trying to calculate the average: ${avcom}");
+        system($avcom);
     }
-    debug("trying to calculate the average: ${avcom}");
-    system($avcom);
 }
 
 sub compare_mode {
@@ -2291,7 +2293,7 @@ sub compare_mode {
       $$bh{useagent} and push(@com,'--use-agent');
     }
     elsif($$bh{btype} eq 'rdiff-backup') {
-      @com=($$$bh{rdiffbackupbinary},'--compare','--no-eas');
+      @com=($$bh{rdiffbackupbinary},'--compare','--no-eas');
     }
     else {
       warn("verify function not implemented for rsync backups");
