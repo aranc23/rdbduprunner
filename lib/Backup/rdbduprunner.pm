@@ -663,6 +663,13 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(global backupdestination backupset)],
     },
+    volsize => {
+        getopt   => 'volsize=i',
+        type     => "integer",
+        min      => 1,
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
 );
 
 our %config_definition = (
@@ -949,6 +956,7 @@ sub build_backup_command {
     if($$bh{dryrun}) {
       push(@com,'--dry-run');
     }
+    $$bh{volsize} and push(@com, '--volsize', $$bh{volsize});
     $$bh{useagent} and push(@com,'--use-agent');
     $$bh{allowsourcemismatch} and push(@com,'--allow-source-mismatch');
     if(defined $$bh{signkey}) {

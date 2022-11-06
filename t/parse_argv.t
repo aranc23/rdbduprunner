@@ -79,6 +79,7 @@ use Hash::Merge qw(merge);
               --maxprocs 2
               --facility daemon
               --level debug
+              --volsize 1000
               --maxwait 32000
               --no-test
       )], @options);
@@ -117,6 +118,7 @@ use Hash::Merge qw(merge);
          test => 0,
          tempdir => '/var/tmp',
          dryrun => 1,
+         volsize => 1000,
      },
         "nothing passed");
 

@@ -57,16 +57,18 @@ use Data::Dumper;
     $$bh{allowsourcemismatch} = 1;
     $$bh{tempdir} = '/var/tmp';
     $$bh{disabled} = 0;
+    $$bh{volsize} = 1000;
     $CONFIG{default}{busted}=0;
 
     is([build_backup_command($bh)],
-       [qw(duplicity --verbosity 5 full --use-agent --allow-source-mismatch --no-print-statistics --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       [qw(duplicity --verbosity 5 full --volsize 1000 --use-agent --allow-source-mismatch --no-print-statistics --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "full duplicity");
 
     # start of "not-full duplicity with extra opts"
     $$bh{signkey} = '0x400';
     $$bh{encryptkey} = 'aran';
     $$bh{stats} = 1;
+    delete $$bh{volsize};
     delete $CLI_CONFIG{'full'};
     is([build_backup_command($bh)],
        [qw(duplicity --verbosity 5 --use-agent --allow-source-mismatch --sign-key 0x400 --encrypt-key aran --exclude-other-filesystems --tempdir /var/tmp --exclude-globbing-filelist /etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],

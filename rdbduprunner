@@ -607,6 +607,12 @@ L<ENVIRONMENT> section for details.
 
 Validity: Global BackupDestination BackupSet
 
+=item C<volsize> I<integer> {B<--volsize> I<integer>} (duplicity)
+
+Passed to the duplicity --volsize option.
+
+Validity: CLI Global BackupDestination BackupSet
+
 =back
 
 =head1 RETURN VALUE
