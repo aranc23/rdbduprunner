@@ -16,6 +16,7 @@ use Data::Dumper;
 {
     local *Backup::rdbduprunner::dlog = sub {};
     $CLI_CONFIG{localhost} = 'a-lnx005';
+    $CLI_CONFIG{excludepath} = '/etc/rdbduprunner/xxx';
     is( [parse_config_backups(\%DEFAULT_CONFIG,
                               {
                                   'backupset' => {
@@ -130,6 +131,7 @@ use Data::Dumper;
                   progress => 1,
                   verbose => 1,
                   localhost => 'a-lnx005',
+                  excludepath => '/etc/rdbduprunner/xxx',
                 },
             )
         ],
