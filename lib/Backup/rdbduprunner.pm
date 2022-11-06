@@ -2279,7 +2279,8 @@ sub average_mode {
         }
         $avcom.=" $$bh{dest}/rdiff-backup-data/session_statistics.*.data";
     }
-    exec($avcom);
+    debug("trying to calculate the average: ${avcom}");
+    system($avcom);
 }
 
 sub compare_mode {
