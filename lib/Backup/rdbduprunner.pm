@@ -99,7 +99,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '1.5.1';
+our $VERSION = '1.6.0';
 
 # constant name of the application
 our $APP_NAME = 'rdbduprunner';
@@ -1889,8 +1889,9 @@ sub parse_config_backups {
                     },
                     $bs);
                 print STDERR Dumper $bh if $DEBUG;
+                # we don't use catfile here because it mangles urls:
                 if (defined $$bh{tag}) {
-                    $$bh{dest} = catfile($backupdestpath,$$bh{tag});
+                    $$bh{dest} = join('/',$backupdestpath,$$bh{tag});
                     $$bh{gtag}='generic-'.$$bh{tag};
                 } else {
                     my $tag = path_munge_tag($$bh{path});
@@ -1898,7 +1899,7 @@ sub parse_config_backups {
                         {
                             tag => $host.$tag,
                             gtag => 'generic'.$tag,
-                            dest =>  catfile($backupdestpath,$host.$tag),
+                            dest => join('/',$backupdestpath,$host.$tag),
                         },
                         $bh);
                 }
