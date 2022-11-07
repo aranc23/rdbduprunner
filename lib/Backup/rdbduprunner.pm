@@ -1703,8 +1703,7 @@ sub log_exit_status {
                  {'exit' => $exit},
                  $bh);
   $msg =~ s/\"/\\\"/g;
-  my $localhost = key_selector('localhost');
-  if($$bh{host} ne $localhost) {
+  unless($$bh{local}) {
       my $facility = key_selector('facility');
     my $com="ssh -x -o BatchMode=yes $$bh{host} \"logger -t rdbduprunner -p ${facility}.notice '${msg}'\" < /dev/null";
     #print $com."\n";
@@ -1811,9 +1810,10 @@ sub parse_config_backups {
         }
     BS:
         foreach my $bs (@bslist) {
-            my $localhost = key_selector('localhost');
-
-            my $host=(defined $$bs{host} ? $$bs{host} : $localhost);
+            # the default for localhost key is shortname():
+            my $host=(defined $$bs{host}
+                      ? $$bs{host}
+                      : key_selector('localhost'));
             my $btype;
             my $backupdest;
 
@@ -1849,8 +1849,8 @@ sub parse_config_backups {
             } else {
                 $btype='rsync';
             }
-            if ($btype eq 'duplicity' and $host ne $localhost) {
-                error("$bstag is a duplicity backup with host set to $host and localhost: ${localhost}: duplicity backups must have a local source!");
+            if ($btype eq 'duplicity' and defined $$bs{host}) {
+                error("${bstag} is a duplicity backup with host set to $$bs{host}: duplicity backups must have a local source!");
                 next BS;
             }
 
@@ -1864,7 +1864,7 @@ sub parse_config_backups {
                 : ();
             # if we are going to inventory then do so:
             if (dtruefalse($bs,'inventory') and not dtruefalse($bs,'disabled')) {
-                push(@paths,inventory_host($host,$localhost,$backupdest,$bs));
+                push(@paths,inventory_host($backupdest,$bs));
             }
             # process each path into a "backup" data structure:
         PATH:
@@ -1883,6 +1883,7 @@ sub parse_config_backups {
                     {
                         path => $path,
                         host => $host,
+                        local => defined $$bs{host} ? 0 : 1,
                         backupdestination => $backupdest,
                         btype => $btype,
                     },
@@ -1932,12 +1933,12 @@ sub parse_config_backups {
                 }
                 print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
                 my @split_host = split(/\./,$$bh{host});
-                $$bh{'src'}
-                    = ( $$bh{host} eq $localhost or $split_host[0] eq $localhost )
-                    ? $$bh{path}
-                    : $$bh{host}
-                    . ( $$bh{btype} eq 'rsync' ? ':' : '::' )
-                    . $$bh{path};
+                $$bh{'src'} = $$bh{path};
+                unless($$bh{local}) {
+                    $$bh{'src'} = join($$bh{btype} eq 'rsync' ? ':' : '::',
+                                       $$bh{host},
+                                       $$bh{path});
+                }
                 dlog('debug','backup',$bh);
                 push(@BACKUPS,$bh);
             }
@@ -1949,8 +1950,6 @@ sub parse_config_backups {
 # end of parse_config_backups
 
 sub inventory_host {
-    my $host = shift;
-    my $localhost = shift;
     my $backupdest = shift;
     my $bs = shift;
     my @paths;
@@ -1966,10 +1965,10 @@ sub inventory_host {
     }
     print STDERR Dumper \%filters if $DEBUG;
     # perform inventory
-    debug("performing inventory on $host");
+    debug("performing inventory on ".defined $$bs{host} ? $$bs{host} : 'localhost');
     my $inventory_command='cat /proc/mounts';
-    if ($host ne $localhost) {
-        $inventory_command="ssh -x -o BatchMode=yes ${host} ${inventory_command} < /dev/null";
+    if (defined $$bs{host}) {
+        $inventory_command="ssh -x -o BatchMode=yes $$bs{host} ${inventory_command} < /dev/null";
     }
     if (-x '/usr/bin/waitmax') {
         $inventory_command="/usr/bin/waitmax 30 ${inventory_command}";
@@ -2009,7 +2008,7 @@ sub inventory_host {
             push(@paths,$e[1]);
         }
     } else {
-        error("unable to inventory ${host}");
+        error("unable to inventory $$bs{host}");
     }
     return @paths;
 }
