@@ -48,9 +48,7 @@ use Data::Dumper;
                 'tag' => 'accx',
                 'backupdestination' => 'restic',
                 'exclude' => [],
-                #'excludes' => [
-                #    '/etc/rdbduprunner/excludes/generic'
-                #],
+                'excludes' => [],
                 'wholefile' => 0,
                 'btype' => 'rsync',
                 'src' => '/home/accx/',
@@ -105,6 +103,7 @@ use Data::Dumper;
                 'tricklebinary' => 'trickle',
                 'zfsbinary' => 'zfs',
                 'rsyncbinary' => 'rsync',
+                'excludes' => [],
             }
         ],
         "skip the skips",
@@ -140,6 +139,7 @@ use Data::Dumper;
                 'src'               => '/home/spin/bin/',
                 'checksum'          => 0,
                 'exclude'           => [],
+                'excludes' => [],
                 'backupdestination' => 'data-tmp',
                 'tag'               => 'a-lnx005-home-spin-bin',
                 'host'              => 'a-lnx005',

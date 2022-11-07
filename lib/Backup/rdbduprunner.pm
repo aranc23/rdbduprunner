@@ -740,7 +740,8 @@ our %config_definition = (
                 type => "valid(truefalse)",
                 optional => "true"
             },
-            # only valid for rsync types
+            # this is the only require parameter, and is the output
+            # path or url of the destination for the this backup:
             path =>
             { type => "string" },
             # only valid for duplicity/rdiff-backup types
@@ -1795,6 +1796,9 @@ sub parse_config_backups {
     print STDERR Dumper \%DEFAULT_CONFIG if $DEBUG;
     print STDERR Dumper \%CONFIG if $DEBUG;
     print STDERR Dumper \%CLI_CONFIG if $DEBUG;
+
+    # although BackupSet's currently require a name, we don't use that
+    # name for anything
     for my $bstag (keys(%{$CONFIG{backupset}})) {
         my @bslist=($CONFIG{backupset}{$bstag});
         if (
@@ -1805,149 +1809,145 @@ sub parse_config_backups {
             # this case can no longer happen because of the config validator
             die("multiple backupsets with the same name: ${bstag}, this cannot happen");
         }
+    BS:
         foreach my $bs (@bslist) {
             my $localhost = key_selector('localhost');
 
-      my $host=(defined $$bs{host} ? $$bs{host} : $localhost);
-      my $btype;
-      my $backupdest;
+            my $host=(defined $$bs{host} ? $$bs{host} : $localhost);
+            my $btype;
+            my $backupdest;
 
-      if (defined $CLI_CONFIG{filterhost} and $host !~ /$CLI_CONFIG{filterhost}/) {
-        next;
-      }
-      dlog('debug','backupset',
-           $bs);
+            if (defined $CLI_CONFIG{filterhost} and $host !~ /$CLI_CONFIG{filterhost}/) {
+                debug("skipping backup on ${host} due to filter");
+                next BS;
+            }
+            dlog('debug','backupset',$bs);
 
-      if (defined $$bs{backupdestination}) {
-        $backupdest=$$bs{backupdestination};
-      } elsif (defined $CONFIG{defaultbackupdestination}) {
-        $backupdest=$CONFIG{defaultbackupdestination};
-      }
-      unless(defined $backupdest) {
-        error("there is no BackupDestination defined for the BackupSet ($bstag): so it cannot be processed");
-        next;
-      }
+            if (defined $$bs{backupdestination}) {
+                $backupdest=$$bs{backupdestination};
+            } elsif (defined $CONFIG{defaultbackupdestination}) {
+                $backupdest=$CONFIG{defaultbackupdestination};
+            }
+            else {
+                error("there is no BackupDestination defined for the BackupSet ($bstag): so it cannot be processed");
+                next BS;
+            }
+            if (defined $CLI_CONFIG{filterdest} and $backupdest !~ /$CLI_CONFIG{filterdest}/) {
+                debug("skipping backup on ${backupdest} due to filter");
+                next BS;
+            }
+            unless (defined $CONFIG{backupdestination}{$backupdest}) {
+                error("there is no such backupdestination as ${backupdest} in the config, skipping");
+                next BS;
+            }
+            my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
 
-      # this should already by validated by the config
-      if (defined $CONFIG{backupdestination}{$backupdest}{type} and
-          $CONFIG{backupdestination}{$backupdest}{type} =~ $VALID_BACKUP_TYPE_REGEX) {
-        # check to make sure that if the type isn't set, we set it to rsync
-        $btype=$CONFIG{backupdestination}{$backupdest}{type};
-      } else {
-        $btype='rsync';
-      }
-      if ($btype eq 'duplicity' and $host ne $localhost) {
-        error("$bstag is a duplicity backup with host set to $host and localhost: ${localhost}: duplicity backups must have a local source!");
-        next;
-      }
+            # this should already by validated by the config
+            if (defined $CONFIG{backupdestination}{$backupdest}{type} ) {
+                # check to make sure that if the type isn't set, we set it to rsync
+                $btype=$CONFIG{backupdestination}{$backupdest}{type};
+            } else {
+                $btype='rsync';
+            }
+            if ($btype eq 'duplicity' and $host ne $localhost) {
+                error("$bstag is a duplicity backup with host set to $host and localhost: ${localhost}: duplicity backups must have a local source!");
+                next BS;
+            }
 
-      if (defined $CLI_CONFIG{filterdest} and $backupdest !~ /$CLI_CONFIG{filterdest}/) {
-        next;
-      }
-      unless (exists $CONFIG{backupdestination}{$backupdest} and exists $CONFIG{backupdestination}{$backupdest}{path}) {
-        error("there is no such backupdestination as $backupdest in the config, skipping");
-        next;
-      }
-      my $backupdestpath=$CONFIG{backupdestination}{$backupdest}{path};
+            # paths can be a singleton or array, because that's how
+            # Config::General works:
+            my @paths
+                = defined $$bs{path}
+                ? (ref($$bs{path}) eq "ARRAY"
+                   ? @{$$bs{path}}
+                   : ($$bs{path}))
+                : ();
+            # if we are going to inventory then do so:
+            if (dtruefalse($bs,'inventory') and not dtruefalse($bs,'disabled')) {
+                push(@paths,inventory_host($host,$localhost,$backupdest,$bs));
+            }
+            # process each path into a "backup" data structure:
+        PATH:
+            foreach my $path (@paths) {
+                # remove any trailing slash, but only if there is
+                # something before it!:
+                $path =~ s/.+\/$//;
+                if (defined $CLI_CONFIG{filterpath} and $path !~ /$CLI_CONFIG{filterpath}/) {
+                    debug("skipping backup on ${backupdest} due to filter");
+                    next PATH;
+                }
 
-      my @paths;
-      if (defined $$bs{path}) {
-        @paths=ref($$bs{path}) eq "ARRAY" ? @{$$bs{path}} : ($$bs{path});
-      }
+                # very important to make a copy here:
+                my $bh = clone($bs);
 
-            if ((defined $$bs{inventory} and $$bs{inventory}) and not (defined $$bs{'disabled'} and $$bs{'disabled'})) {
-          push(@paths,inventory_host($host,$localhost,$backupdest,$bs));
-      }
-      foreach my $path (@paths) {
-        $path =~ s/.+\/$//; # remove any trailing slash, but only if there is something before it!
-        my $bh={};
-        if (defined $CLI_CONFIG{filterpath} and $path !~ /$CLI_CONFIG{filterpath}/) {
-          next;
+                my $dest;
+                my $tag='';
+                my $gtag='';
+                if (defined $$bs{tag}) {
+                    $dest=$$bs{tag};
+                    $tag=$dest;
+                    $gtag='generic-'.$tag;
+                } else {
+                    $dest=$path;
+                    $dest =~ s/\//\-/g;
+                    $dest =~ s/ /_/g;
+                    $dest eq '-' and $dest='-root';
+                    $tag=$host.$dest;
+                    $gtag='generic'.$dest;
+                }
+                # I should use a perl module here, I guess, not .
+                $dest=$backupdestpath.'/'.$tag;
+                #debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
+
+                $$bh{dest}=$dest;
+                $$bh{path}=$path;
+                $$bh{tag}=$tag;
+                $$bh{host}=$host;
+                $$bh{backupdestination}=$backupdest;
+                $$bh{gtag}=$gtag;
+                $$bh{btype}=$btype;
+                if ($$bh{btype} eq 'rsync') {
+                    $$bh{path}=$$bh{path}.'/';
+                    $$bh{path} =~ s/\/\/$/\//; # remove double slashes
+                }
+
+                @{$$bh{excludes}} = exclude_list_generate($bh);
+                $$bh{exclude}=[];
+                foreach my $exc (ref($$bs{exclude}) eq "ARRAY" ? @{$$bs{exclude}} : ($$bs{exclude})) {
+                    if (defined $exc and length $exc > 0) {
+                        push(@{$$bh{exclude}},$exc);
+                    }
+                }
+                print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
+            KEY:
+                for my $key (sort(
+                    hashref_key_filter_array('type',
+                                             qr{^(list|table)},
+                                             $config_definition{'default'}{fields},
+                                             $config_definition{'backupset'}{fields},
+                                             $config_definition{'backupdestination'}{fields},
+                                             $config_definition{'cli'}{fields}),
+                    keys(%DEFAULT_CONFIG))) {
+                    # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
+                    next KEY if string_any($key, qw(filterpath filterdest filterhost defaultbackupdestination type maxprocs level facility force full maxwait skipfstype localhost test excludepath));
+                    my $v = key_selector($key,$bh);
+                    $$bh{$key} = $v if defined $v;
+                }
+                print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
+                my @split_host = split(/\./,$$bh{host});
+                $$bh{'src'}
+                    = ( $$bh{host} eq $localhost or $split_host[0] eq $localhost )
+                    ? $$bh{path}
+                    : $$bh{host}
+                    . ( $$bh{btype} eq 'rsync' ? ':' : '::' )
+                    . $$bh{path};
+                dlog('debug','backup',$bh);
+                push(@BACKUPS,$bh);
+            }
         }
-        my $dest;
-        my $tag='';
-        my $gtag='';
-        if (defined $$bs{tag}) {
-          $dest=$$bs{tag};
-          $tag=$dest;
-          $gtag='generic-'.$tag;
-        } else {
-          $dest=$path;
-          $dest =~ s/\//\-/g;
-          $dest =~ s/ /_/g;
-          $dest eq '-' and $dest='-root';
-          $tag=$host.$dest;
-          $gtag='generic'.$dest;
-        }
-        # I should use a perl module here, I guess, not .
-        $dest=$backupdestpath.'/'.$tag;
-        #debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
-
-        $bh={%{$bs}};           # very important to make a copy here
-        $$bh{dest}=$dest;
-        $$bh{path}=$path;
-        $$bh{tag}=$tag;
-        $$bh{host}=$host;
-        $$bh{backupdestination}=$backupdest;
-        $$bh{gtag}=$gtag;
-        $$bh{btype}=$btype;
-        if ($$bh{btype} eq 'rsync') {
-          $$bh{path}=$$bh{path}.'/';
-          $$bh{path} =~ s/\/\/$/\//; # remove double slashes
-        }
-        my $exclude_path = key_selector('excludepath');
-
-        my $epath=( $btype eq 'rsync'
-                    ? catfile($exclude_path,'excludes')
-                    : catfile($exclude_path,'rdb-excludes')
-                  );
-        if ( -f catfile($epath,'generic') ) {
-          push(@{$$bh{excludes}}, catfile($epath,'generic'));
-        }
-
-        if ( -f catfile($epath, $$bh{gtag}) ) {
-          push(@{$$bh{excludes}}, catfile($epath, $$bh{gtag}));
-        }
-
-        if ( -f catfile($epath, $tag) ) {
-          push(@{$$bh{excludes}}, catfile($epath, $tag));
-        }
-        $$bh{exclude}=[];
-        foreach my $exc (ref($$bs{exclude}) eq "ARRAY" ? @{$$bs{exclude}} : ($$bs{exclude})) {
-          if (defined $exc and length $exc > 0) {
-            push(@{$$bh{exclude}},$exc);
-          }
-        }
-        print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
-    KEY:
-        for my $key (sort(
-            hashref_key_filter_array('type',
-                                     qr{^(list|table)},
-                                     $config_definition{'default'}{fields},
-                                     $config_definition{'backupset'}{fields},
-                                     $config_definition{'backupdestination'}{fields},
-                                     $config_definition{'cli'}{fields}),
-            keys(%DEFAULT_CONFIG))) {
-        # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
-            next KEY if string_any($key, qw(filterpath filterdest filterhost defaultbackupdestination type maxprocs level facility force full maxwait skipfstype localhost test excludepath));
-            my $v = key_selector($key,$bh);
-            $$bh{$key} = $v if defined $v;
-        }
-        print STDERR Data::Dumper->Dump([$bh], [qw(bh)]) if $DEBUG;
-        my @split_host = split(/\./,$$bh{host});
-        $$bh{'src'}
-            = ( $$bh{host} eq $localhost or $split_host[0] eq $localhost )
-            ? $$bh{path}
-            : $$bh{host}
-            . ( $$bh{btype} eq 'rsync' ? ':' : '::' )
-            . $$bh{path};
-        dlog('debug','backup',$bh);
-        push(@BACKUPS,$bh);
-      }
     }
-  }
-  print STDERR Dumper [sort { $$a{dest} cmp $$b{dest} } @BACKUPS] if $DEBUG;
-  return @BACKUPS;
+    print STDERR Dumper [sort { $$a{dest} cmp $$b{dest} } @BACKUPS] if $DEBUG;
+    return @BACKUPS;
 }
 # end of parse_config_backups
 
@@ -2543,6 +2543,27 @@ sub BACKUPS {
     return @BACKUPS;
 }
 
+sub exclude_list_generate {
+    my $bh = shift;
+    my @e;
+    my $exclude_path = key_selector('excludepath');
+
+    my $epath=catfile($exclude_path,
+                      $$bh{btype} eq 'rsync'
+                      ? 'excludes'
+                      : 'rdb-excludes');
+
+    if ( -f catfile($epath,'generic') ) {
+        push(@e, catfile($epath,'generic'));
+    }
+    if ( -f catfile($epath, $$bh{gtag}) ) {
+        push(@e, catfile($epath, $$bh{gtag}));
+    }
+    if ( -f catfile($epath, $$bh{tag}) ) {
+        push(@e, catfile($epath, $$bh{tag}));
+    }
+    return @e;
+}
 # Preloaded methods go here.
 
 # Autoload methods go after =cut, and are processed by the autosplit program.
