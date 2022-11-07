@@ -1878,34 +1878,31 @@ sub parse_config_backups {
                 }
 
                 # very important to make a copy here:
-                my $bh = clone($bs);
-
-                my $dest;
-                my $tag='';
-                my $gtag='';
-                if (defined $$bs{tag}) {
-                    $dest=$$bs{tag};
-                    $tag=$dest;
-                    $gtag='generic-'.$tag;
+                print STDERR Dumper $bs if $DEBUG;
+                my $bh = merge(
+                    {
+                        path => $path,
+                        host => $host,
+                        backupdestination => $backupdest,
+                        btype => $btype,
+                    },
+                    $bs);
+                print STDERR Dumper $bh if $DEBUG;
+                if (defined $$bh{tag}) {
+                    $$bh{dest} = catfile($backupdestpath,$$bh{tag});
+                    $$bh{gtag}='generic-'.$$bh{tag};
                 } else {
-                    $dest=$path;
-                    $dest =~ s/\//\-/g;
-                    $dest =~ s/ /_/g;
-                    $dest eq '-' and $dest='-root';
-                    $tag=$host.$dest;
-                    $gtag='generic'.$dest;
+                    my $tag = path_munge_tag($$bh{path});
+                    $bh = merge(
+                        {
+                            tag => $host.$tag,
+                            gtag => 'generic'.$tag,
+                            dest =>  catfile($backupdestpath,$host.$tag),
+                        },
+                        $bh);
                 }
-                # I should use a perl module here, I guess, not .
-                $dest=$backupdestpath.'/'.$tag;
-                #debug("Host: $host Path: $path Tag: $tag Dest: $dest Root: $backupdestpath");
+                print STDERR Dumper $bh if $DEBUG;
 
-                $$bh{dest}=$dest;
-                $$bh{path}=$path;
-                $$bh{tag}=$tag;
-                $$bh{host}=$host;
-                $$bh{backupdestination}=$backupdest;
-                $$bh{gtag}=$gtag;
-                $$bh{btype}=$btype;
                 if ($$bh{btype} eq 'rsync') {
                     $$bh{path}=$$bh{path}.'/';
                     $$bh{path} =~ s/\/\/$/\//; # remove double slashes
@@ -2564,6 +2561,16 @@ sub exclude_list_generate {
     }
     return @e;
 }
+
+# turn the path into a tag
+sub path_munge_tag {
+    my $path = shift;
+    $path =~ s/\//\-/g;
+    $path =~ s/ /_/g;
+    $path eq '-' and $path='-root';
+    return $path;
+}
+
 # Preloaded methods go here.
 
 # Autoload methods go after =cut, and are processed by the autosplit program.
