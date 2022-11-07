@@ -683,7 +683,19 @@ blocks.
 
 =over 4
 
-=item I<PercentUsed> - Integer, optional
+=item C<path> I<string>
+
+This is the destination component passed to the backup command.  In
+most cases, it's simply a path but duplicity can use other backends.
+
+=item C<type> I<rdiff-backup|rsync|duplicity>
+
+Determines what backup software to use when writting to this
+backupdestination.
+
+Default: rsync
+
+=item C<PercentUsed> I<Integer>
 
 Keep disk usage on destination below this percent:
 When using rdiff-backup and duplicty type backups rdbduprunner will
@@ -691,7 +703,7 @@ attempt to delete older increments in order to keep usage below this
 percentage.  It will do so before running backups and will not run
 backups if it cannot reduce usage below this level.
 
-=item I<MinFree> - Integer, optional
+=item C<MinFree> - I<Integer>
 
 Keep disk usage below this number: When using rdiff-backup and
 duplicty type backups rdbduprunner will attempt to delete older
@@ -711,7 +723,7 @@ will occur.
 
 =over 4
 
-=item I<BackupDestination> - String, optional
+=item C<BackupDestination> I<name>
 
 Must match existing BackupDestination as defined above.  When not
 specified the default will be used as specified in global options as
@@ -719,33 +731,39 @@ DefaultBackupDestination.  These backups will be written to the the
 destination specified using the backup type and other options
 specified for that backup destination.
 
-=item I<Path> - String, mandatory (multiples ok)
+=item C<Path> I<path>
 
 Directory to be backed up. This may be specified multiple times per
 backupset, and doing so will create multiple backups one for each path
 specified.
 
-=item I<Host> - String, optional
+=item C<Host> I<hostname or ip address>
 
 Host to be backed up; if not specified assumes localhost
 
-=item I<Inventory> - Boolean (if present at all, assumed to be true!)
+=item C<Inventory> I<true|false|yes|no|on|off|0|1>
 
 Look at the remote machine for a list of directories to back up:
 Excludes a long list of non-filesystem type filesystems (fuse, etc.)
 Creates a new backup from each one not excluded.
 
-=item I<Tag> - String, optional
+=item C<Tag> I<string>
 
-Overrides the generated tag used to construct the output directory path.
+Overrides the generated tag used to construct the output directory
+path.  This affects the name of the directory to write the backups to,
+underneath that specified by the backupdestination.  Overriding this
+tag could have some weird side effects.  Do not use this option with
+multiple Path directives or with the inventory option.
 
-=item I<Exclude> - String, optional (multiples ok)
+=item C<Exclude> I<string>
 
 Pass these paths to the --exclude or similar options of the underlying
 invocation of rdiff-backup, duplicity, or rsync.  Does not attempt to
 normalize the paths for any given method of specifiying exclusions.
 
+=item C<disabled> I<true|false|yes|no|on|off|0|1>
 
+Do not perform the backups in this BackupSet.
 
 =back
 
