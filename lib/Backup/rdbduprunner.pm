@@ -761,7 +761,7 @@ our %config_definition = (
     },
     truefalse => {
         type => 'string',
-        match => qr{^(?:on|off|true|false|0|1|yes|no)$}xmsi,
+        match => qr{^(?:on|off|true|false|0|1|yes|no|t|f)$}xmsi,
     },
     cli => {
         type   => 'struct',
