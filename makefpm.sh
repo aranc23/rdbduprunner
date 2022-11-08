@@ -43,9 +43,9 @@ fpm --verbose --no-cpan-test $common_opts $common_deps $deb_deps -t deb --rpm-su
 
 # build two packages missing on Ubuntu 20.04 needed by Backup::rdbduprunner:
 for pkg in No::Worries Config::Validator; do
-    fpm --verbose --no-cpan-test --iteration $iteration --prefix /usr --cpan-perl-lib-path /usr/share/perl5 -s cpan -t deb -m arancox@gmail.com $deb_deps $pkg
+    fpm --verbose --no-cpan-test --prefix /usr --cpan-perl-lib-path /usr/share/perl5 -s cpan -t deb -m arancox@gmail.com $deb_deps $pkg || continue;
 done
 
 # build packages missing on CentOS7 needed by Backup::rdbduprunner:
-fpm --verbose --no-cpan-test --prefix /usr --cpan-perl-lib-path /usr/share/perl5 -s cpan -t rpm -m arancox@gmail.com --name perl-Hash-Merge Hash::Merge
-fpm --verbose --no-cpan-test --prefix /usr --cpan-perl-lib-path /usr/share/perl5 -s cpan -t rpm -m arancox@gmail.com --name perl-Clone-Choose Clone::Choose
+fpm --verbose --no-cpan-test --prefix /usr --cpan-perl-lib-path /usr/share/perl5 -s cpan -t rpm -m arancox@gmail.com --name perl-Hash-Merge Hash::Merge  || continue;
+fpm --verbose --no-cpan-test --prefix /usr --cpan-perl-lib-path /usr/share/perl5 -s cpan -t rpm -m arancox@gmail.com --name perl-Clone-Choose Clone::Choose || continue;
