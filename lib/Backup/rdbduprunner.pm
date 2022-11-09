@@ -70,13 +70,11 @@ $CONFIG_DIR
 $LOCK_DIR
 $LOG_DIR
 %CONFIG
-$CONFIG_FILE
 $RUNTIME
 @BACKUPS
 $APP_NAME
 $LOG_FILE
 $LOG_DIR
-@CONFIG_FILES
 %config_definition
 @INCREMENTS
 &perform_backups
@@ -155,18 +153,6 @@ Readonly our $CONFIG_DIR =>
     : exists $ENV{'XDG_CONFIG_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
     : exists $ENV{'HOME'}            ? File::Spec->catfile($ENV{'HOME'}, '.config', $APP_NAME)
     : undef;
-
-our $CONFIG_FILE;
-# potential config files, based on historical and current defaults:
-our @CONFIG_FILES =
-    $USER eq 'root'
-    ? ( "${HOME}/.rdbduprunner.rc",
-        "/etc/rdbduprunner.rc",
-        "${CONFIG_DIR}/rdbduprunner.conf",
-    )
-    : ( "${HOME}/.rdbduprunner.rc",
-        "${CONFIG_DIR}/config",
-    );
 
 our %children; # store children for master backup loop
 our $RUNTIME; # storing the start time so we can calculate run time
@@ -626,8 +612,14 @@ our %DEFAULT_CONFIG = (
     # can be overridden from the command line, but not the config
     # 'config=s'               => \$CONFIG_FILE, # config file
     'config' => {
-        getopt => 'config|config-file|config_file=s',
-        type => "string",
+        getopt => 'config|config-file|config_file=s@',
+        type => "list?(string)",
+        optional => "true",
+        sections => [qw(cli)],
+    },
+    'confd' => {
+        getopt   => 'confd|conf-d|conf_d=s',
+        type     => "string",
         optional => "true",
         sections => [qw(cli)],
     },
@@ -2077,6 +2069,83 @@ sub make_dirs {
 #     return join('=',join('|',$s[0],@{$cli_alias{$s[0]}}),$s[1]);
 # }
 
+sub load_all_configs {
+    my @configs;
+    Readonly my $driver_args => {
+        General => { -IncludeGlob => 0,
+                     -AutoTrue => 1,
+                     -LowerCaseNames => 1 },
+    };
+    if ( defined $CLI_CONFIG{config} or defined $CLI_CONFIG{confd} ) {
+        if ( defined $CLI_CONFIG{config} ) {
+            push(@configs,
+                 @{Config::Any->load_files( { files       => $CLI_CONFIG{config},
+                                              use_ext     => 1,
+                                              driver_args => $driver_args,
+                                          })});
+        }
+        if ( defined $CLI_CONFIG{confd} ) {
+            if ( -d $CLI_CONFIG{confd} ) {
+                push(@configs,
+                     @{Config::Any->load_files( { files       => [glob(catfile($CLI_CONFIG{confd},"*"))],
+                                                  use_ext     => 1,
+                                                  driver_args => $driver_args,
+                                              })});
+            }
+            else {
+                die "unable to find and open config directory: ${CLI_CONFIG{confd}}";
+            }
+        }
+    }
+    elsif( ($USER eq 'root' and -f "/etc/rdbduprunner.rc") or -f catfile($HOME,'.rdbduprunner.rc') ) {
+        # if legacy config files exist, don't load the directory, just
+        # load the legacy file using Config::General
+        my $legacy_config = ($USER eq 'root' and -f "/etc/rdbduprunner.rc") ? "/etc/rdbduprunner.rc" : catfile($HOME,'.rdbduprunner.rc');
+        _warning("found legacy config file at ${legacy_config}");
+        my %c = new Config::General(-ConfigFile     => $legacy_config,
+                                    -IncludeGlob    => 1,
+                                    -AutoTrue       => 1,
+                                    -LowerCaseNames => 1)->getall() or die "unable to parse legacy config";
+        push(@configs,
+             \%c);
+    }
+    else {
+        # normal config processing:
+        push(@configs,
+             @{Config::Any->load_stems( { stems       => [catfile($CONFIG_DIR,'rdbduprunner')],
+                                          use_ext     => 1,
+                                          driver_args => $driver_args,
+                                      })},
+             @{Config::Any->load_files( { files       => [glob(catfile($CONFIG_DIR,'conf.d',"*"))],
+                                          use_ext     => 1,
+                                          driver_args => $driver_args,
+                                      })},
+         );
+    }
+    return %{merge_configs(@configs)};
+}
+
+sub merge_configs {
+    print STDERR Data::Dumper->Dump([\@_],['merge_configs']) if $DEBUG;
+    my $h;
+    my $merger = Hash::Merge->new('RETAINMENT_PRECEDENT');
+  SET:
+    foreach my $fh (@_) {
+      CONFIG:
+        foreach my $config (values(%{$fh})) {
+            unless ($h) {
+                $h = clone($config);
+                next CONFIG;
+            }
+            print STDERR Data::Dumper->Dump([$h,$config],['merge_configs_left','merge_configs_right']) if $DEBUG;
+            $h = $merger->merge($h,$config);
+            print STDERR Data::Dumper->Dump([$h],['merge_configs_merged']) if $DEBUG;
+        }
+    }
+    print STDERR Data::Dumper->Dump([$h],['merge_configs_h']) if $DEBUG;
+    return $h;
+}
+
 sub rdbduprunner {
 
     make_dirs();
@@ -2128,34 +2197,16 @@ sub rdbduprunner {
     $RUNTIME=time();
     dlog('info','starting',{});
 
-    unless ( defined $CLI_CONFIG{config} ) {
-    FILE:
-        foreach my $c (@CONFIG_FILES) {
-            # loop through the candidates, choose the first existing one
-            if ( -f $c ) {
-                $CONFIG_FILE = $c;
-                last FILE;
-            }
-        }
-    }
-    unless( $CONFIG_FILE and -f $CONFIG_FILE ) {
-        my $msg= "no config files found in any locations, unable to continue!";
-        critical($msg);
-        die $msg;
-    }
-    %CONFIG=new Config::General(-ConfigFile => $CONFIG_FILE,
-                                -IncludeGlob => 1,
-                                -AutoTrue => 1,
-                                -LowerCaseNames => 1)->getall() or die "unable to parse $CONFIG_FILE";
+    %CONFIG = load_all_configs();
+    dlog('debug','config',\%CONFIG);
+    $config_validator->validate(\%CONFIG,'global');
 
+    # recreate the dispatcher with values from loading the config
+    # files:
     create_dispatcher( $APP_NAME,
                        key_selector('facility'),
                        key_selector('level'),
                        $LOG_FILE );
-
-    $config_validator->validate(\%CONFIG,'global');
-
-    dlog('debug','config',\%CONFIG,{'config_file' => $CONFIG_FILE});
 
     my $mode='backup';
  MODE:
@@ -2426,7 +2477,7 @@ sub hashref_key_hash {
     while(my ($k,$v) = each(%{$m})) {
         $$a{$k} = $$v{$key} if exists $$v{$key};
     }
-    print STDERR Data::Dumper->Dump([$a], [qw(hashref_key_hash)]) if $DEBUG;
+    #print STDERR Data::Dumper->Dump([$a], [qw(hashref_key_hash)]) if $DEBUG;
     return $a;
 }
 
