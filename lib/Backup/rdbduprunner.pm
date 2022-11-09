@@ -2594,12 +2594,13 @@ sub hashref_key_filter_array {
     return keys(%a);
 }
 
+# we should not assume that the key is an array, it might be a scalar
 sub hashref_key_array_combine {
     my $key = shift;
     my %a;
     foreach my $m (@_) {
         if (defined $$m{$key} ) {
-            if ( reftype $$m{$key} eq reftype []) {
+            if ( ref $$m{$key} and reftype $$m{$key} eq reftype []) {
                 for my $e (@{$$m{$key}}) {
                     $a{$e} =1;
                 }
