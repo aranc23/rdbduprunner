@@ -1,0 +1,119 @@
+DefaultBackupDestination rsync
+ZfsBinary /usr/sbin/zfs
+AllowFS ext2
+AllowFS ext3
+AllowFS ext4
+AllowFS jfs
+AllowFS xfs
+AllowFS reiserfs
+AllowFS btrfs
+MaxProcs 4
+<BackupDestination rsync>
+  Path /stor01/backups/rsync
+  Type rsync
+  ZfsCreate true
+  ZfsSnapshot true
+</BackupDestination>
+<BackupSet a-lnx003.divms.uiowa.edu-profile_backup_client-backupset>
+  Host a-lnx003.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /vmware
+</BackupSet>
+<BackupSet a-lnx004.divms.uiowa.edu-profile_backup_client-backupset>
+  Host a-lnx004.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /vmware
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+  Skip /local
+</BackupSet>
+<BackupSet a-lnx005.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  PostRun /usr/adminbin/deep-check-files $RDBDUPRUNNER_BACKUP_SRC $RDBDUPRUNNER_BACKUP_DEST
+  Host a-lnx005.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /backup
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+  Skip /virtual
+</BackupSet>
+<BackupSet a-lnx006.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host a-lnx006.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet a-lnx007.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host a-lnx007.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /disk1_backup
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet a-lnx008.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host a-lnx008.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/vmware
+  Skip /tmp
+</BackupSet>
+<BackupSet a-lnx009.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  Host a-lnx009.divms.uiowa.edu
+  Inventory true
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+</BackupSet>
+<BackupSet a-lnx010.divms.uiowa.edu-profile_backup_client-backupset>
+  Disabled false
+  PostRun /usr/adminbin/deep-check-files $RDBDUPRUNNER_BACKUP_SRC $RDBDUPRUNNER_BACKUP_DEST
+  Host a-lnx010.divms.uiowa.edu
+  Inventory true
+  Exclude lib/dnf/yumdb
+  Exclude cache/yum
+  Exclude cache/dnf
+  Exclude cache/fscache
+  Exclude log
+  Exclude not_backed_up
+  Exclude lib/flatpak
+  SkipRE ^\/run\/media
+  SkipRE ^\/var\/lib\/docker\/devicemapper
+  Skip /sync
+  Skip /home/accx/Sync
+  Skip /home2
+  Skip /var/lib/mysql
+  Skip /var/lib/pgsql
+  Skip /virtual
+</BackupSet>
+<<include tests/legacy/conf.d/*.conf>>
