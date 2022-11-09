@@ -1056,13 +1056,6 @@ sub hash_backups {
 
 sub perform_backups {
   my %BACKUPS = hash_backups(@_);
-  # $SIG{USR1} = sub {
-  #   debug(Dumper \%BACKUPS);
-  #   debug(Dumper \%children);
-  # };
-  #delete $SIG{USR1};
-  #delete $SIG{USR2};
-  #delete $SIG{HUP};
   $SIG{CHLD} = sub {
     # don't change $! and $? outside handler
     local ($!, $?);
@@ -1078,7 +1071,7 @@ sub perform_backups {
     }
     my $maxprocs = key_selector('maxprocs');
     die unless $maxprocs;
-    
+
     while ( scalar(keys(%children)) < $maxprocs
             and scalar(keys(%BACKUPS)) > 0 ) {
       my $host=(keys %BACKUPS)[0];
@@ -1087,8 +1080,8 @@ sub perform_backups {
       delete $BACKUPS{$host};
       my $pid=fork();
       if ($pid == 0) {
-        #delete $SIG{USR1};
         delete $SIG{CHLD};
+        undef %children; # we don't have children
         perform_backup($host,@{$list});
         critical('perform_backup should never return');
         exit;
