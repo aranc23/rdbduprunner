@@ -18,13 +18,20 @@ use strict;
 use warnings;
 use v5.16;
 # this should cause dd to die when sent kill, ctrl-c etc.
-use sigtrap qw(die normal-signals);
+use sigtrap qw(handler signal_handler normal-signals);
 
 use Backup::rdbduprunner qw($APP_NAME);
 
 $APP_NAME='rdbduprunner';
 
 Backup::rdbduprunner::rdbduprunner();
+
+# send term to our children:
+sub signal_handler {
+    my ($sig) = @_;
+    kill 'TERM', keys %Backup::rdbduprunner::children;
+    die "caught SIG${sig}, exiting after cleanup";
+}
 
 =head1 NAME
 

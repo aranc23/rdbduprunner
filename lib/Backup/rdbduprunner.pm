@@ -89,6 +89,7 @@ $LOG_DIR
 &hashref_keys_drop
 &hashref_key_array
 &hashref_key_array_match
+%children
  ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
