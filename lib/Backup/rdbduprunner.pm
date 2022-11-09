@@ -667,20 +667,6 @@ our %DEFAULT_CONFIG = (
 );
 
 our %config_definition = (
-    service => {
-        type   => "struct",
-        fields => {
-            port  => { type => "integer", min => 0, max => 65535 },
-            proto => { type => "string" },
-        },
-    },
-    host => {
-        type   => "struct",
-        fields => {
-            name    => { type => "string", match => qr/^\w+$/ },
-            service => { type => "list?(valid(service))" },
-        },
-    },
     backupset => {
         type   => 'struct',
         fields =>
