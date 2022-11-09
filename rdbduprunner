@@ -205,31 +205,19 @@ Passess the --force option to duplicity cleanup mode.
 
 =item {B<--config|config-file|config_file> I<path>}
 
-Change the path to the configuration file.  By default rdbduprunner looks in a number of standard locations.  When run as root:
+Load the specified configuration file(s).  If this option is specified
+the the default confguration files and configuration directory will
+not be loaded.
 
-=over 2
+See L<FILES> for further explanation.
 
-=item /root/.rdbduprunner.rc
+=item {B<--confd|conf-d|config_d> I<path>}
 
-=item /etc/rdbduprunner.rc
+Load all the config files in the specfied directory.  If this option
+is specified then the default configuration files and configuration
+directory will not be loaded.
 
-=item /etc/rdbduprunner/rdbduprunner.conf
-
-=back
-
-For non root users:
-
-=over 2
-
-=item ~/.rdbduprunner.rc
-
-=item ~/.config/rdbduprunner/config
-
-=back
-
-The .rc files are search for first for compatibility with existing
-installs, use C</etc/rdbduprunner/rdbduprunner.conf> for root and
-C<~/.config/rdbduprunner/config> for non-root users.
+See L<FILES> for further explanation.
 
 =item {B<--allow-source-mismatch>} (duplicity only)
 
@@ -653,16 +641,65 @@ These values are taken from the details of the backup being performed.
 
 =head1 FILES
 
-=head2 F<$HOME/.local/state/rdbduprunner.pid> F</var/run/rdbduprunner.pid>
+=head2 F<$HOME/.local/state/rdbduprunner.pid> F</run/rdbduprunner.pid>
 
 Default PID/lock file.
 
-=head2 F<$HOME/.config/rdbduprunner/config> F</etc/rdbduprunner/rdbduprunner.conf>
+=head2 Command Line Specified Configuration Files
 
-rdbduprunner's config file is an Apache style config file parsed by
-the Config::General perl module. It consists of global options,
-options enclosed in a BackupDestination config section and options
-enclosed in a BackupSet section.  The options names are case
+If the --config or --confd options are specified, only those files and
+directories will be loaded.  The default configuration files will not
+be loaded in this case.
+
+=head2 Legacy Configuration Files
+
+If no command line overrides are specified and a legacy configuration
+file exists, rbdduprunner will load the legacy config file. The
+default configuration files will not be loaded in this case.
+
+These legacy files are:
+
+=over 2
+
+=item /etc/rdbduprunner.rc (root only)
+
+=item ~/.rdbduprunner.rc
+
+=back
+
+=head2 Default Configuration Files:
+
+In the absence of legacy config files and command line overrides the
+following configuration files will be loaded for root:
+
+=over 2
+
+=item /etc/rdbduprunner/rdbduprunner.*
+
+=item /etc/rdbduprunner/conf.d/*
+
+=back
+
+For non-root users:
+
+=over 2
+
+=item ~/.config/rdbduprunner/rdbduprunner.*
+
+=item ~/.config/rdbduprunner/conf.d/*
+
+=back
+
+rdbduprunner's legacy config file is an Apache style config file parsed by
+the Config::General perl module.
+
+Configuration files specified via the command line option or those
+loaded by default are loaded by Config::Any and therefore can be in
+any format recogized by the module, provided the extension matches the
+contents.  (ie: .yaml for yaml files)
+
+Regardless of the parser the configuration files consist of global options,
+BackupDestinations and BackupSets.  The options names are case
 insensitive. Options are generally honored in this order:
 
 The precendence is as follows:
@@ -680,6 +717,11 @@ The precendence is as follows:
 =item Defaults
 
 =back
+
+Options that can be specified at multiple levels are documented above
+in L<CONFIGURATION FILE PARAMETERS>.  Configuration items than only be
+specified inside a backupset or backupdestination configuration item
+are documented below.
 
 =head3 BackupDestination Options
 
