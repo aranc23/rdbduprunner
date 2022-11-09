@@ -90,7 +90,8 @@ $LOG_DIR
 &hashref_key_array
 &hashref_key_array_match
 %children
- ) ] );
+&merge_config_definition
+) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
@@ -2137,6 +2138,7 @@ sub load_configs {
     #   section => 'global',
     # }
     my $params = shift;
+    print STDERR Data::Dumper->Dump([$params],['load_configs_params']) if $DEBUG;
     my @configs;
     Readonly my $driver_args => {
         General => { -IncludeGlob => 0,
@@ -2168,7 +2170,10 @@ sub load_configs {
                                       })});
     }
     if ( exists $$params{dirs} and scalar @{$$params{dirs}} > 0 ) {
-        my @files = map { glob(catfile($_,"*")); } @{$$params{dirs}};
+        my @files;
+        foreach my $dir (@{$$params{dirs}}) {
+            push @files, glob(catfile($dir,"*"));
+        }
         push(@configs,
              @{Config::Any->load_files( { files       => \@files,
                                           use_ext     => 1,
@@ -2176,24 +2181,30 @@ sub load_configs {
                                       })});
     }
     croak("no configuration files were found in any configured locations!") if scalar @configs == 0;
-    return @configs;
+    print STDERR Data::Dumper->Dump([\@configs],['load_configs']) if $DEBUG;
+    return hash_array_merge(@configs);
+}
+
+sub hash_array_merge {
+    my $h = shift;
+    foreach my $fh (@_) {
+        $h = merge($h,$fh);
+    }
+    return $h;
 }
 
 sub validate_each {
     print STDERR Data::Dumper->Dump([\@_],['validate_each']) if $DEBUG;
     state $config_validator = Config::Validator->new(%config_definition);
-  SET:
-    foreach my $fh (@_) {
-    CONFIG:
-        while(my ($file,$config) = each(%{$fh})) {
-            eval { $config_validator->validate($config, 'global'); 1; }
-                or do {
-                    my $error = $@;
-                    warn $error;
-                    #print STDERR Dumper [$file,$config];
-                    die "config file failed validation: ${file}";
-                };
-        }
+  CONFIG:
+    while(my ($file,$config) = each(%{$_[0]})) {
+        eval { $config_validator->validate($config, 'global'); 1; }
+            or do {
+                my $error = $@;
+                warn $error;
+                #print STDERR Dumper [$file,$config];
+                die "config file failed validation: ${file}";
+            };
     }
     return 1;
 }
@@ -2203,26 +2214,21 @@ sub merge_configs {
     print STDERR Data::Dumper->Dump([\@_],['merge_configs']) if $DEBUG;
     my $h;
     my $merger = Hash::Merge->new('RETAINMENT_PRECEDENT');
-  SET:
-    foreach my $fh (@_) {
-      CONFIG:
-        foreach my $config (values(%{$fh})) {
-            unless ($h) {
-                $h = clone($config);
-                next CONFIG;
-            }
-            print STDERR Data::Dumper->Dump([$h,$config],['merge_configs_left','merge_configs_right']) if $DEBUG;
-            $h = $merger->merge($h,$config);
-            print STDERR Data::Dumper->Dump([$h],['merge_configs_merged']) if $DEBUG;
+  CONFIG:
+    foreach my $config (values(%{$_[0]})) {
+        unless ($h) {
+            $h = clone($config);
+            next CONFIG;
         }
+        print STDERR Data::Dumper->Dump([$h,$config],['merge_configs_left','merge_configs_right']) if $DEBUG;
+        $h = $merger->merge($h,$config);
+        print STDERR Data::Dumper->Dump([$h],['merge_configs_merged']) if $DEBUG;
     }
     print STDERR Data::Dumper->Dump([$h],['merge_configs_h']) if $DEBUG;
     return $h;
 }
 
-sub rdbduprunner {
-
-    make_dirs();
+sub merge_config_definition {
     for my $section (qw(cli global backupdestination backupset)) {
         $config_definition{$section}{fields} = merge(
             $config_definition{$section}{fields},
@@ -2236,7 +2242,12 @@ sub rdbduprunner {
                 'mode',)
         );
     }
+}
 
+sub rdbduprunner {
+
+    make_dirs();
+    merge_config_definition();
     print STDERR Dumper \%config_definition if $DEBUG;
 
     my $config_validator = Config::Validator->new(%config_definition);
@@ -2285,9 +2296,9 @@ sub rdbduprunner {
         $load_opts{stems} = [catfile($CONFIG_DIR,'rdbduprunner')];
         $load_opts{files} = [catfile($CONFIG_DIR,'conf.d',"*")];
     }
-    my @configs = load_configs(\%load_opts);
-    validate_each(@configs);
-    %CONFIG = %{merge_configs(@configs)};
+    my $configs = load_configs(\%load_opts);
+    validate_each($configs);
+    %CONFIG = %{merge_configs($configs)};
 
     #%CONFIG = load_all_configs();
     dlog('debug','config',\%CONFIG);
