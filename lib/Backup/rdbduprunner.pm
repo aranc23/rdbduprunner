@@ -2103,11 +2103,11 @@ sub load_all_configs {
         my $legacy_config = ($USER eq 'root' and -f "/etc/rdbduprunner.rc") ? "/etc/rdbduprunner.rc" : catfile($HOME,'.rdbduprunner.rc');
         _warning("found legacy config file at ${legacy_config}");
         my %c = new Config::General(-ConfigFile     => $legacy_config,
-                                    -IncludeGlob    => 1,
+                                    -IncludeGlob    => 0,
                                     -AutoTrue       => 1,
                                     -LowerCaseNames => 1)->getall() or die "unable to parse legacy config";
         push(@configs,
-             \%c);
+             { $legacy_config => \%c } );
     }
     else {
         # normal config processing:
@@ -2122,8 +2122,81 @@ sub load_all_configs {
                                       })},
          );
     }
+    croak("no configuration files were found in any configured locations!") if scalar @configs == 0;
+    validate_each(@configs);
     return %{merge_configs(@configs)};
 }
+
+sub load_configs {
+    # { legacy => [], # load using Config::General
+    #   files => [], # load using load_files()
+    #   dirs => [], # glob all files in this dirs and load using load_files()
+    #   stems => [], # use load_stems on these
+    #   validator => [],
+    #   section => 'global',
+    # }
+    my $params = shift;
+    my @configs;
+    Readonly my $driver_args => {
+        General => { -IncludeGlob => 0,
+                     -AutoTrue => 1,
+                     -LowerCaseNames => 1 },
+    };
+    if ( exists $$params{legacy} and scalar @{$$params{legacy}} > 0 ) {
+        for my $legacy_config (@{$$params{legacy}}) {
+            my %c = new Config::General(-ConfigFile     => $legacy_config,
+                                        -IncludeGlob    => 1,
+                                        -AutoTrue       => 1,
+                                        -LowerCaseNames => 1)->getall() or die "unable to parse legacy config";
+            push(@configs, { $legacy_config => \%c });
+        }
+    }
+
+    if ( exists $$params{files} and scalar @{$$params{files}} > 0 ) {
+        push(@configs,
+             @{Config::Any->load_files( { files       => $$params{files},
+                                          use_ext     => 1,
+                                          driver_args => $driver_args,
+                                      })});
+    }
+    if ( exists $$params{stems} and scalar @{$$params{stems}} > 0 ) {
+        push(@configs,
+             @{Config::Any->load_stems( { stems       => $$params{stems},
+                                          use_ext     => 1,
+                                          driver_args => $driver_args,
+                                      })});
+    }
+    if ( exists $$params{dirs} and scalar @{$$params{dirs}} > 0 ) {
+        my @files = map { glob(catfile($_,"*")); } @{$$params{dirs}};
+        push(@configs,
+             @{Config::Any->load_files( { files       => \@files,
+                                          use_ext     => 1,
+                                          driver_args => $driver_args,
+                                      })});
+    }
+    croak("no configuration files were found in any configured locations!") if scalar @configs == 0;
+    return @configs;
+}
+
+sub validate_each {
+    print STDERR Data::Dumper->Dump([\@_],['validate_each']) if $DEBUG;
+    state $config_validator = Config::Validator->new(%config_definition);
+  SET:
+    foreach my $fh (@_) {
+    CONFIG:
+        while(my ($file,$config) = each(%{$fh})) {
+            eval { $config_validator->validate($config, 'global'); 1; }
+                or do {
+                    my $error = $@;
+                    warn $error;
+                    #print STDERR Dumper [$file,$config];
+                    die "config file failed validation: ${file}";
+                };
+        }
+    }
+    return 1;
+}
+
 
 sub merge_configs {
     print STDERR Data::Dumper->Dump([\@_],['merge_configs']) if $DEBUG;
@@ -2197,9 +2270,32 @@ sub rdbduprunner {
     $RUNTIME=time();
     dlog('info','starting',{});
 
-    %CONFIG = load_all_configs();
+    my %load_opts = ( validator => $config_validator, section => 'global' );
+    if ( defined $CLI_CONFIG{config} or defined $CLI_CONFIG{confd} ) {
+        $load_opts{files} = $CLI_CONFIG{config};
+        $load_opts{dirs} = [$CLI_CONFIG{confd}];
+    }
+    elsif( ($USER eq 'root' and -f "/etc/rdbduprunner.rc") or -f catfile($HOME,'.rdbduprunner.rc') ) {
+        my $legacy_config = ($USER eq 'root' and -f "/etc/rdbduprunner.rc") ? "/etc/rdbduprunner.rc" : catfile($HOME,'.rdbduprunner.rc');
+        _warning("found legacy config file at ${legacy_config}");
+        $load_opts{legacy} = [$legacy_config];
+    }
+    else {
+        $load_opts{stems} = [catfile($CONFIG_DIR,'rdbduprunner')];
+        $load_opts{files} = [catfile($CONFIG_DIR,'conf.d',"*")];
+    }
+    my @configs = load_configs(\%load_opts);
+    validate_each(@configs);
+    %CONFIG = %{merge_configs(@configs)};
+
+    #%CONFIG = load_all_configs();
     dlog('debug','config',\%CONFIG);
-    $config_validator->validate(\%CONFIG,'global');
+    eval { $config_validator->validate(\%CONFIG,'global'); 1; }
+        or do {
+            my $error = $@;
+            warn $@;
+            die "combined configuration files failed validation, probably due to duplicated keywords!";
+        };
 
     # recreate the dispatcher with values from loading the config
     # files:
@@ -2579,8 +2675,8 @@ sub key_selector {
     if ( string_any('cli', @{$DEFAULT_CONFIG{$key}{sections}}) ) {
         push(@hashes, \%CLI_CONFIG);
     }
-    print STDERR Data::Dumper->Dump([\@hashes],
-                                    [qw(key_selector)]) if $DEBUG;
+    # print STDERR Data::Dumper->Dump([\@hashes],
+    #                                 [qw(key_selector)]) if $DEBUG;
     return key_select($key, @hashes);
 }
 
