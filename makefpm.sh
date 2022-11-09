@@ -47,5 +47,5 @@ for pkg in No::Worries Config::Validator; do
 done
 
 # build packages missing on CentOS7 needed by Backup::rdbduprunner:
-fpm --verbose --no-cpan-test --prefix /usr --cpan-perl-lib-path /usr/share/perl5 -s cpan -t rpm -m arancox@gmail.com --name perl-Hash-Merge Hash::Merge  || continue;
-fpm --verbose --no-cpan-test --prefix /usr --cpan-perl-lib-path /usr/share/perl5 -s cpan -t rpm -m arancox@gmail.com --name perl-Clone-Choose Clone::Choose || continue;
+fpm --verbose --no-cpan-test --prefix /usr --cpan-perl-lib-path /usr/share/perl5 -s cpan -t rpm -m arancox@gmail.com --name perl-Hash-Merge Hash::Merge  || echo "already exists"
+fpm --verbose --no-cpan-test --prefix /usr --cpan-perl-lib-path /usr/share/perl5 -s cpan -t rpm -m arancox@gmail.com --name perl-Clone-Choose Clone::Choose || echo "already exists"
