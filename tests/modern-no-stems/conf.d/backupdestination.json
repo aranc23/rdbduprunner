@@ -1,0 +1,1 @@
+{ "backupdestination": { "bob": { "type": "rsync", "path": "/data/rsync" } } }

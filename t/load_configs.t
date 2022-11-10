@@ -1,6 +1,6 @@
 #########################
 
-# change 'tests => 1' to 'tests => last_test_to_print';
+# Change 'tests => 1' to 'tests => last_test_to_print';
 
 use strict;
 use warnings;
@@ -225,6 +225,23 @@ use Data::Dumper;
        "modern config is valid");
     ok(lives { $config_validator->validate(Backup::rdbduprunner::merge_configs($configs),'global') },
        "merged modern config is valid");
+
+    # start of "modern no stems"
+    $configs = Backup::rdbduprunner::load_configs(merge($load_opts,
+                                                        { stems => ['./tests/modern-no-stems/rdbduprunner'],
+                                                          dirs => ['./tests/modern-no-stems/conf.d'],
+                                                      }));
+    is($configs,
+       {
+           'tests/modern-no-stems/conf.d/backupset.yaml' => { backupset => { stuff => { path => '/etc'} } },
+           'tests/modern-no-stems/conf.d/backupdestination.json' => {
+               backupdestination => { bob => { path => '/data/rsync', type => 'rsync'} } },
+       },
+       "modern no stems");
+    ok(lives { Backup::rdbduprunner::validate_each($configs) },
+       "modern no stems config is valid");
+    ok(lives { $config_validator->validate(Backup::rdbduprunner::merge_configs($configs),'global') },
+       "merged no stems modern config is valid");
 }
 
 done_testing;
