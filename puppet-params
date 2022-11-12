@@ -1,0 +1,65 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+use v5.16;
+
+use Backup::rdbduprunner qw(:all);
+use Data::Dumper;
+use Scalar::Util qw(reftype);
+
+$APP_NAME='puppet-params';
+
+merge_config_definition();
+
+print Dumper \%config_definition;
+
+for my $section (qw(global backupdestination backupset)) {
+    for my $field (sort(keys(%{$config_definition{$section}{fields}}))) {
+        my $pt = xlate($config_definition{$section}{fields}{$field}{'type'});
+        my $default = ',';
+        if ( defined $config_definition{$section}{fields}{$field}{'optional'}
+             and $config_definition{$section}{fields}{$field}{'optional'} eq 'true' ) {
+            $pt = "Optional[${pt}]";
+            $default = ' = undef,';
+        }
+        printf("%s \$%s\n",$pt,$field.$default);
+    }
+}
+sub sparams {
+    my $section = shift;
+    my @a;
+    for my $field (sort(keys(%{$config_definition{$section}{fields}}))) {
+        my $pt = xlate($config_definition{$section}{fields}{$field}{'type'});
+        my $default = ',';
+        if ( defined $config_definition{$section}{fields}{$field}{'optional'}
+             and $config_definition{$section}{fields}{$field}{'optional'} eq 'true' ) {
+            $pt = "Optional[${pt}]";
+            $default = ' = undef,';
+        }
+        push @a,printf("%s \$%s\n",$pt,$field.$default);
+    }
+    return @a
+}
+
+
+
+sub xlate {
+    my $type = shift;
+    my $puppet_type;
+    $puppet_type =
+        $type eq 'valid(truefalse)'
+        ? 'Boolean'
+        : $type eq 'string'
+        ? 'String'
+        : $type eq 'integer'
+        ? 'Integer'
+        : $type eq 'list?(string)'
+        ? 'Variant[String,Array[String]]'
+        : (ref $type and (reftype($type) eq reftype([]) ) and $$type[0] eq 'hostname')
+        ? 'Stdlib::Host'
+        : $type;
+    return $puppet_type;
+}
+
+      
