@@ -1,12 +1,7 @@
-#! /bin/bash
+#! /bin/env perl
 
-if ! which rdbduprunner 2>/dev/null >/dev/null ; then
-    exit 0;
-fi
-t=$(mktemp)
-rdbduprunner --level critical --status-json > $t
-if (( $( cat $t | wc -l ) > 0 )); then
-    echo '<<<rdbduprunner>>>'
-    cat $t
-fi
-rm -f $t
+use strict;
+use Backup::rdbduprunner;
+
+print '<<<rdbduprunner>>>'."\n";
+Backup::rdbduprunner::status_json();
