@@ -2038,76 +2038,6 @@ sub make_dirs {
     }
 }
 
-# sub munge_getopts {
-#     my @s = split('=',$_);
-#     unless(exists $cli_alias{$s[0]}) {
-#         return $_;
-#     }
-#     if (scalar @s == 1 ) {
-#         return join('|', @s, @{$cli_alias{$s[0]}});
-#     }
-#     # combine:
-#     return join('=',join('|',$s[0],@{$cli_alias{$s[0]}}),$s[1]);
-# }
-
-sub load_all_configs {
-    my @configs;
-    Readonly my $driver_args => {
-        General => { -IncludeGlob => 0,
-                     -AutoTrue => 1,
-                     -LowerCaseNames => 1 },
-    };
-    if ( defined $CLI_CONFIG{config} or defined $CLI_CONFIG{confd} ) {
-        if ( defined $CLI_CONFIG{config} ) {
-            push(@configs,
-                 @{Config::Any->load_files( { files       => $CLI_CONFIG{config},
-                                              use_ext     => 1,
-                                              driver_args => $driver_args,
-                                          })});
-        }
-        if ( defined $CLI_CONFIG{confd} ) {
-            if ( -d $CLI_CONFIG{confd} ) {
-                push(@configs,
-                     @{Config::Any->load_files( { files       => [glob(catfile($CLI_CONFIG{confd},"*"))],
-                                                  use_ext     => 1,
-                                                  driver_args => $driver_args,
-                                              })});
-            }
-            else {
-                die "unable to find and open config directory: ${CLI_CONFIG{confd}}";
-            }
-        }
-    }
-    elsif( ($USER eq 'root' and -f "/etc/rdbduprunner.rc") or -f catfile($HOME,'.rdbduprunner.rc') ) {
-        # if legacy config files exist, don't load the directory, just
-        # load the legacy file using Config::General
-        my $legacy_config = ($USER eq 'root' and -f "/etc/rdbduprunner.rc") ? "/etc/rdbduprunner.rc" : catfile($HOME,'.rdbduprunner.rc');
-        _warning("found legacy config file at ${legacy_config}");
-        my %c = new Config::General(-ConfigFile     => $legacy_config,
-                                    -IncludeGlob    => 0,
-                                    -AutoTrue       => 1,
-                                    -LowerCaseNames => 1)->getall() or die "unable to parse legacy config";
-        push(@configs,
-             { $legacy_config => \%c } );
-    }
-    else {
-        # normal config processing:
-        push(@configs,
-             @{Config::Any->load_stems( { stems       => [catfile($CONFIG_DIR,'rdbduprunner')],
-                                          use_ext     => 1,
-                                          driver_args => $driver_args,
-                                      })},
-             @{Config::Any->load_files( { files       => [glob(catfile($CONFIG_DIR,'conf.d',"*"))],
-                                          use_ext     => 1,
-                                          driver_args => $driver_args,
-                                      })},
-         );
-    }
-    croak("no configuration files were found in any configured locations!") if scalar @configs == 0;
-    validate_each(@configs);
-    return %{merge_configs(@configs)};
-}
-
 sub load_configs {
     # { legacy => [], # load using Config::General
     #   files => [], # load using load_files()
@@ -2273,7 +2203,7 @@ sub rdbduprunner {
     }
     else {
         $load_opts{stems} = [catfile($CONFIG_DIR,'rdbduprunner')];
-        $load_opts{files} = [catfile($CONFIG_DIR,'conf.d',"*")];
+        $load_opts{files} = [glob(catfile($CONFIG_DIR,'conf.d',"*"))];
     }
     my $configs = load_configs(\%load_opts);
     validate_each($configs);
