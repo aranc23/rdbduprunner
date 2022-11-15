@@ -19,6 +19,8 @@ for my $section (qw(global backupdestination backupset)) {
     print join("\n",pparams($section)),"\n";
     print "---*** HASH ${section} ***---\n";
     print join("\n",hash_params($section)),"\n";
+    print "---*** docstring ${section} ***---\n";
+    print join("\n",docstrings($section)),"\n";
 }
 
 sub hash_params {
@@ -29,6 +31,17 @@ sub hash_params {
         push(@a, "${field} => \$${field},");
     }
     push(@a, "}");
+    return @a;
+}
+sub docstrings {
+    my $section = shift;
+    my @a;
+ FIELD:
+    for my $field (sort(keys(%{$config_definition{$section}{fields}}))) {
+        push(@a, "# \@param ${field}",
+             "#   sets parameter of the same name in ${section}",
+             "#   see rdbduprunner docs for details");
+    }
     return @a;
 }
 
