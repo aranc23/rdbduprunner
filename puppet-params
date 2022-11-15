@@ -28,7 +28,9 @@ sub hash_params {
     my @a = ( "\$_${section} = {" );
  FIELD:
     for my $field (sort(keys(%{$config_definition{$section}{fields}}))) {
-        push(@a, "${field} => \$${field},");
+        next FIELD if $section eq 'global' and ($field eq 'backupdestination' or $field eq 'backupset');
+        my $p = $section eq 'global' ? 'rdbduprunner::' : '';
+        push(@a, "${field} => \$${p}${field},");
     }
     push(@a, '}.filter |$k,$v| { $v =~ NotUndef }');
     return @a;
@@ -56,11 +58,6 @@ sub pparams {
                  or $field eq 'backupset' )) {
             push(@a,"Hash[String,Struct[{");
             push(@a,sparams($field));
-            if ($field eq 'backupdestination') {
-                push(@a,
-                     "export => Optional[Boolean],",
-                     "tag => Optional[String],",);
-            }
             push(@a,"}]] \$${field},");
             next FIELD;
         }
@@ -89,11 +86,14 @@ sub sparams {
  FIELD:
     for my $field (sort(keys(%{$config_definition{$section}{fields}}))) {
         my $pt = xlate($config_definition{$section}{fields}{$field}{'type'});
+        if($field =~ m{binary}) {
+            $pt = 'Stdlib::UnixPath';
+        }
         if ( defined $config_definition{$section}{fields}{$field}{'optional'}
              and $config_definition{$section}{fields}{$field}{'optional'} eq 'true' ) {
             $pt = "Optional[${pt}]";
         }
-        push(@a,sprintf("%s => %s",$field,$pt));
+        push(@a,sprintf("%s => %s,",$field,$pt));
     }
     #print STDERR Dumper \@a;
     return @a
