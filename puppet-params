@@ -52,6 +52,9 @@ sub pparams {
             next FIELD;
         }
         my $pt = xlate($config_definition{$section}{fields}{$field}{'type'});
+        if($field =~ m{binary}) {
+            $pt = 'Stdlib::UnixPath';
+        }
         my $default = ',';
         if ( defined $config_definition{$section}{fields}{$field}{'optional'}
              and $config_definition{$section}{fields}{$field}{'optional'} eq 'true' ) {
