@@ -30,7 +30,7 @@ sub hash_params {
     for my $field (sort(keys(%{$config_definition{$section}{fields}}))) {
         push(@a, "${field} => \$${field},");
     }
-    push(@a, "}");
+    push(@a, '}.filter |$k,$v| { $v =~ NotUndef }');
     return @a;
 }
 sub docstrings {
