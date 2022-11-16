@@ -15,9 +15,8 @@ use Data::Dumper;
 
     Backup::rdbduprunner::merge_config_definition();
     my $config_validator = Config::Validator->new(%config_definition);
-    my $load_opts = { validator => $config_validator, section => 'global' };
 
-    my $configs = Backup::rdbduprunner::load_configs(merge($load_opts, { legacy => ['./tests/legacy/rdbduprunner.rc'] }));
+    my $configs = Backup::rdbduprunner::load_configs('./tests/legacy/rdbduprunner.rc');
     is( $configs,
            {
                './tests/legacy/rdbduprunner.rc' => {
@@ -181,7 +180,7 @@ use Data::Dumper;
                    ],
                    'zfsbinary' => '/usr/sbin/zfs',
                    'maxprocs' => '4',
-                   'wholefile' => 1
+                   'wholefile' => 1,
                }
            },
        "massive legacy file");
@@ -189,11 +188,15 @@ use Data::Dumper;
        "legacy config is valid");
 
 
+    is([sort(find_configs(['./tests/modern/conf.d'],['./tests/modern/rdbduprunner']))],
+       [sort('./tests/modern/rdbduprunner.conf',
+             'tests/modern/conf.d/backupset.yaml',
+             './tests/modern/rdbduprunner.json',
+             './tests/modern/rdbduprunner.yaml',
+             'tests/modern/conf.d/backupdestination.json')],
+       "find dirs and stems");
 
-    $configs = Backup::rdbduprunner::load_configs(merge($load_opts,
-                                                        { stems => ['./tests/modern/rdbduprunner'],
-                                                          dirs => ['./tests/modern/conf.d'],
-                                                      }));
+    $configs = Backup::rdbduprunner::load_configs(find_configs(['./tests/modern/conf.d'],['./tests/modern/rdbduprunner']));
     is($configs,
                   {
                     './tests/modern/rdbduprunner.conf' => {
@@ -210,7 +213,11 @@ use Data::Dumper;
                                                                                                    }
                                                                                    }
                                                           },
-                    'tests/modern/conf.d/backupset.yaml' => { backupset => { stuff => { path => '/etc'} } },
+                    'tests/modern/conf.d/backupset.yaml' => {
+                        'zfssnapshot' => 'true',
+                        'zfscreate' => 'false',
+                        backupset => {
+                            stuff => { path => '/etc', 'wholefile' => 'false'} } },
                     './tests/modern/rdbduprunner.json' => {
                                                             'maxwait' => 20000
                                                           },
@@ -227,10 +234,11 @@ use Data::Dumper;
        "merged modern config is valid");
 
     # start of "modern no stems"
-    $configs = Backup::rdbduprunner::load_configs(merge($load_opts,
-                                                        { stems => ['./tests/modern-no-stems/rdbduprunner'],
-                                                          dirs => ['./tests/modern-no-stems/conf.d'],
-                                                      }));
+    ok([sort(find_configs( ['./tests/modern-no-stems/conf.d'], ['./tests/modern-no-stems/rdbduprunner'] ))],
+       [sort('tests/modern-no-stems/conf.d/backupset.yaml', 'tests/modern-no-stems/conf.d/backupdestination.json')],
+       "find_configs modern no stems");
+
+    $configs = Backup::rdbduprunner::load_configs(find_configs( ['./tests/modern-no-stems/conf.d'], ['./tests/modern-no-stems/rdbduprunner'] ));
     is($configs,
        {
            'tests/modern-no-stems/conf.d/backupset.yaml' => { backupset => { stuff => { path => '/etc'} } },

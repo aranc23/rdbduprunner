@@ -3,3 +3,6 @@
 backupset:
   stuff:
     path: /etc
+    wholefile: false
+zfssnapshot: true
+zfscreate: false
