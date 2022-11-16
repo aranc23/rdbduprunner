@@ -937,7 +937,7 @@ sub build_backup_command {
     return;
   }
 
-  if(defined $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted}) {
+  if(dtruefalse($CONFIG{'backupdestination'}{$$bh{backupdestination}},'busted')) {
     # I guess this is a way to mark a backupdestination as unavailable
     dlog('notice','backupdestination busted',$$bh{backupdestination});
     return;
@@ -1126,7 +1126,7 @@ sub perform_backup {
         delete $ENV{$env_var};
       }
     }
-    if(dtruefalse($CONFIG{$$bh{backupdestination}},'busted')) {
+    if(dtruefalse($CONFIG{'backupdestination'}{$$bh{backupdestination}},'busted')) {
       dlog('notice','skipping backup due to busted destination',$bh);
       next;
     }
@@ -2477,7 +2477,7 @@ sub backup_mode {
           if($ans == -1) {
             error("unable to determine if this backupdestination ($$bh{backupdestination}) has enough free space");
             error("no backups to this backupdestination will be attempted and this message will be repeated only once");
-            $CONFIG{$$bh{backupdestination}}{busted}=1;
+            $CONFIG{backupdestination}{$$bh{backupdestination}}{busted}=1;
             next BACKUP;
           } elsif($ans == 0) {
             unless(remove_oldest($$bh{backupdestination})) {
@@ -2485,7 +2485,7 @@ sub backup_mode {
               # we cannot do backups on this bd for this run!
               _warning("unable to remove an increment on backupdestination ($$bh{backupdestination}:$CONFIG{backupdestination}{$$bh{backupdestination}}{path})");
               _warning("no further attempts will be made to do backups to this destination");
-              $CONFIG{$$bh{backupdestination}}{busted}=1;
+              $CONFIG{backupdestination}{$$bh{backupdestination}}{busted}=1;
               next BACKUP;
             }
             # we can just fall out now and let check_space() run again to see if it helped
