@@ -1949,7 +1949,7 @@ sub inventory_host {
     }
     print STDERR Dumper \%filters if $DEBUG;
     # perform inventory
-    debug("performing inventory on ".defined $$bs{host} ? $$bs{host} : 'localhost');
+    debug("performing inventory on ".(defined $$bs{host} ? $$bs{host} : 'localhost'));
     my $inventory_command='cat /proc/mounts';
     if (defined $$bs{host}) {
         $inventory_command="ssh -x -o BatchMode=yes $$bs{host} ${inventory_command} < /dev/null";
