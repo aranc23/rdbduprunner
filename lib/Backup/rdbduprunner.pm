@@ -24,7 +24,7 @@ use English qw( -no_match_vars );
 use Getopt::Long qw(GetOptionsFromArray);
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Storable qw( freeze thaw dclone );
-use Scalar::Util qw/reftype/;
+use Scalar::Util qw/reftype looks_like_number/;
 BEGIN {
     @AnyDBM_File::ISA = qw(GDBM_File SDBM_File);
 }
@@ -35,7 +35,8 @@ use Fatal qw( :void open close link unlink symlink rename fork );
 # added from CPAN or system packages
 use Config::General;
 use Config::Validator;
-use Config::Any;
+use YAML;
+use JSON;
 use Hash::Merge qw(merge);
 use Clone qw(clone);
 use Carp;
@@ -91,6 +92,7 @@ $LOG_DIR
 &hashref_key_array_match
 %children
 &merge_config_definition
+&find_configs
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -129,6 +131,9 @@ Readonly our $EXIT_CODE => {
         '35' => 'Timeout waiting for daemon connection',
     },
 };
+
+# supported config file extensions
+Readonly our @extensions => qw( conf yaml json rc );
 
 # we could use a list but regexp works in Validator
 our $VALID_BACKUP_TYPE_REGEX = qr{^ ( rdiff [-] backup | rsync | duplicity ) $}xms;
@@ -301,7 +306,7 @@ our %DEFAULT_CONFIG = (
         sections => [qw(global backupdestination)],
         },
     lc "ZfsSnapshot" => {
-        type     => "valid(truefalse)",
+        type     => ['boolean',"valid(truefalse)"],
         optional => "true",
         sections => [qw(global backupdestination)],
     },
@@ -764,6 +769,13 @@ our %config_definition = (
     },
 );
 
+our %config_load_dispatch = (
+    'conf' => \&load_config_conf,
+    'rc'   => \&load_config_conf,
+    'yaml' => \&load_config_yaml,
+    'json' => \&load_config_json,
+);
+
 my $callback_clean = sub { my %t=@_;
                            chomp $t{message};
                            return $t{message}."\n"; # add a newline
@@ -971,8 +983,8 @@ sub build_backup_command {
           '--delete-excluded',
          );
     # here is the where the rubbger meets the robe:
-    if( defined $$bh{wholefile} ) {
-      push(@com, $$bh{wholefile} ? '--whole-file' : '--no-whole-file');
+    if( defined $$bh{wholefile}) {
+      push(@com, bool_parse($$bh{wholefile}) ? '--whole-file' : '--no-whole-file');
     }
     if($$bh{dryrun}) {
       push(@com,'--dry-run');
@@ -1687,19 +1699,20 @@ sub log_exit_status {
 
 # given a string, interpret it as 0 or 1 (false or true)
 sub bool_parse {
-  my @true = qw( true t yes on 1 );
-  my @false = qw( false f no off 0 );
+    my $bool = shift;
 
-  if(grep { lc $_[0] eq $_ } (@true)) {
-    return 1;
-  }
-  elsif(grep { lc $_[0] eq $_ } (@false)) {
-    return 0;
-  }
-  else {
-    warn "unable to parse provided value for boolean option, assuming false";
-    return 0;
-  }
+    if (looks_like_number($bool) and $bool < 0) {
+        croak "supposed boolean value appears to be a negative number: ${bool}";
+    }
+    if ( (looks_like_number($bool) and $bool > 0) or string_any( $bool, qw( true t yes on 1 ) ) ) {
+        return 1;
+    }
+    if ( (looks_like_number($bool) and $bool == 0) or string_any( $bool, qw( false f no off 0 ) ) ) {
+        return 0;
+    }
+    # this would interpret negative numbers as "false" which is weird and probably wrong
+    warn "unable to parse provided value for boolean option (${bool})";
+    return;
 }
 
 # if the path given is on a zfs filesystem, return the zfs it lives on
@@ -2038,60 +2051,67 @@ sub make_dirs {
     }
 }
 
-sub load_configs {
-    # { legacy => [], # load using Config::General
-    #   files => [], # load using load_files()
-    #   dirs => [], # glob all files in this dirs and load using load_files()
-    #   stems => [], # use load_stems on these
-    #   validator => [],
-    #   section => 'global',
-    # }
-    my $params = shift;
-    print STDERR Data::Dumper->Dump([$params],['load_configs_params']) if $DEBUG;
-    my @configs;
-    Readonly my $driver_args => {
-        General => { -IncludeGlob => 0,
-                     -AutoTrue => 1,
-                     -LowerCaseNames => 1 },
-    };
-    if ( exists $$params{legacy} and scalar @{$$params{legacy}} > 0 ) {
-        for my $legacy_config (@{$$params{legacy}}) {
-            my %c = new Config::General(-ConfigFile     => $legacy_config,
-                                        -IncludeGlob    => 1,
-                                        -AutoTrue       => 1,
-                                        -LowerCaseNames => 1)->getall() or die "unable to parse legacy config";
-            push(@configs, { $legacy_config => \%c });
-        }
-    }
+sub find_configs {
+    my $dirs = shift;
+    my $stems = shift;
+    print STDERR Data::Dumper->Dump([$dirs,$stems],['find_configs_params']) if $DEBUG;
+    my @files;
 
-    if ( exists $$params{files} and scalar @{$$params{files}} > 0 ) {
-        push(@configs,
-             @{Config::Any->load_files( { files       => $$params{files},
-                                          use_ext     => 1,
-                                          driver_args => $driver_args,
-                                      })});
-    }
-    if ( exists $$params{stems} and scalar @{$$params{stems}} > 0 ) {
-        push(@configs,
-             @{Config::Any->load_stems( { stems       => $$params{stems},
-                                          use_ext     => 1,
-                                          driver_args => $driver_args,
-                                      })});
-    }
-    if ( exists $$params{dirs} and scalar @{$$params{dirs}} > 0 ) {
-        my @files;
-        foreach my $dir (@{$$params{dirs}}) {
-            push @files, glob(catfile($dir,"*"));
+    if ( scalar @{$stems} > 0 ) {
+        for my $stem (@{$stems}) {
+            for my $e (@extensions) {
+                my $f = join('.', $stem, $e);
+                push(@files, $f) if -f $f;
+            }
         }
-        push(@configs,
-             @{Config::Any->load_files( { files       => \@files,
-                                          use_ext     => 1,
-                                          driver_args => $driver_args,
-                                      })});
     }
-    croak("no configuration files were found in any configured locations!") if scalar @configs == 0;
-    print STDERR Data::Dumper->Dump([\@configs],['load_configs']) if $DEBUG;
-    return hash_array_merge(@configs);
+    if ( scalar @{$dirs} > 0 ) {
+        foreach my $dir (@{$dirs}) {
+            #print STDERR Dumper [map { catfile($dir,join('.','*',$_))} (@extensions) ];
+            push @files, map { glob($_[0]) } (map { catfile($dir,join('.','*',$_)) } (@extensions) );
+        }
+    }
+    #print STDERR Dumper \@files;
+    return @files;
+}
+
+sub load_config_conf {
+    my %c = new Config::General(-ConfigFile     => $_[0],
+                                -IncludeGlob    => 1,
+                                -AutoTrue       => 1,
+                                -LowerCaseNames => 1)->getall() or die "unable to parse legacy config: $_[0]";
+    return \%c;
+}
+
+sub load_config_yaml {
+    return YAML::LoadFile($_[0]);
+}
+
+sub load_config_json {
+    my $h;
+    open($h,"<",$_[0]) or croak "unable to open ${_[0]} for reading";
+    return JSON::decode_json(<$h>);
+}
+
+sub load_configs {
+    # array of files is the only parameters
+    print STDERR Data::Dumper->Dump(\@_,['load_configs_params']) if $DEBUG;
+    my $configs = {};
+
+    my $pat = join('|',@extensions);
+    for my $file (@_) {
+        if(my ($ext) = $file =~ m{ [.] ($pat) $}xms) {
+            $$configs{$file} = $config_load_dispatch{$ext}->($file);
+        }
+        else {
+            croak "no pattern matched for config file: ${file}";
+        }
+    }
+    if (scalar keys %{$configs} == 0) {
+        croak("no configuration files were found in any configured locations!");
+    }
+    print STDERR Data::Dumper->Dump([$configs],['load_configs']) if $DEBUG;
+    return $configs;
 }
 
 sub hash_array_merge {
@@ -2191,21 +2211,25 @@ sub rdbduprunner {
     $RUNTIME=time();
     dlog('info','starting',{});
 
-    my %load_opts = ( validator => $config_validator, section => 'global' );
+    my @config_files;
     if ( defined $CLI_CONFIG{config} or defined $CLI_CONFIG{confd} ) {
-        $load_opts{files} = $CLI_CONFIG{config};
-        $load_opts{dirs} = [$CLI_CONFIG{confd}];
+        push(@config_files, $CLI_CONFIG{config}) if defined $CLI_CONFIG{config};
+        push(@config_files, find_configs([$CLI_CONFIG{confd}],[])) if defined $CLI_CONFIG{confd};
     }
     elsif( ($USER eq 'root' and -f "/etc/rdbduprunner.rc") or -f catfile($HOME,'.rdbduprunner.rc') ) {
         my $legacy_config = ($USER eq 'root' and -f "/etc/rdbduprunner.rc") ? "/etc/rdbduprunner.rc" : catfile($HOME,'.rdbduprunner.rc');
         _warning("found legacy config file at ${legacy_config}");
-        $load_opts{legacy} = [$legacy_config];
+        push(@config_files, $legacy_config);
     }
     else {
-        $load_opts{stems} = [catfile($CONFIG_DIR,'rdbduprunner')];
-        $load_opts{files} = [glob(catfile($CONFIG_DIR,'conf.d',"*"))];
+        push(@config_files,
+             find_configs(
+                 [catfile($CONFIG_DIR,'conf.d')], # one directory
+                 [catfile($CONFIG_DIR,'rdbduprunner')], # one stem
+             )
+         );
     }
-    my $configs = load_configs(\%load_opts);
+    my $configs = load_configs(@config_files);
     validate_each($configs);
     %CONFIG = %{merge_configs($configs)};
 
