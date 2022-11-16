@@ -937,12 +937,6 @@ sub build_backup_command {
     return;
   }
 
-  if(dtruefalse($CONFIG{'backupdestination'}{$$bh{backupdestination}},'busted')) {
-    # I guess this is a way to mark a backupdestination as unavailable
-    dlog('notice','backupdestination busted',$$bh{backupdestination});
-    return;
-  }
-
   if($$bh{btype} eq 'duplicity') {
     @com=($$bh{duplicitybinary});
     push(@com,'full') if dtruefalse(\%CLI_CONFIG, 'full');
@@ -1126,7 +1120,9 @@ sub perform_backup {
         delete $ENV{$env_var};
       }
     }
-    if(dtruefalse($CONFIG{'backupdestination'}{$$bh{backupdestination}},'busted')) {
+
+    if(defined $CONFIG{'backupdestination'}{$$bh{backupdestination}}
+       and dtruefalse($CONFIG{'backupdestination'}{$$bh{backupdestination}},'busted')) {
       dlog('notice','skipping backup due to busted destination',$bh);
       next;
     }
