@@ -101,7 +101,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '1.7.3';
+our $VERSION = '1.7.5';
 
 # constant name of the application
 our $APP_NAME = 'rdbduprunner';
