@@ -56,7 +56,7 @@ use Data::Dumper;
     $$bh{useagent} = 1;
     $$bh{allowsourcemismatch} = 1;
     $$bh{tempdir} = '/var/tmp';
-    $$bh{disabled} = 0;
+    $$bh{disabled} = 'f';
     $$bh{volsize} = 1000;
     $CONFIG{default}{busted}=0;
 
@@ -99,7 +99,7 @@ use Data::Dumper;
     $$bh{btype} = 'rsync';
     $$bh{checksum} = 1;
     $$bh{trickle} = 4;
-    $$bh{stats} = 0;
+    $$bh{stats} = 'no';
     $$bh{sshcompress} = 1;
     $$bh{dryrun} = 1;
 
@@ -110,9 +110,9 @@ use Data::Dumper;
        "rsync dry-run");
     $$bh{inplace} = 1;
     $$bh{stats} = 1;
-    $$bh{wholefile} = 0;
+    $$bh{wholefile} = 'false';
     $$bh{exclude} = [qw(nope not this)];
-    $$bh{dryrun} = 0;
+    $$bh{dryrun} = 'false';
 
     is([build_backup_command($bh)],
        [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --bwlimit=4 -z --stats --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
