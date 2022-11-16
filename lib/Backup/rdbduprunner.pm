@@ -912,10 +912,10 @@ sub verbargs {
     }
   }
   else {
-    if($$bh{progress}) {
+    if(dtruefalse($bh,'progress')) {
       push(@a,'--progress');
     }
-    if($$bh{verbose}) {
+    if(dtruefalse($bh,'verbose')) {
       push(@a,'--verbose');
     }
   }
@@ -925,7 +925,7 @@ sub verbargs {
 sub build_backup_command {
   my $bh=shift;
   my @com;
-  if($$bh{disabled}) {
+  if(dtruefalse($bh,'disabled')) {
     dlog('notice','disabled backup',$bh);
     # skip disabled backups
     return;
@@ -946,19 +946,19 @@ sub build_backup_command {
   if($$bh{btype} eq 'duplicity') {
     @com=($$bh{duplicitybinary});
     push(@com,'full') if dtruefalse(\%CLI_CONFIG, 'full');
-    if($$bh{dryrun}) {
+    if(dtruefalse($bh,'dryrun')) {
       push(@com,'--dry-run');
     }
     $$bh{volsize} and push(@com, '--volsize', $$bh{volsize});
-    $$bh{useagent} and push(@com,'--use-agent');
-    $$bh{allowsourcemismatch} and push(@com,'--allow-source-mismatch');
+    dtruefalse($bh,'useagent') and push(@com,'--use-agent');
+    dtruefalse($bh,'allowsourcemismatch') and push(@com,'--allow-source-mismatch');
     if(defined $$bh{signkey}) {
       push(@com,'--sign-key',$$bh{signkey});
     }
     if(defined $$bh{encryptkey}) {
       push(@com,'--encrypt-key',$$bh{encryptkey});
     }
-    unless($$bh{stats}) {
+    unless(dtruefalse($bh,'stats')) {
       push(@com,'--no-print-statistics');
     }
     push(@com,'--exclude-other-filesystems');
@@ -968,10 +968,10 @@ sub build_backup_command {
           '--exclude-other-filesystems',
           '--no-eas',
          );
-    unless($$bh{sshcompress}) {
+    unless(dtruefalse($bh,'sshcompress')) {
       push(@com,'--ssh-no-compression');
     }
-    if($$bh{stats}) {
+    if(dtruefalse($bh,'stats')) {
       push(@com,'--print-statistics');
     }
   } elsif($$bh{btype} eq 'rsync') {
@@ -984,15 +984,15 @@ sub build_backup_command {
          );
     # here is the where the rubbger meets the robe:
     if( defined $$bh{wholefile}) {
-      push(@com, bool_parse($$bh{wholefile}) ? '--whole-file' : '--no-whole-file');
+      push(@com, dtruefalse($bh,'wholefile') ? '--whole-file' : '--no-whole-file');
     }
-    if($$bh{dryrun}) {
+    if(dtruefalse($bh,'dryrun')) {
       push(@com,'--dry-run');
     }
-    if($$bh{checksum}) {
+    if(dtruefalse($bh,'checksum')) {
       push(@com,'--checksum');
     }
-    if(defined $$bh{'inplace'} and $$bh{'inplace'}) {
+    if(dtruefalse($bh,'inplace')) {
       push(@com,'--inplace','--partial');
     }
     else {
@@ -1001,10 +1001,10 @@ sub build_backup_command {
     if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/) {
       push(@com,"--bwlimit=$$bh{trickle}");
     }
-    if($$bh{sshcompress}) {
+    if(dtruefalse($bh,'sshcompress')) {
       push(@com,'-z');
     }
-    if($$bh{stats}) {
+    if(dtruefalse($bh,'stats')) {
       push(@com,'--stats');
     }
     # use logging
@@ -1126,7 +1126,7 @@ sub perform_backup {
         delete $ENV{$env_var};
       }
     }
-    if(exists $CONFIG{$$bh{backupdestination}}{busted} and $CONFIG{$$bh{backupdestination}}{busted} == 1) {
+    if(dtruefalse($CONFIG{$$bh{backupdestination}},'busted')) {
       dlog('notice','skipping backup due to busted destination',$bh);
       next;
     }
@@ -1135,7 +1135,7 @@ sub perform_backup {
       dlog('debug','empty backup command',$bh);
       next BACKUP;
     }
-    if (defined $$bh{zfscreate} and bool_parse($$bh{zfscreate}) == 1 and not $$bh{dryrun}) {
+    if (dtruefalse($bh,'zfscreate') and not dtruefalse($bh,'dryrun')) {
       # this seems messy, but we want the parent dir of the real destination
       my @all_dirs = File::Spec->splitdir( $$bh{'dest'} );
       my $zfs_child = pop @all_dirs;
@@ -1704,10 +1704,10 @@ sub bool_parse {
     if (looks_like_number($bool) and $bool < 0) {
         croak "supposed boolean value appears to be a negative number: ${bool}";
     }
-    if ( (looks_like_number($bool) and $bool > 0) or string_any( $bool, qw( true t yes on 1 ) ) ) {
+    if ( (looks_like_number($bool) and $bool > 0) or string_any( lc $bool, qw( true t yes on 1 ) ) ) {
         return 1;
     }
-    if ( (looks_like_number($bool) and $bool == 0) or string_any( $bool, qw( false f no off 0 ) ) ) {
+    if ( (looks_like_number($bool) and $bool == 0) or string_any( lc $bool, qw( false f no off 0 ) ) ) {
         return 0;
     }
     # this would interpret negative numbers as "false" which is weird and probably wrong
@@ -1914,6 +1914,7 @@ sub parse_config_backups {
                                              $config_definition{'cli'}{fields}),
                     keys(%DEFAULT_CONFIG))) {
                     # for my $key (qw( stats wholefile inplace checksum verbose progress verbosity terminalverbosity )) {
+                    # this is a list of items that exist at only one layer and shouldn't be smashed many of them are command line options:
                     next KEY if string_any($key, qw(filterpath filterdest filterhost defaultbackupdestination type maxprocs level facility force full maxwait skipfstype localhost test excludepath));
                     my $v = key_selector($key,$bh);
                     $$bh{$key} = $v if defined $v;
@@ -2417,7 +2418,7 @@ sub compare_mode {
     if ($$bh{btype} eq 'duplicity') {
       push(@com,$$bh{dest},$$bh{path});
     } else {
-      unless($$bh{sshcompress}) {
+      unless(bool_parse($$bh{sshcompress})) {
 	push(@com,'--ssh-no-compression');
       }
       push(@com,'--exclude-device-files',$$bh{src},$$bh{dest});
@@ -2584,11 +2585,8 @@ sub dtruefalse {
     my $h = shift;
     croak "dtrue needs a hashref" unless reftype $h eq reftype {};
     my $k = shift;
-    if ( defined $$h{$k} and $$h{$k} ) {
-        return 1;
-    }
-    if ( defined $$h{$k} and not $$h{$k} ) {
-        return 0;
+    if ( defined $$h{$k} ) {
+        return bool_parse( $$h{$k} );
     }
     return;
 }
@@ -2604,6 +2602,7 @@ sub key_selector {
     my $bh = shift;
     my @hashes = (hashref_key_hash(\%DEFAULT_CONFIG,'default'));
 
+    return undef unless exists $DEFAULT_CONFIG{$key};
     if ( exists $DEFAULT_CONFIG{$key} and string_any('global', @{$DEFAULT_CONFIG{$key}{sections}}) ) {
         push(@hashes, \%CONFIG);
     }
