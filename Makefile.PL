@@ -24,7 +24,7 @@ WriteMakefile(
         'Readonly' => 0,
         'Storable' => 0,
         'Sys::Hostname' => 0,
-        'YAML',
+        'YAML' => 0,
     },
     ABSTRACT_FROM     => 'lib/Backup/rdbduprunner.pm', # retrieve abstract from module
     AUTHOR            => 'Aran Cox <arancox@gmail.com>',
