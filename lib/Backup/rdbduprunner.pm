@@ -28,15 +28,14 @@ use Scalar::Util qw/reftype looks_like_number/;
 BEGIN {
     @AnyDBM_File::ISA = qw(GDBM_File SDBM_File);
 }
-use JSON;
 use AnyDBM_File;
 eval { use Time::HiRes qw( time ); };
 use Fatal qw( :void open close link unlink symlink rename fork );
 # added from CPAN or system packages
 use Config::General;
 use Config::Validator;
-use YAML;
-use JSON;
+use YAML::Syck;
+use Cpanel::JSON::XS;
 use Hash::Merge qw(merge);
 use Clone qw(clone);
 use Carp;
@@ -1365,8 +1364,7 @@ sub status_json {
     while(my ($k,$v)=each(%status)) {
         $json{$k}=thaw($v);
     }
-    my $json = JSON->new->pretty();
-    print $json->encode(\%json);
+    print Cpanel::JSON::XS->new->ascii->pretty->allow_nonref->encode(\%json);
     untie %status;
     unlock_db($h);
 }
@@ -2081,13 +2079,13 @@ sub load_config_conf {
 }
 
 sub load_config_yaml {
-    return YAML::LoadFile($_[0]);
+    return YAML::Syck::LoadFile($_[0]);
 }
 
 sub load_config_json {
     my $h;
     open($h,"<",$_[0]) or croak "unable to open ${_[0]} for reading";
-    return JSON::decode_json(<$h>);
+    return decode_json(<$h>);
 }
 
 sub load_configs {
