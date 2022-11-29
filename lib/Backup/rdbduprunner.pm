@@ -1622,7 +1622,7 @@ sub remove_oldest {
 	    next;
 	}
 	my $t=$$ih{inctime};
-	my @com=($$ih{rdiffbackupbinary},
+	my @com=($$ih{bh}{rdiffbackupbinary},
              verbargs($$ih{bh}),
 		 '--remove-older-than',($t+1), # do I really need to add 1?
 		 $$ih{bh}{dest});
