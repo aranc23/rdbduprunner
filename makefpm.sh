@@ -16,7 +16,7 @@ egrep 'our \$VERSION' lib/Backup/rdbduprunner.pm > $tmp
 echo 'print $VERSION."\n"' >> $tmp
 
 version=$(perl $tmp)
-iteration=0
+iteration=2
 rm -f $tmp
 
 #rpm_deps="-d perl-JSON -d perl-Log-Dispatch -d perl-Config-General -d perl-Readonly"
@@ -32,8 +32,8 @@ for mod in ${cpan_reject[@]}; do
     deb_deps="${deb_deps} --cpan-package-reject-from-depends ${mod}"
 done
 
-fpm -n $pkg --version ${version} --iteration ${iteration} -m arancox@gmail.com --architecture noarch -C $build_dir -s dir -d perl-Backup-rdbduprunner    -t rpm --rpm-summary "${summary}" --description "${description}" --url "${url}" .
-fpm -n $pkg --version ${version} --iteration ${iteration} -m arancox@gmail.com --architecture noarch -C $build_dir -s dir -d libbackup-rdbduprunner-perl -t deb --rpm-summary "${summary}" --description "${description}" --url "${url}" .
+fpm -n $pkg --version ${version} --iteration ${iteration} -m arancox@gmail.com --architecture noarch -C $build_dir -s dir -d "perl-Backup-rdbduprunner = ${version}-${iteration}"    -t rpm --rpm-summary "${summary}" --description "${description}" --url "${url}" .
+fpm -n $pkg --version ${version} --iteration ${iteration} -m arancox@gmail.com --architecture noarch -C $build_dir -s dir -d "libbackup-rdbduprunner-perl = ${version}-${iteration}" -t deb --rpm-summary "${summary}" --description "${description}" --url "${url}" .
 
 rm -rf $build_dir
 
