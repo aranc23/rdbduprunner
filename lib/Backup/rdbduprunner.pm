@@ -1967,11 +1967,11 @@ sub inventory_host {
             if ( defined $filters{allowfs}
                  and scalar @{$filters{allowfs}} > 0 ) {
                 if ( not string_any($e[2], @{$filters{allowfs}}) ) {
-                    debug("filesystem type is not allowd via the allow list: ${e[2]}");
+                    debug("filesystem at $e[1] is not allowed via the allow list: ${e[2]}");
                     next M;
                 }
             } elsif ( defined $filters{skipfstype} and string_any($e[2], @{$filters{skipfstype}}) ) {
-                debug("filesystem type is not allowd via the skip list: ${e[2]}");
+                debug("filesystem at $e[1] is not allowed via the skip list: ${e[2]}");
                 next M;
             }
             if (defined $filters{skip}) {
