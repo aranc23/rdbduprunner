@@ -1343,7 +1343,7 @@ sub status_delete {
         return;
     }
 
-    for my $k (@_) {
+    for my $k (@{$CLI_CONFIG{status_delete}}) {
         delete $status{$k} if exists $status{$k};
     }
 
