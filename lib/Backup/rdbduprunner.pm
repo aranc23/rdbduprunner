@@ -2071,11 +2071,14 @@ sub find_configs {
 }
 
 sub load_config_conf {
-    my %c = new Config::General(-ConfigFile     => $_[0],
-                                -IncludeGlob    => 1,
-                                -AutoTrue       => 1,
-                                -LowerCaseNames => 1)->getall() or die "unable to parse legacy config: $_[0]";
-    return \%c;
+    my $file = shift;
+    die "file ${file} does not exist, cannot be loaded" unless -f $file;
+    my $conf =
+        new Config::General(-ConfigFile     => $file,
+                            -IncludeGlob    => 1,
+                            -AutoTrue       => 1,
+                            -LowerCaseNames => 1);
+    return {$conf->getall()};
 }
 
 sub load_config_yaml {
