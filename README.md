@@ -569,11 +569,11 @@ For an overview of the configuration file format see the ["FILES"](#files) secti
 Before executing the post and pre run commands, the following
 environment variables will be set:
 
-- RDBDUPRUNNER\_BACKUP\_src
-- RDBDUPRUNNER\_BACKUP\_dest
-- RDBDUPRUNNER\_BACKUP\_tag
-- RDBDUPRUNNER\_BACKUP\_path
-- RDBDUPRUNNER\_BACKUP\_host
+- RDBDUPRUNNER\_BACKUP\_SRC
+- RDBDUPRUNNER\_BACKUP\_DEST
+- RDBDUPRUNNER\_BACKUP\_TAG
+- RDBDUPRUNNER\_BACKUP\_PATH
+- RDBDUPRUNNER\_BACKUP\_HOST
 
 These values are taken from the details of the backup being performed.
 
