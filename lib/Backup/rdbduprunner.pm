@@ -1111,7 +1111,7 @@ sub perform_backup {
  BACKUP:
   foreach my $bh (sort backup_sort (@_)) {
     foreach my $key (qw( src dest tag path host ) ) {
-      my $env_var = join('_',$APP_NAME,'BACKUP',uc($key));
+      my $env_var = join('_',uc($APP_NAME),'BACKUP',uc($key));
       if ( exists $$bh{$key} ) {
         $ENV{$env_var}=$$bh{$key};
       }
