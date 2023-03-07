@@ -156,7 +156,7 @@ Readonly our $LOG_FILE => File::Spec->catfile( $LOG_DIR, 'rdbduprunner.log' );
 # can be overridden from the command line, but not the config
 Readonly our $CONFIG_DIR =>
     $USER eq 'root'                  ? File::Spec->catfile('/etc',$APP_NAME)
-    : exists $ENV{'XDG_CONFIG_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
+    : exists $ENV{'XDG_CONFIG_HOME'} ? File::Spec->catfile($ENV{'XDG_CONFIG_HOME'}, $APP_NAME)
     : exists $ENV{'HOME'}            ? File::Spec->catfile($ENV{'HOME'}, '.config', $APP_NAME)
     : undef;
 
