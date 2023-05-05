@@ -289,11 +289,23 @@ For an overview of the configuration file format see the ["FILES"](#files) secti
 
 - `Inplace` _yes|no|on|off|0|1|true|false_ {**--inplace|--no-inplace|--noinplace**
 
-    Passes the --inplace and --partial options to rsync (instead of
-    \--sparse) for this destination.  Assumed to be true every day of the
-    week except Sunday unless explicitly set.  If you always want
-    \--inplace, set this to true, if you always want --sparse set this to
-    false.
+    Passes the --inplace and --partial options to rsync. Inplace has
+    impliciations that should be understood before enabling.  See the
+    rsync man-page.  This option was incompatible with --sparse in earlier
+    versions of rsync.
+
+    Default: false
+
+    Validity: CLI, Global, BackupDestination, BackupSet
+
+- `Sparse` _yes|no|on|off|0|1|true|false_ {**--sparse|--no-sparse|--nosparse**
+
+    Passes the --sparse otpion to rsync.  May be incompatible with Inplace
+    option on older versions of rsync.
+
+    Default: true
+
+    Validity: CLI, Global, BackupDestination, BackupSet
 
 - `Checksum` _yes|no|on|off|0|1|true|false_ {**-c|--checksum|--no-checksum**} (rsync only)
 
