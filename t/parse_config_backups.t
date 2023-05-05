@@ -62,6 +62,7 @@ use Data::Dumper;
                 'zfsbinary' => 'zfs',
                 'rsyncbinary' => 'rsync',
                 'local' => 1,
+                  sparse => 1,
             }
         ],
         "simple config",
@@ -106,6 +107,7 @@ use Data::Dumper;
                 'rsyncbinary' => 'rsync',
                 'excludes' => [],
                 'local' => 1,
+                  sparse => 1,
             }
         ],
         "skip the skips",
@@ -157,6 +159,7 @@ use Data::Dumper;
                 'zfsbinary' => 'zfs',
                 'rsyncbinary' => 'rsync',
                 'local' => 1,
+                  sparse => 1,
             }
         ],
         "cli override inplace and checksum",
@@ -172,6 +175,7 @@ use Data::Dumper;
                             'path' =>
                                 [ '/', '/usr', '/var', '/home', '/tmp' ],
                             'inplace'   => 1,
+                            'sparse'    => 0,
                             'inventory' => 0
                         },
                         'tock' => {
@@ -200,6 +204,7 @@ use Data::Dumper;
                     'tests/excludes/generic-home'
                 ],
                 'inplace'  => 1,
+                'sparse'   => 0,
                 'stats'    => 1,
                 'host'     => 'tick.physics.uiowa.edu',
                 'checksum' => 0,
@@ -231,6 +236,7 @@ use Data::Dumper;
                     'tests/excludes/generic-root'
                 ],
                 'inplace' => 1,
+                'sparse'  => 0,
                 'progress' => 0,
                 'verbose' => 0,
                 'rdiffbackupbinary' => 'rdiff-backup',
@@ -249,6 +255,7 @@ use Data::Dumper;
                 'btype'             => 'rsync',
                 'excludes'          => ['tests/excludes/generic'],
                 'inplace'           => 1,
+                'sparse'     => 0,
                 'stats'             => 1,
                 'host'              => 'tick.physics.uiowa.edu',
                 'gtag'              => 'generic-tmp',
@@ -269,6 +276,7 @@ use Data::Dumper;
                 'host'     => 'tick.physics.uiowa.edu',
                 'stats'    => 1,
                 'inplace'  => 1,
+                'sparse'   => 0,
                 'excludes' => [
                     'tests/excludes/generic',
                     'tests/excludes/generic-usr'
@@ -297,6 +305,7 @@ use Data::Dumper;
                     'tests/excludes/tick.physics.uiowa.edu-var'
                 ],
                 'inplace'   => 1,
+                'sparse'    => 0,
                 'stats'     => 1,
                 'host'      => 'tick.physics.uiowa.edu',
                 'gtag'      => 'generic-var',
@@ -341,6 +350,7 @@ use Data::Dumper;
                 'zfsbinary' => 'zfs',
                 'rsyncbinary' => 'rsync',
                 'local' => 0,
+                'sparse' => 1,
             },
             {   'exclude'   => [],
                 'path'      => '/',
@@ -368,6 +378,7 @@ use Data::Dumper;
                 'zfsbinary' => 'zfs',
                 'rsyncbinary' => 'rsync',
                 'local' => 0,
+                'sparse' => 1,
             }
         ],
         "tick-tock",

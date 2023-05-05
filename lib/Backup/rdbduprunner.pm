@@ -191,7 +191,14 @@ our %DEFAULT_CONFIG = (
     'inplace' => {
         getopt   => 'inplace!',
         type     => "valid(truefalse)",
-        default  => strftime( '%w', localtime( time() ) ) == 0 ? 0 : 1,
+        default  => 0,
+        optional => "true",
+        sections => [qw(cli global backupdestination backupset)],
+    },
+    'sparse' => {
+        getopt   => 'sparse!',
+        type     => "valid(truefalse)",
+        default  => 1,
         optional => "true",
         sections => [qw(cli global backupdestination backupset)],
     },
@@ -988,7 +995,7 @@ sub build_backup_command {
     if(dtruefalse($bh,'inplace')) {
       push(@com,'--inplace','--partial');
     }
-    else {
+    if(dtruefalse($bh,'sparse')) {
       push(@com,'--sparse');
     }
     if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/) {

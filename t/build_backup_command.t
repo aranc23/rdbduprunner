@@ -102,6 +102,7 @@ use Data::Dumper;
     $$bh{stats} = 'no';
     $$bh{sshcompress} = 1;
     $$bh{dryrun} = 1;
+    $$bh{sparse} = 1;
 
     $LOG_DIR = '/var/log';
 
@@ -115,7 +116,7 @@ use Data::Dumper;
     $$bh{dryrun} = 'false';
 
     is([build_backup_command($bh)],
-       [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --bwlimit=4 -z --stats --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
+       [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --sparse --bwlimit=4 -z --stats --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
        "rsync");
 }
 
