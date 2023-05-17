@@ -4,4 +4,4 @@ use strict;
 use Backup::rdbduprunner;
 
 print '<<<rdbduprunner>>>'."\n";
-Backup::rdbduprunner::status_json();
+Backup::rdbduprunner::status_print();

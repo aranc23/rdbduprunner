@@ -79,6 +79,7 @@ $LOG_DIR
 @INCREMENTS
 &perform_backups
 &parse_config_backups
+&status_print
 &status_json
 &status_delete
 &backup_sort
@@ -411,14 +412,20 @@ our %DEFAULT_CONFIG = (
         sections => [qw(cli)],
         mode     => \&orphans_mode,
     },
-    # maintain the status database:
-    # 'status_json|status-json!'       => \$STATUS_JSON,
+    # maintain/view the status database:
     'status_json' => {
         getopt => 'status_json|status-json',
         type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(cli)],
         mode     => \&status_json,
+    },
+    'status_print' => {
+        getopt => 'status_print|status-print',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+        mode     => \&status_print,
     },
     # 'status_delete|status-delete=s@' => \@STATUS_DELETE,
     'status_delete' => {
@@ -1372,6 +1379,30 @@ sub status_json {
         $json{$k}=thaw($v);
     }
     print Cpanel::JSON::XS->new->ascii->pretty->allow_nonref->encode(\%json);
+    untie %status;
+    unlock_db($h);
+}
+
+sub status_print {
+    my $h = lock_db(LOCK_SH);
+
+    my %status;
+    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
+        error("unable to open database file ${DB_FILE} for reading");
+        return;
+    }
+
+    while(my ($k,$v)=each(%status)) {
+        my $s = thaw($v);
+        print $k;
+        foreach my $k (qw( phase time exit errno runtime )) {
+            print '|';
+            if ( defined $$s{$k} ) {
+                print $$s{$k};
+            }
+        }
+        print "\n";
+    }
     untie %status;
     unlock_db($h);
 }

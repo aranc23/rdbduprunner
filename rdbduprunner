@@ -75,6 +75,11 @@ backups tools like ls and du perform similar functions.
 
 Prints the status DBM as a json hash for parsing by other tools.
 
+=item {B<--status-print>}
+
+Prints the status DBM one line at a time using | as a separator.
+The fields are path, phase, time, exit, errno, runtime.
+
 =item {B<--status-delete>=I<backup_src>}
 
 Deletes the specified keys from the status DBM thus making

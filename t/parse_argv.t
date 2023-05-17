@@ -61,6 +61,7 @@ use Hash::Merge qw(merge);
               --list
               --orphans
               --status-json
+              --status-print
               --status-delete pork
               --force
               --full
@@ -109,6 +110,7 @@ use Hash::Merge qw(merge);
          orphans => 1,
          status_delete => ['pork'],
          status_json => 1,
+         status_print => 1,
          tidy => 1,
          maxwait => 32000,
          maxinc => 4,
