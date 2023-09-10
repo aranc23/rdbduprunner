@@ -1162,16 +1162,17 @@ sub perform_backup {
           set_env($bh);
           system(@com);
           unless($? == 0) {
+            my $exit_status = exit_status(${^CHILD_ERROR_NATIVE});
             # if we failed to run the pre-run, issue the final summary based on that
             error("unable to execute zfs create command as requested: skipping backup!");
             update_status_db(
                 $$bh{src},
                 {   'phase' => 'zfscreate',
-                    'exit'  => exit_status(${^CHILD_ERROR_NATIVE}),
+                    'exit'  => $exit_status,
                     'time'  => time(),
                 }
             ) unless $CLI_CONFIG{test};
-            log_exit_status($bh,$?);
+            log_exit_status($bh,$exit_status);
             next BACKUP;
           }
         }
@@ -1182,12 +1183,12 @@ sub perform_backup {
         update_status_db(
             $$bh{src},
             {   'phase' => 'zfscreate',
-                'exit'  => int(-1),
+                'exit'  => int(1),
                 'errno' => $msg,
                 'time'  => time(),
             }
         ) unless $CLI_CONFIG{test};
-        log_exit_status( $bh, $? );
+        log_exit_status( $bh, int(1) );
         next;
       }
     }
@@ -1197,18 +1198,19 @@ sub perform_backup {
         set_env($bh);
         system($$bh{prerun});
         unless ( $? == 0 ) {
+            my $exit_status = exit_status(${^CHILD_ERROR_NATIVE});
             # if we failed to run the pre-run, issue the final summary based on that
             my $msg = "unable to execute prerun command: skipping backup!";
             error($msg);
             update_status_db(
                 $$bh{src},
                 {   'phase' => 'prerun',
-                    'exit'  => exit_status(${^CHILD_ERROR_NATIVE}),
+                    'exit'  => $exit_status,
                     'errno' => $msg,
                     'time'  => time(),
                 }
             ) unless $CLI_CONFIG{test};
-            log_exit_status( $bh, $? );
+            log_exit_status( $bh, $exit_status );
             next;
         }
       }
