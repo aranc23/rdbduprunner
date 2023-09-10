@@ -1167,7 +1167,7 @@ sub perform_backup {
             update_status_db(
                 $$bh{src},
                 {   'phase' => 'zfscreate',
-                    'exit'  => int(POSIX::WEXITSTATUS($CHILD_ERROR)),
+                    'exit'  => exit_status(${^CHILD_ERROR_NATIVE}),
                     'time'  => time(),
                 }
             ) unless $CLI_CONFIG{test};
@@ -1203,7 +1203,7 @@ sub perform_backup {
             update_status_db(
                 $$bh{src},
                 {   'phase' => 'prerun',
-                    'exit'  => int(POSIX::WEXITSTATUS($CHILD_ERROR)),
+                    'exit'  => exit_status(${^CHILD_ERROR_NATIVE}),
                     'errno' => $msg,
                     'time'  => time(),
                 }
@@ -1219,18 +1219,13 @@ sub perform_backup {
       set_env($bh);
       $$bh{runtime}=time();
       system(@{$$bh{com}});
-      $mainret=$?;
+      $mainret = exit_status(${^CHILD_ERROR_NATIVE});
       $$bh{runtime}=time()-$$bh{runtime};
-      # in order to look up useful return code values for rsync you have to divide by 256
-      # however, it doesn't always return a code evenly divisble by 256 so we need to check first
-      if ($$bh{btype} eq 'rsync' and $mainret % 256 == 0) {
-        $mainret=($mainret/256);
-      }
       if (defined $$EXIT_CODE{$$bh{btype}}{$mainret}) {
         $$bh{'exit_code'}=$$EXIT_CODE{$$bh{btype}}{$mainret};
       }
       unless($mainret == 0) {
-        error("unable to execute $$bh{btype}!");
+        error("$$bh{btype} exited with error code!");
       }
     }
     # if there is no postrun, return the log_exit_status using $mainret
@@ -1248,7 +1243,7 @@ sub perform_backup {
             update_status_db(
                 $$bh{src},
                 {   'phase' => 'postrun',
-                    'exit'  => int(POSIX::WEXITSTATUS($CHILD_ERROR)),
+                    'exit'  => exit_status(${^CHILD_ERROR_NATIVE}),
                     'errno' => $msg,
                     'time'  => time(),
                 }
@@ -2696,6 +2691,14 @@ sub path_munge_tag {
     $path =~ s/ /_/g;
     $path eq '-' and $path='-root';
     return $path;
+}
+
+# return the exit status if exited normally, or the negative of the
+# signal if signalled
+sub exit_value {
+    POSIX::WIFEXITED($_[0]) and return int(POSIX::WEXITSTATUS($_[0]));
+    POSIX::WIFSIGNALED($_[0]) and return int(POSIX::WTERMSIG($$_[0])) * -1;
+    return int(-1);
 }
 
 # Preloaded methods go here.
