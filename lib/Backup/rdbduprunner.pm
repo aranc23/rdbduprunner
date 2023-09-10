@@ -1170,6 +1170,7 @@ sub perform_backup {
                 {   'phase' => 'zfscreate',
                     'exit'  => $exit_status,
                     'time'  => time(),
+                    'btype' => $$bh{btype},
                 }
             ) unless $CLI_CONFIG{test};
             log_exit_status($bh,$exit_status);
@@ -1186,6 +1187,7 @@ sub perform_backup {
                 'exit'  => int(1),
                 'errno' => $msg,
                 'time'  => time(),
+                'btype' => $$bh{btype},
             }
         ) unless $CLI_CONFIG{test};
         log_exit_status( $bh, int(1) );
@@ -1208,6 +1210,7 @@ sub perform_backup {
                     'exit'  => $exit_status,
                     'errno' => $msg,
                     'time'  => time(),
+                    'btype' => $$bh{btype},
                 }
             ) unless $CLI_CONFIG{test};
             log_exit_status( $bh, $exit_status );
@@ -1249,6 +1252,7 @@ sub perform_backup {
                     'exit'  => $exit_status,
                     'errno' => $msg,
                     'time'  => time(),
+                    'btype' => $$bh{btype},
                 }
             ) unless $CLI_CONFIG{test};
             log_exit_status( $bh, $exit_status );
@@ -1288,6 +1292,7 @@ sub perform_backup {
             'errno'   => exists $$bh{exit_code} ? $$bh{exit_code} : 'backup failed',
             'time'    => time(),
             'runtime' => $$bh{runtime},
+            'btype'   => $$bh{btype},
         }
     ) unless $CLI_CONFIG{test};
     log_exit_status($bh,$mainret) unless $CLI_CONFIG{test};
