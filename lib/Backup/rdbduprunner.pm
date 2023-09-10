@@ -2703,7 +2703,7 @@ sub path_munge_tag {
 
 # return the exit status if exited normally, or the negative of the
 # signal if signalled
-sub exit_value {
+sub exit_status {
     POSIX::WIFEXITED($_[0]) and return int(POSIX::WEXITSTATUS($_[0]));
     POSIX::WIFSIGNALED($_[0]) and return int(POSIX::WTERMSIG($$_[0])) * -1;
     return int(-1);
