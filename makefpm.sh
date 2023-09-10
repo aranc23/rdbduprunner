@@ -12,7 +12,7 @@ rsync -av check_mk "${build_dir}/usr/lib/${pkg}"
 cp "contrib/tmpfiles.d/${pkg}.conf" "${build_dir}/usr/lib/tmpfiles.d/"
 
 tmp=$(mktemp)
-egrep 'our \$VERSION' lib/Backup/rdbduprunner.pm > $tmp
+grep -E 'our \$VERSION' lib/Backup/rdbduprunner.pm > $tmp
 echo 'print $VERSION."\n"' >> $tmp
 
 version=$(perl $tmp)
@@ -38,8 +38,8 @@ fpm -n $pkg --version ${version} --iteration ${iteration} -m arancox@gmail.com -
 rm -rf $build_dir
 
 # create the packages for the Backup::rdbduprunner module
-fpm --verbose --no-cpan-test $common_opts $common_deps $rpm_deps -t rpm --rpm-summary "${summary}" --description "${description}" --name perl-Backup-rdbduprunner .
-fpm --verbose --no-cpan-test $common_opts $common_deps $deb_deps -t deb --rpm-summary "${summary}" --description "${description}" --cpan-package-name-prefix lib --cpan-package-name-postfix -perl .
+fpm --verbose --no-cpan-test $common_opts $common_deps $rpm_deps -t rpm --rpm-summary "${summary}" --description "${description}" .
+fpm --verbose --no-cpan-test $common_opts $common_deps $deb_deps -t deb --rpm-summary "${summary}" --description "${description}" .
 
 # build two packages missing on Ubuntu 20.04 needed by Backup::rdbduprunner:
 for pkg in No::Worries Config::Validator; do
