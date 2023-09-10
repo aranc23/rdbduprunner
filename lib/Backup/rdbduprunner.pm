@@ -1161,8 +1161,8 @@ sub perform_backup {
         unless($CLI_CONFIG{test}) {
           set_env($bh);
           system(@com);
-          unless($? == 0) {
-            my $exit_status = exit_status(${^CHILD_ERROR_NATIVE});
+          my $exit_status = exit_status(${^CHILD_ERROR_NATIVE});
+          unless($exit_status == 0) {
             # if we failed to run the pre-run, issue the final summary based on that
             error("unable to execute zfs create command as requested: skipping backup!");
             update_status_db(
@@ -1197,8 +1197,8 @@ sub perform_backup {
       unless($CLI_CONFIG{test}) {
         set_env($bh);
         system($$bh{prerun});
-        unless ( $? == 0 ) {
-            my $exit_status = exit_status(${^CHILD_ERROR_NATIVE});
+        my $exit_status = exit_status(${^CHILD_ERROR_NATIVE});
+        unless ( $exit_status == 0 ) {
             # if we failed to run the pre-run, issue the final summary based on that
             my $msg = "unable to execute prerun command: skipping backup!";
             error($msg);
@@ -1237,7 +1237,8 @@ sub perform_backup {
       unless($CLI_CONFIG{test}) {
         set_env($bh);
         system( $$bh{postrun} );
-        unless ( $? == 0 ) {
+        my $exit_status = exit_status(${^CHILD_ERROR_NATIVE});
+        unless ( $exit_status == 0 ) {
             my $msg = "postrun command exited with an error";
             error($msg);
 
@@ -1245,12 +1246,12 @@ sub perform_backup {
             update_status_db(
                 $$bh{src},
                 {   'phase' => 'postrun',
-                    'exit'  => exit_status(${^CHILD_ERROR_NATIVE}),
+                    'exit'  => $exit_status,
                     'errno' => $msg,
                     'time'  => time(),
                 }
             ) unless $CLI_CONFIG{test};
-            log_exit_status( $bh, $? );
+            log_exit_status( $bh, $exit_status );
             next;
         }
       }
