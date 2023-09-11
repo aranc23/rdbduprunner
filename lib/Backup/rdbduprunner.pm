@@ -82,6 +82,7 @@ $LOG_DIR
 &status_print
 &status_json
 &status_log
+&status_prom
 &status_delete
 &backup_sort
 &build_backup_command
@@ -434,6 +435,13 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli)],
         mode     => \&status_log,
+    },
+    'status_prom' => {
+        getopt => 'status_prom|status-prom',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+        mode     => \&status_prom,
     },
     # 'status_delete|status-delete=s@' => \@STATUS_DELETE,
     'status_delete' => {
@@ -1438,6 +1446,27 @@ sub status_log {
         my $msg = dlog('notice','backup status',
                        {'src' => $k},
                        $s);
+    }
+    untie %status;
+    unlock_db($h);
+}
+
+sub status_prom {
+    my $h = lock_db(LOCK_SH);
+
+    my %status;
+    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
+        error("unable to open database file ${DB_FILE} for reading");
+        return;
+    }
+    while(my ($k,$v)=each(%status)) {
+        my $s = thaw($v);
+        unless ( defined $$s{'btype'} ) {
+            $$s{'btype'} = 'rsync';
+        }
+        foreach my $nk (qw( time exit runtime )) {
+            print "node_rdbduprunner_backup_status_${nk}{src=\"${k}\"} $$s{$nk}\n";
+        }
     }
     untie %status;
     unlock_db($h);
