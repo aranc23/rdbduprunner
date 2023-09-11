@@ -81,6 +81,7 @@ $LOG_DIR
 &parse_config_backups
 &status_print
 &status_json
+&status_log
 &status_delete
 &backup_sort
 &build_backup_command
@@ -426,6 +427,13 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli)],
         mode     => \&status_print,
+    },
+    'status_log' => {
+        getopt => 'status_log|status-log',
+        type     => "valid(truefalse)",
+        optional => "true",
+        sections => [qw(cli)],
+        mode     => \&status_log,
     },
     # 'status_delete|status-delete=s@' => \@STATUS_DELETE,
     'status_delete' => {
@@ -1349,6 +1357,9 @@ sub update_status_db {
     }
     untie %status;
     unlock_db($db_lock_handle);
+    my $_msg = dlog('notice','backup status',
+                    {'src' => $src},
+                    $hash);
 }
 
 sub status_delete {
@@ -1405,6 +1416,28 @@ sub status_print {
             }
         }
         print "\n";
+    }
+    untie %status;
+    unlock_db($h);
+}
+
+sub status_log {
+    my $h = lock_db(LOCK_SH);
+
+    my %status;
+    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
+        error("unable to open database file ${DB_FILE} for reading");
+        return;
+    }
+
+    while(my ($k,$v)=each(%status)) {
+        my $s = thaw($v);
+        unless ( defined $$s{'btype'} ) {
+            $$s{'btype'} = 'rsync';
+        }
+        my $msg = dlog('notice','backup status',
+                       {'src' => $k},
+                       $s);
     }
     untie %status;
     unlock_db($h);
