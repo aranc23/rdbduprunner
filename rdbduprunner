@@ -41,7 +41,7 @@ rdbduprunner - perl magic wrapper for rsync, rdiff-backup, and duplicity
 
 B<rdbduprunner> {B<-h|--help>}
 
-B<rdbduprunner> {B<--calculate-average|--check|--cleanup|--compare|--verify|--dump|--list|--list-oldest|--orphans|--remove-oldest|--status|--tidy|--status-json|--status-delete=I<backup>>} {B<-t|--terminal-verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--full>} {B<--force>} {B<--allow-source-mismatch>} {B<-n|--dry-run>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>}
+B<rdbduprunner> {B<--calculate-average|--check|--cleanup|--compare|--verify|--dump|--list|--list-oldest|--orphans|--remove-oldest|--status|--tidy|--status-json|--status-print|--status-log|--status-delete=I<backup>>} {B<-t|--terminal-verbosity> I<integer>} {B<-v|--verbose>} {B<--progress>} {B<--full>} {B<--force>} {B<--allow-source-mismatch>} {B<-n|--dry-run>} {B<--dest> I<regex>} {B<--host> I<regex>} {B<--path> I<regex>}
 
 =head1 DESCRIPTION
 
@@ -79,6 +79,10 @@ Prints the status DBM as a json hash for parsing by other tools.
 
 Prints the status DBM one line at a time using | as a separator.
 The fields are path, phase, time, exit, errno, runtime.
+
+=item {B<--status-log>}
+
+Logs the status DBM one line at a time using a splunky output format.
 
 =item {B<--status-delete>=I<backup_src>}
 
