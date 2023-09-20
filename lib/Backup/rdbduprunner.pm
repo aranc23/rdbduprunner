@@ -132,6 +132,8 @@ Readonly our $EXIT_CODE => {
         '30' => 'Timeout in data send/receive',
         '35' => 'Timeout waiting for daemon connection',
     },
+    'rdiff-backup' => { 0 => 'Success' },
+    'duplicity' => { 0 => 'Success' },
 };
 
 # supported config file extensions
