@@ -132,7 +132,11 @@ Readonly our $EXIT_CODE => {
         '30' => 'Timeout in data send/receive',
         '35' => 'Timeout waiting for daemon connection',
     },
-    'rdiff-backup' => { 0 => 'Success' },
+    'rdiff-backup' => {
+        0 => 'Success',
+        1 => 'ERROR', # anything with bit 1 set is an ERROR
+        2 => 'WARNING', # anything with bit 2 set is a WARNING
+    },
     'duplicity' => { 0 => 'Success' },
 };
 
