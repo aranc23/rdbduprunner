@@ -1465,7 +1465,16 @@ sub status_prom {
             $$s{'btype'} = 'rsync';
         }
         foreach my $nk (qw( time exit runtime )) {
-            print "node_rdbduprunner_backup_status_${nk}{src=\"${k}\"} $$s{$nk}\n";
+            my $fc = '%.2f';
+            $fc = '%d' if $nk eq 'exit';
+            printf('node_rdbduprunner_backup_status_%s{src="%s" btype="%s" phase="%s" errno="%s"} '."${fc}\n",
+                   $nk,
+                   $k,
+                   $$s{btype},
+                   $$s{phase},
+                   $$s{errno},
+                   $$s{$nk},
+               );
         }
     }
     untie %status;
