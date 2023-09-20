@@ -103,7 +103,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '1.7.14';
+our $VERSION = '1.7.15';
 
 # constant name of the application
 our $APP_NAME = 'rdbduprunner';
@@ -1473,13 +1473,10 @@ sub status_prom {
         foreach my $nk (qw( time exit runtime )) {
             my $fc = '%.2f';
             $fc = '%d' if $nk eq 'exit';
-            printf('node_rdbduprunner_backup_status_%s{src="%s" btype="%s" phase="%s" errno="%s" timestamp="%s"} '."${fc}\n",
+            printf('node_rdbduprunner_backup_status_%s{src="%s" btype="%s"} '."${fc}\n",
                    $nk,
                    $k,
                    $$s{btype},
-                   $$s{phase},
-                   $$s{errno},
-                   strftime("%FT%T",localtime($$s{time})),
                    $$s{$nk},
                );
         }
