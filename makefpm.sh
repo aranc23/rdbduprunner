@@ -5,10 +5,11 @@ umask 002
 pkg="rdbduprunner"
 build_dir=$(mktemp -d)
 url=https://github.com/aranc23/rdbduprunner
-mkdir -p "${build_dir}"/{"usr/lib/${pkg}","usr/lib/tmpfiles.d","etc/${pkg}/conf.d","run/${pkg}","var/log/${pkg}"} 
+mkdir -p "${build_dir}"/{"usr/lib/${pkg}","usr/lib/${pkg}/check_mk/checks","usr/lib/${pkg}/check_mk/plugins","usr/lib/tmpfiles.d","etc/${pkg}/conf.d","run/${pkg}","var/log/${pkg}"} 
 
 #cp $pkg ./Build/usr/bin/
-rsync -av check_mk "${build_dir}/usr/lib/${pkg}"
+cp check_mk/checks/rdbduprunner "${build_dir}/usr/lib/${pkg}/check_mk/checks/"
+cp check_mk/plugins/rdbduprunner "${build_dir}/usr/lib/${pkg}/check_mk/plugins/"
 cp "contrib/tmpfiles.d/${pkg}.conf" "${build_dir}/usr/lib/tmpfiles.d/"
 
 tmp=$(mktemp)

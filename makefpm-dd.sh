@@ -29,7 +29,7 @@ common_deps="-d perl -d mbuffer -d gzip -d bzip2 -d zstd -d rsync"
 common_opts="-n ${pkg} --version $version --architecture noarch -C ${build_dir} -s dir"
 url="https://github.com/aranc23/rdbduprunner"
 
-fpm  -d "perl-Backup-delta-dumper = ${version}-${iteration}" $common_opts $common_deps $rpm_deps -t rpm --rpm-summary "${summary}" --description "${description}" --url "${url}" .
+fpm  -d "perl-Backup-rdbduprunner = ${version}-${iteration}" $common_opts $common_deps $rpm_deps -t rpm --rpm-summary "${summary}" --description "${description}" --url "${url}" .
 fpm  -d "libbackup-rdbduprunner-perl = ${version}-${iteration}" $common_opts $common_deps $deb_deps -t deb --rpm-summary "${summary}" --description "${description}" --url "${url}" .
 
 rm -rf $build_dir
