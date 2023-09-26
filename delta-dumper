@@ -1,0 +1,2753 @@
+#! /usr/bin/perl
+
+use strict;
+use warnings;
+use v5.16;
+use Fatal qw( :void open close link unlink symlink rename fork );
+# this should cause dd to die when sent kill, ctrl-c etc.
+use sigtrap qw(handler signal_handler normal-signals);
+
+# might be assumed to be installed on any perl system by default?
+use Data::Dumper;
+use Readonly;
+use English qw( -no_match_vars );
+use File::Basename;
+use POSIX;
+use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
+use File::Temp qw/ tempfile /;
+use Env qw( HOME HOSTNAME SHORTNAME DEBUG );
+use Pod::Usage;
+eval { use Time::HiRes qw( time ); };
+use File::Spec;
+use File::Path qw( make_path );
+use Date::Parse;
+BEGIN {
+    @AnyDBM_File::ISA = qw(GDBM_File SDBM_File);
+}
+use JSON;
+use AnyDBM_File;
+use Storable qw( freeze thaw );
+
+# added from CPAN or system packages
+use Log::Dispatch;
+use Log::Dispatch::Syslog;
+use Log::Dispatch::Screen;
+use Log::Dispatch::File;
+use AppConfig qw(:expand :argcount);
+use Getopt::Long qw(:config pass_through) ; # use this to pull out the config file, then let AppConfig handle the rest
+
+##### GLOBALS ##### # the horrror:
+# use this string when refering to ourself:
+Readonly my $APP_NAME => 'delta-dumper';
+
+# tease the user out of the environment, or just call getpwuid:
+my $USER
+    = $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar( getpwuid($<) );
+
+# translate lowercase database types to funky case
+Readonly my %databasetype_case => (
+    'mysql'      => 'MySQL',
+    'postgresql' => 'PostgreSQL',
+    'mongodb'    => 'MongoDB',
+);
+
+# list of readonly periods:
+Readonly my @periods => qw( daily weekly monthly );
+
+# list of readonly known database types:
+Readonly my @dbtypes => qw( mysql postgresql mongodb );
+
+# timestamp format to use in files and database entries:
+Readonly my $timestamp_format => '%FT%T%z';
+# pattern for matching *most of* iso 8601
+Readonly my $iso8601_regex => qr{\d\d\d\d . \d\d . \d\d T \d\d . \d\d . \d\d (?:[+-] \d\d\d\d){0,1}}xms;
+
+# global app configuration
+my $config;
+
+my $STATE_DIR =
+    $USER eq 'root'                 ? File::Spec->catfile('/var/lib', $APP_NAME)
+    : exists $ENV{'XDG_STATE_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
+    : exists $ENV{'HOME'}           ? File::Spec->catfile($ENV{'HOME'}, '.local', 'state', $APP_NAME)
+    : undef;
+
+my $LOCK_DIR =
+    $USER eq 'root' ? File::Spec->catfile('/run',$APP_NAME) : $STATE_DIR;
+my $LOG_DIR =
+    $USER eq 'root' ? '/var/log' : $STATE_DIR;
+
+my $DB_FILE = File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
+my $CHECKSUM_DB = File::Spec->catfile($STATE_DIR, "${APP_NAME}-checksum.db");
+
+my $CONFIG_DIR =
+    $USER eq 'root'                  ? File::Spec->catfile('/etc',$APP_NAME)
+    : exists $ENV{'XDG_CONFIG_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
+    : exists $ENV{'HOME'}            ? File::Spec->catfile($ENV{'HOME'}, '.config', $APP_NAME)
+    : undef;
+
+for my $dir ($STATE_DIR,$CONFIG_DIR) {
+    unless ( -d $dir ) {
+        my @created;
+        unless ( @created = make_path($dir, { mode => 0700 }) ) {
+            die "unable to create directory: ${dir}";
+        }
+        unless ($created[0] eq $dir) {
+            die "make_path did not return the expected result trying to create ${dir}";
+        }
+    }
+}
+
+# the path to the config file to be parsed
+my $CONFIG_FILE = File::Spec->catfile($CONFIG_DIR, 'config');
+
+# unused, unloved, restore mode!
+my $RESTORE;
+# if true, print the database status and exit
+my $STATUS_JSON;
+# delete these keys from the status database
+my @STATUS_DELETE;
+# dump the checksums and exit
+my $CHECKSUM_DUMP;
+# verify the checksums and exit
+my $CHECKSUM_VERIFY_ALL;
+# verify just one dump:
+my $CHECKSUM_VERIFY;
+
+# create the call back for the dispatcher at the top level (probably
+# not needed)
+my $callback_clean = sub { my %t=@_;
+                           chomp $t{message};
+                           return $t{message}."\n"; # add a newline
+                         };
+
+# global dispatcher variable for use in dlog() etc.
+my $DISPATCHER;
+
+# create a logparams for logging, intended to be localized:
+our %logparams=();
+
+# data structure for finding the most recent dumps and protecting used
+# ones:
+my %dump_db;
+
+# store a list of temp files which dd will attempt to remove if it
+# catches a normal signal:
+my @temp_files;
+
+# just ensure hostname is set to something
+unless($HOSTNAME and length $HOSTNAME > 0) {
+    $HOSTNAME=`hostname`;
+    chomp $HOSTNAME;
+}
+unless($SHORTNAME and length $SHORTNAME > 0) {
+    $SHORTNAME=$HOSTNAME;
+    chomp $SHORTNAME;
+}
+
+if ( scalar split(/\./, $SHORTNAME) > 1 ) {
+    my @a = split(/\./, $SHORTNAME);
+    $SHORTNAME=shift @a;
+}
+
+######## MAIN ########
+
+main();
+
+######## SUBROUTINES ########
+# delete all the temporary files, ignoring errors and die
+sub signal_handler {
+    my ($sig) = @_;
+    eval {
+        foreach my $f (@temp_files) {
+            warn "unlink ${f}" if unlink($f);
+        }
+    };
+    die "caught SIG${sig}, exiting after cleanup";
+}
+
+sub lock_file_compose {
+  return sprintf('%s/%s.lock',$LOCK_DIR,$_[0]);
+}
+sub lock_pid_file {
+  my $MAXWAIT=30;
+  my $LOCK_FILE=lock_file_compose(@_);
+  my $LOCK;
+  my $waittime=time();
+  my $locked=0;
+
+  unless(open($LOCK,'+<',$LOCK_FILE) or open($LOCK,'>',$LOCK_FILE)) {
+    return;
+  }
+  eval {
+    local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
+    alarm $MAXWAIT;
+    if (flock($LOCK,LOCK_EX)) {
+      $locked=1;
+    }
+    alarm 0;
+  };
+  if ($@) {
+    die unless $@ eq "alarm\n"; # propagate unexpected errors
+  } else {
+    if ($locked) {
+      truncate($LOCK,0); # this shouldn't fail if we have the file opened and locked!
+      print $LOCK $$."\n";      # who really cares if this fails?
+      return $LOCK;             # happiness is a locked file
+    }
+  }
+  # this is the fall through for the cases where we have received an alarm
+  # or we failed to lock the file without receiving a signal
+  close $LOCK;
+  return;
+}
+sub unlock_pid_file {
+  flock($_[0],LOCK_UN);
+  close $_[0];
+}
+
+# create the dispatcher and return it
+sub create_dispatcher {
+  my $disp=Log::Dispatch->new( callbacks => $callback_clean );
+
+  if ($config->sys_logging) {
+    $disp->add(Log::Dispatch::Syslog->new(name      => 'syslog',
+                                          min_level => $config->level,
+                                          ident     => $APP_NAME.'['.$$.']',
+                                          facility  => $config->facility,
+                                          socket    => 'unix',
+                                         )
+              );
+  }
+  if ($config->terminal_logging) {
+    $disp->add(Log::Dispatch::Screen->new(name      => 'screen',
+                                          min_level => $config->log_level,
+                                          stderr    => 1,
+                                         )
+              );
+  }
+  if ($config->file_logging) {
+    $disp->add(
+               Log::Dispatch::File->new(
+                                        name      => 'logfile',
+                                        min_level => $config->level,
+                                        filename  => File::Spec->catfile($LOG_DIR,"${APP_NAME}.log-".strftime('%Y%m%d',localtime(time()))),
+                                        mode      => '>>',
+                                       )
+              );
+  }
+  return $disp;
+}
+
+# string turns hash refs into a string of key value pairs, it does not recurse
+sub stringy {
+  # each element passed to stringy should be a HASH REF
+  my %a; # strings
+  my %specials  = (
+      tag => 1,
+      host => 1,
+  );
+  foreach my $h (@_) {
+    next unless ref $h eq 'HASH';
+    while( my ($key,$val) = each(%$h) ) {
+      next if ref ${$h}{$key}; # must not be a reference
+      $val =~ s/\n/NL/g; # remove newlines
+      $val =~ s/"/\\"/g; # replace " with \"
+      if ($key =~ /^pass/) {
+        $val = 'XXXXXXXX';
+      } elsif( $key eq 'databasetype' and defined $databasetype_case{$val}) {
+        $val = $databasetype_case{$val};
+      } elsif( $key eq 'runtime' or $key eq 'total_run_time_seconds' ){
+          $val = sprintf("%.5f", $val);
+      }
+      if($specials{$key}) {
+        $a{"${APP_NAME}_${key}"}=$val;
+      } else {
+        $a{$key}=$val;
+      }
+    }
+  }
+  my @f;
+  foreach my $key (sort {&sort_tags} (keys(%a))) {
+    push(@f,"${key}=\"$a{$key}\"");
+  }
+  return join(" ",@f);
+}
+
+# main logging function, using global dispatcher
+sub dlog {
+    my $level = shift;
+    my $msg   = shift;
+    my $time  = time();
+    my $str   = stringy(
+        {   'msg'      => $msg,
+            'severity' => $level,
+            timestamp  => $time,
+            datetime   => strftime( $timestamp_format, localtime($time) ),
+            hostname   => $HOSTNAME,
+            pid        => $$,
+        },
+        @_
+    );
+    $DISPATCHER->log(
+        level   => $level,
+        message => $str,
+    );
+    return $str;
+}
+
+# sort function, use the priority of a tag to compare,
+# otherwise use string compare (alphabetical)
+sub sort_tags {
+    my $p = tag_prio($a) <=> tag_prio($b);
+    if ( $p == 0 ) {
+        return $a cmp $b;
+    }
+    return $p;
+}
+
+sub tag_prio {
+  my %prios = (
+      'datetime'  => -10,
+      'hostname'  => -9,
+      'severity'  => -8,
+      'msg'       => -5,
+      'timestamp' => 50,
+  );
+  my $t = lc $_[0];
+  return $prios{$t} if defined $prios{$t};
+  return 0;
+}
+
+sub build_mysql_exec {
+  my $bin = shift;
+  my @mysql_options = ($config->mysql_bindir ? File::Spec->catfile($config->mysql_bindir,$bin) : $bin);
+  if ($config->mysql_defaults_file) {
+    push(@mysql_options, '--defaults-file='.$config->mysql_defaults_file);
+  }
+  if($bin eq 'mysqldump') {
+    if ($config->mysql_ignore_table and @{$config->mysql_ignore_table} > 0) {
+      foreach my $t (@{$config->mysql_ignore_table}) {
+        push(@mysql_options,"--ignore-table=${t}");
+      }
+    }
+    if ($config->mysql_single_transaction) {
+      push(@mysql_options, '--single-transaction');
+    }
+    if ($config->mysql_extra_option and scalar @{$config->mysql_extra_option} > 0) {
+        push(@mysql_options, @{$config->mysql_extra_option});
+    }
+}
+  my %mopts = (
+      '-u' => 'user',
+      '-h' => 'hostname',
+      '-p' => 'password',
+  );
+  while(my ($p,$c) = each(%mopts)) {
+      if ( $config->get('mysql_'.$c) ) {
+          push(@mysql_options, $p.$config->get('mysql_'.$c));
+      }
+  }
+  return @mysql_options;
+}
+
+sub build_mongodb_exec {
+    my @options
+        = ( $config->mysql_bindir
+        ? File::Spec->catfile( $config->mysql_bindir, 'mongodump' )
+        : 'mongodump' );
+    push @options, '--archive';
+    foreach my $p (qw( username hostname password port )) {
+        if ( $config->get('mongodb_'.$p) ) {
+            push(@options, '--'.$p.$config->get('mongodb_'.$p));
+        }
+    }
+    if ( $config->mongodb_ssl ) {
+        push( @options, '--ssl' );
+    }
+    return @options;
+}
+
+sub mysql_database_list {
+  my $mysql_com = join(' ',build_mysql_exec('mysql'));
+  my $mysql_handle;
+  my @dl;
+  if (open $mysql_handle, '-|', "${mysql_com} -e \"SHOW DATABASES;\"") {
+    my $c=0;
+    foreach (<$mysql_handle>) {
+      chomp $_;
+      push(@dl,$_) unless $c == 0;
+      $c++;
+    }
+  }
+  else {
+    dlog('critical','unable to launch mysql for listing databases',{return_code => POSIX::WEXITSTATUS($?)});
+  }
+  return @dl;
+}
+
+sub init_config {
+    $config = AppConfig->new(
+        { GLOBAL => { EXPAND => EXPAND_VAR | EXPAND_ENV, }, } );
+
+    $config->define(
+        'dry_run' => {
+            ALIAS    => 'dry-run',
+            ARGCOUNT => ARGCOUNT_NONE,
+            ARGS     => '!',
+        },
+        'log_level' => {
+            ALIAS    => "loglevel|level|log-level",
+            DEFAULT  => 'info',
+            ARGCOUNT => ARGCOUNT_ONE,
+            ARGS     => '=s',
+            VALIDATE =>
+                '^(debug|info|notice|warning|error|critical|alert|emergency)$'
+        },
+        'facility' => {
+            DEFAULT  => 'user',
+            ARGCOUNT => ARGCOUNT_ONE,
+            ARGS     => '=s',
+            VALIDATE =>
+                '^(auth|authpriv|cron|daemon|kern|local[0-7]|mail|news|syslog|user|uucp)$',
+        },
+        'checksum' => {
+            ARGS     => '!',
+            ARGCOUNT => ARGCOUNT_NONE,
+        },
+        'checksum_binary' => {
+            ARGS     => '=s',
+            ALIAS    => 'checksum-binary',
+            DEFAULT  => 'sha256sum',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mbuffer' => {
+            ARGS     => '!',
+            ARGCOUNT => ARGCOUNT_NONE,
+        },
+        'mbuffer_binary' => {
+            ARGS     => '=s',
+            ALIAS    => 'mbuffer-binary',
+            DEFAULT  => 'mbuffer',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mbuffer_opts' => {
+            ARGS     => '=s',
+            DEFAULT  => '-v 1',
+            ALIAS    => 'mbuffer-opts',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'rate_limit' => {
+            ARGS     => '=s',
+            ALIAS    => 'rate-limit',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mysql_skip_database' => {
+            DEFAULT =>
+                [ '#lost+found', 'performance_schema', 'information_schema' ],
+            ARGCOUNT => ARGCOUNT_LIST,
+            ARGS     => '=s@',
+        },
+        'postgresql_skip_database' => {
+            DEFAULT  => ['#lost+found'],
+            ARGCOUNT => ARGCOUNT_LIST,
+            ARGS     => '=s@',
+        },
+        'compression' => {
+            DEFAULT  => 'gzip',
+            ARGCOUNT => ARGCOUNT_ONE,
+            ARGS     => '=s',
+        },
+        'secondary_compression' => {
+            DEFAULT  => 'none',
+            ARGCOUNT => ARGCOUNT_ONE,
+            ARGS     => '=s',
+        },
+        'compressor_compress' => {
+            ARGS    => '=s%',
+            ALIAS   => 'compressor-compress',
+            DEFAULT => {
+                'gzip'     => 'gzip -c',
+                'bzip2'    => 'bzip2 -c',
+                'xz'       => 'xz --stdout',
+                'zstd'     => 'zstd --stdout',
+                'compress' => 'compress -c',
+                'none'     => 'cat',
+                'xdelta'   => 'xdelta3 -e -D',
+            },
+            ARGCOUNT => ARGCOUNT_HASH,
+        },
+        'compressor_uncompress|compressor-uncompress=s%' => {
+            DEFAULT => {
+                'gzip'     => 'gzip -d -c',
+                'bzcat'    => 'bzcat',
+                'xz'       => 'xzcat',
+                'zstd'     => 'zstd --uncompress --stdout',
+                'compress' => 'uncompress -c',
+                'none'     => 'cat',
+                'xdelta'   => 'xdelta3 -d -D',
+            },
+        },
+        'compressor_suffix|compressor-suffix=s%' => {
+            DEFAULT => {
+                'gzip' => 'gz',
+                'bzip2' => 'bz2',
+                'xz' => 'xz',
+                'zstd' => 'zst',
+                'compress' => 'Z',
+                # 'none' => 'cat', # leave undefined
+                'xdelta' => 'vcdiff',
+            },
+        },
+        'backup_location=s' => {
+            DEFAULT => "/var/${APP_NAME}/backups",
+            VALIDATE => '^\/.+',    # require an absolute path?
+        },
+        'old_backup_location' => {
+            ALIAS    => 'old-backup-location',
+            ARGS     => '=s@',
+            ARGCOUNT => ARGCOUNT_LIST,
+        },
+        'tmpdir' => {
+            ALIAS    => 'tmp_dir|tempdir|temp_dir',
+            ARGS     => '=s',
+            VALIDATE => '^\/.+',       # require an absolute path?
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'dump_config' => {
+            ALIAS    => 'dump-config',
+            ARGS     => '!',
+            ARGCOUNT => ARGCOUNT_NONE,
+        },
+        'log_location' => {
+            DEFAULT => $LOG_DIR,
+            VALIDATE => '^\/.+',    # require an absolute path?
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'h|help!',
+        'mysql_bindir' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+            VALIDATE => '^\/.+',        # require an absolute path?
+        },
+        'postgresql_bindir' => {
+            DEFAULT  => '/usr/bin',
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+            VALIDATE => '^\/.+',        # require an absolute path?
+        },
+        'postgresql_dump_database' => {
+            ARGS     => '=s@',
+            ARGCOUNT => ARGCOUNT_LIST,
+        },
+        'postgresql_extra_option' => {
+            DEFAULT  => ['--clean','--if-exists'],
+            ARGS     => '=s@',
+            ARGCOUNT => ARGCOUNT_LIST,
+        },
+        'postgresql_username' => {
+            DEFAULT  => 'postgres',
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'postgresql_host' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mysql!',
+        'postgresql!',
+        'mongodb!',
+        'localcow!',
+        'sys_logging' => {
+            DEFAULT  => 1,
+            ARGS     => '!',
+            ALIAS    => 'syslog',
+            ARGCOUNT => ARGCOUNT_NONE,
+        },
+        'terminal_logging' => {
+
+            # if stderr is a terminal, enable terminal_loging
+            DEFAULT  => -t STDERR ? 1 : 0,
+            ARGS     => '!',
+            ALIAS    => 't',
+            ARGCOUNT => ARGCOUNT_NONE,
+        },
+        'file_logging' => {
+            DEFAULT  => 1,
+            ARGS     => '!',
+            ARGCOUNT => ARGCOUNT_NONE,
+        },
+        'mysql_defaults_file' => {
+            ALIAS    => 'mysql_defaults-file|defaults-file',
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mysql_single_transaction' => {
+            DEFAULT  => 1,
+            ARGS     => '!',
+            ALIAS    => 'single-transaction|mysql_single-transaction',
+            ARGCOUNT => ARGCOUNT_NONE,
+        },
+        'mysql_ignore_table' => {
+            DEFAULT  => ['mysql.events'],
+            ARGS     => '=s@',
+            ALIAS    => 'mysql_ignore-table|ignore-table',
+            ARGCOUNT => ARGCOUNT_LIST,
+        },
+        'mysql_user' => {
+            ARGS     => '=s',
+            ALIAS    => 'mysql-user',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mysql_password' => {
+            ARGS     => '=s',
+            ALIAS    => 'mysql-password',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mysql_hostname' => {
+            ARGS     => '=s',
+            ALIAS    => 'mysql-hostname',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mysql_extra_option' => {
+            ARGS     => '=s@',
+            ARGCOUNT => ARGCOUNT_LIST,
+        },
+        'mysql_verify' => {
+            ARGS     => '!',
+            ALIAS    => 'mysql-verify',
+            ARGCOUNT => ARGCOUNT_NONE,
+        },
+        'daily' => {
+            ARGS     => '=i',
+            ARGCOUNT => ARGCOUNT_ONE,
+            VALIDATE => '^\d+$',
+        },
+        'weekly' => {
+            ARGS     => '=i',
+            ARGCOUNT => ARGCOUNT_ONE,
+            VALIDATE => '^\d+$',
+        },
+        'monthly' => {
+            ARGS     => '=i',
+            ARGCOUNT => ARGCOUNT_ONE,
+            VALIDATE => '^\d+$',
+        },
+        'week_start' => {
+            DEFAULT  => 'Sun',
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+            VALIDATE => '^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)$',
+        },
+        'month_start' => {
+            DEFAULT  => '1',
+            ARGS     => '=i',
+            ARGCOUNT => ARGCOUNT_ONE,
+            VALIDATE => '^[0-9]+$',
+        },
+        'maxage' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+            VALIDATE => '^[0-9]+[hdwmy]$',
+        },
+        'rsync_binary' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+            DEFAULT  => 'rsync',
+        },
+        'rsync_options' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+            DEFAULT  => '-a --inplace --no-whole-file',
+        },
+        'prerun' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'postrun' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mongodb_bindir' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+            VALIDATE => '^\/.+',        # require an absolute path?
+        },
+        'mongodb_username' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mongodb_password' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mongodb_port' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mongodb_hostname' => {
+            ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mongodb_ssl' => {
+            DEFAULT  => 1,
+            ARGS     => '!',
+            ARGCOUNT => ARGCOUNT_NONE,
+        },
+    );
+}
+
+sub main {
+  init_config();
+  parse_config();
+
+  # set up our dispatch destinations:
+  $DISPATCHER = create_dispatcher();
+
+  # major modes of operation follow:
+  if ( @STATUS_DELETE and scalar @STATUS_DELETE > 0 ) {
+      status_delete(@STATUS_DELETE);
+      exit;
+  }
+  if ( basename($PROGRAM_NAME) eq 'check_delta_dumper' or $STATUS_JSON ) {
+      status_json();
+      exit;
+  }
+  if ( $CHECKSUM_DUMP ) {
+      checksum_dump();
+      exit;
+  }
+  if ( $CHECKSUM_VERIFY_ALL ) {
+      checksum_verify_all();
+      exit;
+  }
+  if ( $CHECKSUM_VERIFY ) {
+      checksum_verify($CHECKSUM_VERIFY);
+      exit;
+  }
+
+  if ($RESTORE and -f $RESTORE) {
+      restore($RESTORE);
+      exit;
+  }
+
+  ## Starting up:
+  my $RUNTIME=time();
+  dlog('info','starting',{});
+
+  ## Dump the config if request, and exit:
+  if ($config->dump_config) {
+      print Dumper $config;
+    die "configuration dump requested and delivered, exiting";
+  }
+
+  sanity_check_config();
+
+  %dump_db = %{scan_existing()};
+
+  # obtain the global lock, or die trying
+  my $GLOBAL_LOCK = $config->dry_run ? 1 : lock_pid_file($APP_NAME);
+  unless ( $GLOBAL_LOCK ) {
+    my $emsg='unable to lock pid file: '.lock_file_compose($APP_NAME);
+    dlog('warning',$emsg,{});
+    die $emsg;
+  }
+
+  unless ( -d $config->backup_location ) {
+    dlog('critical', 'backup location does not exist', { backup_location => $config->backup_location });
+      die "output directory does not exist and WILL NOT be created: ".$config->backup_location;
+  }
+  # create sub-directories:
+  foreach my $p (@periods,'current') {
+    my $ddir = File::Spec->catfile($config->backup_location,$p);
+    unless ( $config->dry_run or -d $ddir or mkdir($ddir)) {
+      dlog('critical',
+           "output directory does not exist and cannot be created: ${ddir}",
+           { backup_location => $config->backup_location, ddir => $ddir });
+      die "output directory does not exist and cannot be created: ${ddir}";
+    }
+  }
+  if ( $config->prerun ) {
+      unless( system_runner('prerun', $config->prerun) ) {
+          unlock_pid_file($GLOBAL_LOCK);
+          dlog('error',
+               'exiting because prerun command failed',
+               {'total_run_time_seconds' => time()-$RUNTIME});
+          exit;
+      }
+  }
+
+ DBTYPE:
+  foreach my $dbtype (qw(mysql postgresql mongodb)) {
+      next unless $config->get($dbtype);
+  DB:
+      foreach my $db ( $dbtype eq 'mysql' ? mysql_database_list()
+                       : ( $dbtype eq 'postgresql' ? @{$config->postgresql_dump_database}
+                       : ( $dbtype eq 'mongodb' ? qw(all)
+                       : ())) ) {
+          if ( $dbtype eq 'mysql'
+               and $config->mysql_skip_database
+               and string_any($db,@{$config->mysql_skip_database}) ) {
+              dlog('notice',
+                   'skipping database',
+                   { databasetype => $dbtype, databasename => $db },
+               );
+              next DB;
+          }
+          eval {
+              perform_backup($dbtype,$db);
+          } or do {
+              my $e = $@;
+              dlog('error',
+                   'perform_backup exception',
+                   { databasetype => $dbtype, databasename => $db, exception => $e },
+               );
+              die $e if $e =~ m{caught \s+ SIG .+ exiting}xms;
+              next DB;
+          }
+      }
+  }
+
+  if ( $config->postrun ) {
+      system_runner('postrun', $config->postrun);
+  }
+
+  unlock_pid_file($GLOBAL_LOCK) unless $config->dry_run;
+  dlog('info',
+       'exiting',
+       {'total_run_time_seconds' => time()-$RUNTIME});
+}
+
+sub system_runner {
+    local %logparams = %logparams;
+    local %ENV = %ENV;
+    my $prefix = uc $APP_NAME;
+    $prefix =~ s/\-/_/g;
+
+    my $tag = shift;
+    $logparams{cmd} = shift;
+
+    my %pairs = ('BACKUP_LOCATION' => $config->backup_location,
+                 'LOG_LOCATION'    => $config->log_location,
+                 'TMPDIR'          => $config->tmpdir,
+                 'COMPRESSION'     => $config->compression,
+                 'COMPRESS'        => $config->compressor_compress->{$config->compression},
+                 'UNCOMPRESS'      => $config->compressor_uncompress->{$config->compression},
+                 'SUFFIX'          => $config->compressor_suffix->{$config->compression},
+             );
+    while ( my ($k,$v) = each %pairs) {
+        $ENV{join('_',$prefix, uc $k)} = $v;
+    }
+
+    unless ($config->dry_run) {
+        unless ( POSIX::WIFEXITED(system( $logparams{cmd} ) ) ) {
+            $logparams{errno} = "${ERRNO}";
+            dlog( 'error', $tag, \%logparams );
+            return;
+        }
+        $logparams{exit} = POSIX::WEXITSTATUS($CHILD_ERROR);
+        unless ( $logparams{exit} == 0 ) {
+            dlog( 'error', $tag, \%logparams );
+            return;
+        }
+    }
+    dlog( 'info', $tag, \%logparams );
+    return 1;
+}
+
+sub parse_config {
+  ## Configuration file parsing:
+  # parse --config command line options, removing it from @ARGV
+  GetOptions('config_file|config|config-file=s'         => \$CONFIG_FILE,
+             'status_json|status-json!'                 => \$STATUS_JSON,
+             'status_delete|status-delete=s@'           => \@STATUS_DELETE,
+             'checksum_dump|checksum-dump!'             => \$CHECKSUM_DUMP,
+             'checksum_verify|checksum-verify=s'        => \$CHECKSUM_VERIFY,
+             'checksum_verify_all|checksum-verify-all!' => \$CHECKSUM_VERIFY_ALL,
+             'restore=s'                                => \$RESTORE,
+            );
+  # read the config file
+  if ( -f $CONFIG_FILE ) {
+    $config->file($CONFIG_FILE);
+  } else {
+    warn "configuration file does not exist (${CONFIG_FILE}), proceeding from command line options only";
+  }
+  ## Command Line Parsing:
+  $config->getopt;
+  # if there is anything left, we must acquit:
+  if (@ARGV > 0) {
+    die "unparsed remaining command line options: @{ARGV}";
+  }
+
+  # print usage if request:
+  pod2usage(-1) if $config->help;
+}
+
+# pass an array of elemeents to join, and an option arrayref of
+# suffixes:
+sub backup_file_name_builder {
+    print Dumper \@_ if $DEBUG;
+    my $sufs = pop;
+    unless( ref $sufs eq 'ARRAY' ) {
+        push @_, $sufs;
+        undef $sufs;
+    }
+    # two array refs
+    return join('-',@_).($sufs ? '.'.join('.', @{$sufs}) : '');
+}
+
+# called perform backup, however it is mostly concerned with what
+# happens after the backup/dump is performed
+sub perform_backup {
+    my $databasetype = shift;
+    my $database = shift;
+    local %logparams = (
+        databasetype    => $databasetype_case{$databasetype},
+        compression     => $config->compression,
+        backup_location => $config->backup_location,
+        databasename    => $database,
+    );
+    # record the time for logging:
+    my $start_time = time();
+    # this is the directory we intend to write the dump to:
+    my $current_dir = File::Spec->catfile($config->backup_location,'current');
+    # suffix or not:
+    my @suffix = ( 'sql' ) ;
+    # this is a hash from the dump_db with keys, timestamp, path, full, and period
+    my $full_dump = find_most_recent_dump($databasetype,$database);
+
+    my $effective_compresssion_method
+        = $config->compression eq 'xdelta'
+        ? ($full_dump
+           ? 'xdelta' # ask and ye shall receive
+           : $config->secondary_compression)
+        : $config->compression;
+    if ( defined $config->compressor_suffix->{$effective_compresssion_method} ) {
+        push @suffix, $config->compressor_suffix->{$effective_compresssion_method};
+    }
+    $logparams{compression} = $effective_compresssion_method;
+
+    # the components of the file name to eventually create:
+    my @file_parts = ( $databasetype, $database );
+    my $file_name = backup_file_name_builder(@file_parts,\@suffix);
+    # the backup path is the full path to the database dump we are
+    # trying to create:
+    my $backup_path = File::Spec->catfile($current_dir,$file_name);
+    $logparams{backup_file} = $backup_path;
+    # create a useful list of alternate possible last backups:
+    my @alternates = path_alternates($backup_path);
+    # look for postgres-* in the current directory if we are backing up postgresql
+    if ( $databasetype eq 'postgresql' ) {
+        push(
+            @alternates,
+            path_alternates(
+                File::Spec->catfile(
+                    $current_dir,
+                    backup_file_name_builder(
+                        'postgres', $database, \@suffix
+                    )
+                )
+            )
+        );
+        push(
+            @alternates,
+            path_alternates(
+                File::Spec->catfile(
+                    $current_dir,
+                    backup_file_name_builder(
+                        'postgres', 'all-databases', \@suffix
+                    )
+                )
+            )
+        ) if $database eq 'all';
+    }
+
+    print Dumper \@alternates if $DEBUG;
+    # output_path is a full path to a temporary file to initially dump
+    # the database into:
+    my ($_of,$output_path);
+    if($config->dry_run) {
+        $output_path = File::Spec->catfile($config->tmpdir ? $config->tmpdir : $current_dir, "${file_name}.XXXXXXXX");
+    }
+    else {
+        ($_of,$output_path) = tempfile("${file_name}.XXXXXXXX",
+                                       DIR => $config->tmpdir ? $config->tmpdir : $current_dir) or die "failed to create temp file";
+        push @temp_files, $output_path;
+    }
+    # this timestamp should be used in the creation of the symlinks:
+    my $backup_timestamp_format = strftime $timestamp_format,  localtime($start_time);
+    $logparams{start_time} = $backup_timestamp_format;
+
+    my $file_name_timestamp
+        = ( $effective_compresssion_method eq 'xdelta' )
+        ? backup_file_name_builder(@file_parts,
+                                   join('_',
+                                        strftime($timestamp_format, localtime($$full_dump{timestamp})),
+                                        strftime($timestamp_format, localtime($start_time))
+                                    ),
+                                   \@suffix)
+        : backup_file_name_builder(@file_parts,
+                                   strftime($timestamp_format, localtime($start_time)),
+                                   \@suffix);
+
+    my ($return_value,$stage)
+        = generic_dump($databasetype,
+                       $database,
+                       $effective_compresssion_method,
+                       $output_path,
+                       $full_dump);
+
+    return $start_time if $config->dry_run;
+
+    if (defined $return_value and $return_value == 0) {
+      # this is the relative link path to the most recent backup in current:
+      my $relative_name = File::Spec->catfile('..','current',$file_name);
+
+      if($config->localcow and -f $backup_path) {
+        local %logparams = %logparams;
+        $logparams{temp_file} = join('.',$backup_path,'TEMP');
+        push @temp_files, $logparams{temp_file};
+
+        unless ( rsync($backup_path, $logparams{temp_file}) ) {
+            dlog('error', "unable to rsync from backup to location to temp file", \%logparams);
+            eval { unlink $logparams{temp_file}; }; # it's ok if this failed, maybe it was never created
+            update_status_db($databasetype, $database, { exit => 1,
+                                                         stage => 'rsync',
+                                                         start_time => $start_time, });
+            return;
+        }
+        link_symlinks( $databasetype, $database );
+        unlink $logparams{temp_file};
+      }
+      else {
+          # look in each directory for symlinks to the current file:
+          link_symlinks($databasetype,$database);
+      }
+
+      # remove the old output file, now that the hard links will
+      # preserve it:
+      foreach my $alt (@alternates) {
+          # delete all the current files for this backup, unless it's
+          # the one we intend to write in this pass and localcow is
+          # enabled:
+          next unless -f $alt;
+          next if ( $config->localcow and $backup_path eq $alt );
+          dlog('debug', "unlink alternate", \%logparams, {alternate_file => $alt});
+          unless(unlink $alt) {
+              dlog('error', "unlink alternate", \%logparams, {errno => $ERRNO, alternate_file => $alt});
+          }
+      }
+
+      # rename our temp file into the file we're trying to create:
+      my $rename_result=0;
+      unless($config->localcow) {
+        if(rename $output_path, $backup_path) {
+          $rename_result=1;
+        }
+        elsif( $! eq 'Invalid cross-device link' ) {
+          # this is ok to continue, we can just use rsync later
+          $rename_result=0;
+        }
+        else {
+          local %logparams = %logparams; # is this a copy???
+          $logparams{errno} = $!;
+          dlog('error', 'rename error', \%logparams);
+          unlink $output_path;
+          update_status_db($databasetype, $database, { exit => 1,
+                                                       stage => 'rename',
+                                                       start_time => $start_time,
+                                                       errno => $logparams{errno} });
+          return;
+        }
+      }
+      if($rename_result == 0 or $config->localcow) {
+          push @temp_files, $backup_path;
+          unless ( rsync($output_path,$backup_path) ) {
+              local %logparams = %logparams;
+              $logparams{backup_path} = $backup_path;
+              $logparams{output_path} = $output_path;
+              dlog('error', "unable to rsync from output path to backup location", \%logparams);
+              unlink $output_path if -f $output_path;
+              update_status_db(
+                  $databasetype,
+                  $database,
+                  {   exit       => 1,
+                      stage      => 'rsync',
+                      start_time => $start_time,
+                  }
+              );
+              return;
+          }
+          pop @temp_files;
+          unlink $output_path if -f $output_path;
+      }
+      # create a series of symlinks to this path...
+      # we do this to keep rsync from having to work so hard
+      # preserving the hard links:
+      symlink $relative_name,
+        File::Spec->catfile( $config->backup_location,
+                             'daily',
+                             $file_name_timestamp);
+      if ( strftime( "%a", localtime($start_time) ) eq $config->week_start ) {
+        symlink $relative_name,
+          File::Spec->catfile( $config->backup_location,
+                               'weekly',
+                               $file_name_timestamp);
+      }
+      if ( strftime( "%d", localtime($start_time) ) eq sprintf('%02d', $config->month_start) ) {
+        symlink $relative_name,
+          File::Spec->catfile( $config->backup_location,
+                               'monthly',
+                               $file_name_timestamp);
+      }
+      dlog('notice',
+           "backup status",
+           \%logparams);
+      $dump_db{$databasetype}{$database}{$start_time} = {
+          timestamp      => $start_time,
+          path           => File::Spec->catfile(
+              $config->backup_location, 'daily', $file_name_timestamp
+          ),
+          period         => 'daily',
+          full           => $effective_compresssion_method eq 'xdelta' ? 0 : 1,
+          full_timestamp => $effective_compresssion_method eq 'xdelta' ? $$full_dump{timestamp} : undef,
+      };
+      print Dumper \%dump_db if $DEBUG;
+      clean_old_dumps($databasetype, $database);
+      update_status_db($databasetype, $database, { exit => 0,
+                                                   start_time => $start_time, });
+      return $start_time;
+  }
+  else {
+      # presumed to have failed... I think we need to clean up manually
+      dlog('info','perform cleanup', \%logparams);
+      unlink $output_path if -f $output_path;
+      update_status_db($databasetype, $database, { exit => $return_value,
+                                                   stage => $stage,
+                                                   start_time => $start_time });
+  }
+  dlog('error','perform backup fall through failure', \%logparams);
+  return;
+}
+
+sub timestamp_sort {
+    return int($$a{timestamp}) <=> int($$b{timestamp});
+}
+sub find_most_recent_dump {
+    local %logparams = %logparams;
+    my $databasetype = shift;
+    my $databasename = shift;
+    unless(exists $dump_db{$databasetype}{$databasename}) {
+        return; # fail to find
+    }
+    my @vals = values(%{$dump_db{$databasetype}{$databasename}});
+    @vals = grep {$$_{full}} @vals;
+    return unless scalar @vals > 0;
+    @vals = sort timestamp_sort @vals;
+    my $dump_stamp = $vals[-1]{ timestamp }; # my favorite musical genre
+    my $maxage_seconds = $config->maxage ? parse_time_spec( $config->maxage ) : undef;
+    if ( $config->maxage
+         and $maxage_seconds
+         and $maxage_seconds > 0
+         and ( $dump_stamp + $maxage_seconds ) < time() ) {
+        dlog('info',
+             "backup age",
+             \%logparams,
+             {   maxage         => $config->maxage,
+                 maxage_seconds => $maxage_seconds,
+                 dump_timestamp => $dump_stamp,
+             }
+         );
+        return;    # fail to find because of age
+    }
+    return $vals[-1];
+}
+
+sub parse_time_spec {
+    my $spec = shift @_;
+    my ($t,$p);
+    unless( ($t,$p) = $spec =~ m{ \A (\d+) \s* ([hdwmy]) }xms ) {
+        dlog('error', "parse_time_spec failure", { spec => $spec });
+        return;
+    }
+    return $t * ( $p eq 'h' ? (3600)
+                  : $p eq 'd' ? ( 3600 * 24 )
+                  : $p eq 'w' ? ( 3600 * 24 * 7 )
+                  : $p eq 'm' ? ( 3600 * 24 * 30 )
+                  : ( 3600 * 24 * 365 )
+                  );
+    # the last option must be y
+}
+
+sub scan_existing {
+    my $dump_db = {};
+    local %logparams = %logparams;
+    # pattern for finding delta-dumper files in per-period directories:
+    my @locations = ($config->backup_location);
+    if ( $config->old_backup_location and ( scalar $config->old_backup_location > 0 ) ) {
+        push(@locations, @{$config->old_backup_location});
+    }
+    my $delta_pat = File::Spec->catfile('{'.join(',',@locations).'}',
+                                        '{'.join(',',@periods).'}',
+                                        '{'.join(',',@dbtypes,'postgres').'}-*sql*');
+    # pattern for finding files created by csg-db-backup.pl, not using
+    # per-period directories:
+    my $csg_db_backup_pat = File::Spec->catfile('{'.join(',',@locations).'}',
+                                                '*{'.join(',',@periods).'}*sql*');
+ FILE:
+    foreach my $file (glob($delta_pat),glob($csg_db_backup_pat)) {
+        if (my $dump = build_dump_hash_from_path($file) ) {
+            print STDERR Dumper $dump if $DEBUG;
+            $$dump_db{$$dump{databasetype}}{$$dump{databasename}}{$$dump{timestamp}} = $dump;
+        }
+        else {
+            dlog( 'error', "unable to parse information from file", \%logparams );
+            next FILE;
+        }
+    }
+    print Dumper $dump_db if $DEBUG;
+    return $dump_db;
+}
+
+# use daily/weekly/monthly values to remove files
+sub clean_old_dumps {
+    my $databasetype = shift;
+    my $databasename = shift;
+    local %logparams = %logparams;
+    # we shouldn't calculate this on each call, but here we are:
+    my %period_times;
+    unless ( exists $dump_db{$databasetype}
+             and exists $dump_db{$databasetype}{$databasename} ) {
+        return;
+    }
+ PERIOD:
+    foreach my $period (@periods) {
+
+        my $n = $config->get($period) ? $config->get($period) : 0;
+        $n = $n * 7 if $period eq 'weekly';
+        $n = $n * 31 if $period eq 'monthly';
+        $n *= 86400; # convert to seconds
+        $period_times{$period} = $n;
+    }
+ FILE:
+    foreach my $fhash (values(%{$dump_db{$databasetype}{$databasename}})) {
+        local %logparams = %logparams;
+        if ( -l $$fhash{path} and -f $$fhash{path} ) {
+            next FILE; # we do not act on non-broken symlinks... but maybe we should?
+        }
+        next unless ( -f $$fhash{path} or -l $$fhash{path} ) ; # do not act on non-regular files
+        next unless unused_dump($$fhash{timestamp}, values(%{$dump_db{$databasetype}{$databasename}}));
+        $logparams{'period'} = $$fhash{period};
+        $logparams{'file'} = $$fhash{path};
+        $logparams{file_timestamp} = $$fhash{timestamp};
+        $logparams{file_datetime} = localtime($$fhash{timestamp});
+        if( (time() - $$fhash{timestamp}) > $period_times{$$fhash{period}} ) {
+            if( unlink $$fhash{path} ) {
+                dlog('info','unlink dump', \%logparams );
+            }
+            else {
+                dlog('error','unlink dump', \%logparams );
+            }
+        }
+    }
+}
+
+sub unused_dump {
+    my $timestamp = shift;
+    foreach my $fh (@_) {
+        print Dumper $fh if $DEBUG;
+        if ( defined $$fh{full_timestamp} and $$fh{full_timestamp} eq $timestamp ) {
+            return;
+        }
+    }
+    return 1;
+}
+
+sub path_alternates {
+    my $p = shift;
+    state @suffixes;
+    @suffixes
+        = map { '.' . $_; } ( values(%{$config->compressor_suffix}) ) unless @suffixes;
+    # create a list of possible alternative backup paths (if compression changes)
+    my @alternates = map {
+        my ( $f, $d, $s ) = fileparse( $p, @suffixes );
+        File::Spec->catfile( $d, $f . $_ );
+    } @suffixes;
+    my ( $f, $d, $s ) = fileparse( $p, @suffixes );
+    push @alternates, File::Spec->catfile( $d, $f );
+    return @alternates;
+}
+
+
+sub pipeline {
+    # params are an array of hashrefs, with the following possible keys:
+    # input_file or input_handle: used for the start of pipe
+    #   if both are undefined then close stdin
+    # output_file or output_handle: used the end of the pipe
+    #   if both are undefined then close stdin
+    # pipes: arrayref of hashrefs of commands to execute while being
+    #   joined by anonymous pipes:
+    #   stage: named stage (required)
+    #   exec:  arrayref of command to execute (required)
+    #   user: change to this user first (optional)
+    my @pipelines = @_;
+
+    # pipes should look like this:
+    # { 'stage' => 'compress', 'exec' => ['bzip2','-c'] },
+    # etc.
+    my %child_map;               # map pids to stage
+    my %exit_map;                #map stages to exit codes
+    local %logparams = %logparams;
+    my @stages;
+    foreach my $pipeline (@pipelines) {
+        #print STDERR Dumper $pipeline;
+        my $input_handle;
+        my $output_handle;
+        unless ( exists $$pipeline{pipes} and scalar @{$$pipeline{pipes}} > 0 ){
+            die "you must specify valid pipes to pipeline";
+        }
+        my @pipes = @{$$pipeline{pipes}};
+        #print STDERR Dumper \@pipes;
+        if (defined $$pipeline{input_file}) {
+            unless(open($input_handle, '<', $$pipeline{input_file})) {
+                $logparams{file} = $$pipeline{input_file};
+                $logparams{errno} = $ERRNO;
+                dlog('error','unable to open input file',\%logparams);
+                die 'unable to open input file: '.$logparams{file};
+            }
+        }
+        elsif ( defined $$pipeline{input_handle} ) {
+            $input_handle = $$pipeline{input_handle};
+        }
+        if (defined $$pipeline{output_file}) {
+            unless(open($output_handle, '>', $$pipeline{output_file})) {
+                $logparams{file} = $$pipeline{output_file};
+                $logparams{errno} = $ERRNO;
+                dlog('error','unable to open output file',\%logparams);
+                die 'unable to open output file: '.$logparams{file};
+            }
+        }
+        elsif ( defined $$pipeline{output_handle} ) {
+            $output_handle = $$pipeline{output_handle};
+        }
+    POS:
+        for my $pos (0..$#pipes) {
+            my ($input,$output);
+
+            if ($pos == $#pipes) { # we are the last iteration!
+                # also possible the only iteration?
+                ($input,$output) = ( $input_handle, $output_handle );
+            }
+            else {
+                my ($pr);
+                unless(pipe($pr,$output)) {
+                    $logparams{errno} = $ERRNO;
+                    dlog('error','unable to call pipe()',\%logparams);
+                    die 'unable to call pipe()';
+                }
+                # last interations read bits
+                $input = $input_handle;
+                # save the read end of this
+                $input_handle = $pr;
+            }
+            $child_map{split_fork_exec($input,
+                                       $output,
+                                       ( defined $pipes[$pos]{'user'} ? $pipes[$pos]{'user'} : undef ),
+                                       @{$pipes[$pos]{'exec'}}),
+                   } = $pipes[$pos]{'stage'};
+        }
+    }
+
+    my $MAXWAIT=1;
+    do {
+        $MAXWAIT = $MAXWAIT * 2;
+        while ( (my $pid = waitpid(-1, WNOHANG)) > 0 ) {
+            dlog('debug',"waitpid in while loop returned child ${pid}",\%child_map);
+            if(exists $child_map{$pid}) {
+                $exit_map{$child_map{$pid}} = POSIX::WEXITSTATUS(${^CHILD_ERROR_NATIVE});
+                dlog( 'debug',
+                      "waitpid returned child ${pid} with exit: ".$exit_map{ $child_map{$pid} },
+                      \%exit_map );
+                delete $child_map{$pid};
+                $MAXWAIT=1;
+            }
+            else {
+                dlog( 'error', "waitpid returned child ${pid} not in map",
+                      \%exit_map );
+            }
+        }
+        if (scalar(keys(%child_map)) > 0) {
+            # set some signal handlers so that we can awak from pause
+            local $SIG{CHLD} = sub { };
+            local $SIG{ALRM} = sub { };
+            dlog('debug',
+                 'waiting on '.(scalar(keys(%child_map))).' sub-processes to exit, pausing',
+                 \%logparams);
+            my $pause_start=time();
+            alarm $MAXWAIT;
+            pause;
+            alarm 0;
+            dlog('debug',
+                 "paused for: ".sprintf('%.5f seconds',time()-$pause_start),
+                 \%logparams);
+        };
+    } until( scalar(keys(%child_map)) == 0 );
+    return(\%exit_map);
+}
+
+sub split_fork_exec {
+    my $pr = shift;
+    my $pw = shift;
+    my $user = shift;
+
+    my $pid = fork();
+    # I don't think logging is worth anything at this point:
+    die "cannot fork" unless defined $pid;
+
+    if ($pid == 0) {
+        # child needs to do some stuff:
+        if($user) {
+            POSIX::setuid(scalar getpwnam($user));
+            if ($! != 0) {
+                warn "cannot setuid as specified to ${user}";
+                exit(1);
+            }
+        }
+        if ($pr) {
+            unless(open(STDIN, '<&', $pr)) {
+                warn 'cannot duplicate filehandle into STDIN';
+                exit(1);
+            }
+        }
+        else {
+            close STDIN;
+        }
+        if ($pw) {
+            #close STDOUT;
+            # dup2(0,$pw) or die $!;
+            unless(open(STDOUT, '+<&', $pw)) {
+                warn 'cannot duplicate filehandle into STDOUT';
+                exit(1);
+            }
+        }
+        local %logparams = %logparams;
+        $logparams{exec} = join(' ',@_);
+
+        dlog('debug','split_fork_exec',\%logparams);
+        exec(@_);
+        warn 'unable to exec: '.join(' ',@_);
+        exit(1);
+    }
+    else {
+        close $pr if $pr;
+        close $pw if $pw;
+        return $pid;
+    }
+}
+
+sub find_compressor {
+    my $file = shift;
+    #warn ($file) if $DEBUG;
+    for my $method (keys(%{$config->compressor_suffix})) {
+        my $suffix = $config->compressor_suffix->{$method};
+        #warn $method, $suffix if $DEBUG;
+        if ( $file =~ m{ [.] $suffix $}xms ){
+            return $method;
+        }
+    }
+    return;
+}
+
+sub generic_dump {
+    local %logparams = %logparams;
+    # pass the type, database, and path? or also the primary dump exec command?
+    my $dbtype = shift;
+    my $database = shift;
+    my $compression = shift;
+    my $backup_path = shift;
+    my $full_dump = shift; # only used if xdelta is in effect
+
+    # if you specify a template, it must include the temporary
+    # directory if you don't want it to end up in your current
+    # directory:
+    my ($cfh,$cfp);
+    if($config->dry_run) {
+        $cfp = '/tmp/dd.XXXXXXXX';
+    }
+    else {
+        ($cfh,$cfp) = tempfile() or die "unable to create a temp file, that's bad";
+        push @temp_files, $cfp;
+    }
+    my @pipelines;
+    my @mb = ( $config->mbuffer_binary, '-q' );
+    if ($config->mbuffer_opts) {
+        push @mb, split(/\s+/,$config->mbuffer_opts);
+    }
+    my @pipes = ({'stage' => 'dump'});
+    if ($dbtype eq 'mysql') {
+        $pipes[0]{'exec'} = [(build_mysql_exec('mysqldump'),$database)];
+    }
+    elsif ($dbtype eq 'postgresql') {
+        my @pg_exec = build_postgresql_exec( $database eq 'all' ? 'pg_dumpall' : 'pg_dump' );
+        if ( $database ne 'all' ) {
+            push(@pg_exec,$database);
+        }
+        $pipes[0]{'exec'} = \@pg_exec;
+        $pipes[0]{'user'} = 'postgres';
+    }
+    elsif ($dbtype eq 'mongodb') {
+        $pipes[0]{'exec'} = [build_mongodb_exec()];
+    }
+    else {
+        my $dmsg = "unknown database type: ${dbtype}";
+        dlog('critical',$dmsg, \%logparams);
+        die $dmsg;
+    }
+
+    my %fifos = (
+        verify => join('.',$backup_path,'fifo'),
+        hash => join('.',$backup_path,'hash'),
+        delta => join('.',$backup_path,'delta'),
+    );
+    if ($config->rate_limit) {
+        push(@pipes, {
+            'stage' => 'pv',
+            'exec' => [ 'pv', '-L', $config->rate_limit ],
+        });
+    }
+    if ($config->mbuffer) {
+        push(@pipes,
+             {
+                 'stage' => 'mbuffer-dump',
+                 'exec' => \@mb,
+             },
+         );
+    }
+    if (($dbtype eq 'mysql' and $config->mysql_verify) or $config->checksum) {
+        my @tees = ('tee');
+        if ($dbtype eq 'mysql' and $config->mysql_verify) {
+            push @tees, $fifos{verify};
+        }
+        if ($config->checksum) {
+            push @tees, $fifos{hash};
+        }
+        push(@pipes,
+             {
+                 'stage' => 'tee',
+                 'exec'  => \@tees,
+             },
+         );
+        if ($config->mbuffer) {
+            push(@pipes,
+                 {
+                     'stage' => 'mbuffer-tee',
+                     'exec' => \@mb,
+                 },
+             );
+        }
+    }
+    # store this here and now but put it at the end of the pipelines
+    my $decomp_hash;
+    # here we need to decide if we should create a diff or not
+    if ($compression eq 'xdelta') {
+        $logparams{xdelta_source} = $$full_dump{path};
+        my @delta_exec = split(/\s+/,$config->compressor_compress->{$compression});
+        if (my $c = find_compressor($$full_dump{path}) ) {
+            warn "use this compressor/uncompressor: ${c}" if $DEBUG;
+            push @delta_exec, '-s', $fifos{delta};
+            unless($config->dry_run) {
+                mkfifo($fifos{delta}, 0600) or die "unable to create fifo for decompressing";
+                push @temp_files, $fifos{delta};
+            }
+            $decomp_hash = {
+                input_file => $$full_dump{path},
+                output_file => $fifos{delta},
+                pipes => [
+                    { stage => 'uncompress',
+                      exec => [split(/\s+/,$config->compressor_uncompress->{$c})],
+                  }],
+            };
+        }
+        else {
+            # here we allow xdelta direct access to the file
+            push @delta_exec, '-s', $$full_dump{path};
+        }
+        push(@pipes,{
+            'stage' => 'xdelta',
+            'exec'  => \@delta_exec,
+        });
+        if ($config->mbuffer) {
+            push(@pipes,
+                 {
+                     'stage' => 'mbuffer-xdelta',
+                     'exec' => \@mb,
+                 },
+             );
+        }
+        #delete $dump_db{$dbtype}->{$database}->{$$full_dump{timestamp}};
+    }
+    elsif ( $compression ne 'none' ) {
+        push(@pipes,{
+            'stage' => 'compress',
+            'exec' => [
+                split(/\s+/,$config->compressor_compress->{$compression})
+            ],
+        });
+        if ($config->mbuffer) {
+            push(@pipes,
+                 {
+                     'stage' => 'mbuffer-compress',
+                     'exec' => \@mb,
+                 },
+             );
+        }
+    }
+    push(@pipelines,
+         { output_file => $backup_path,
+           pipes       => \@pipes,
+       });
+    if ($config->mysql and $config->mysql_verify) {
+        unless($config->dry_run) {
+            mkfifo($fifos{verify}, 0600) or die "unable to create fifo for verifying mysql dump";
+            push @temp_files, $fifos{verify};
+        }
+        my @vpipes;
+        if ($config->mbuffer) {
+            push (@vpipes,
+                  {
+                      'stage' => 'mbuffer-verify',
+                      'exec'  => \@mb,
+                  },
+              );
+        }
+        push(@vpipes,
+             {
+                 'stage' => 'verify-tail', 'exec' => [ 'tail', '-n', '1' ] },
+             { 'stage' => 'verify',
+               'exec'  => [ 'grep', '-q', 'Dump completed' ]
+           },
+         );
+        push(@pipelines,{
+            input_file  => $fifos{verify},
+            output_file => '/dev/null',
+            pipes => \@vpipes,
+        });
+    }
+    if ($config->checksum) {
+        unless($config->dry_run) {
+            mkfifo($fifos{hash}, 0600) or die "unable to create fifo for hashing dump";
+            push @temp_files, $fifos{hash};
+        }
+        my @cpipes;
+        if ($config->mbuffer) {
+            push (@cpipes,
+                  {
+                      'stage' => 'mbuffer-checksum',
+                      'exec'  => \@mb,
+                  },
+              );
+        }
+        push(@cpipes,
+             { 'stage' => 'checksum', 'exec' => [ $config->checksum_binary ] },
+         );
+        push(@pipelines,{
+            input_file    => $fifos{hash},
+            output_handle => $cfh,
+            pipes         => \@cpipes,
+        });
+    }
+    if ($decomp_hash) {
+        push @pipelines, $decomp_hash;
+    }
+
+    my $start_time = time();
+
+    if($config->dry_run) {
+        dry_run_pipeline(@pipelines);
+        return(0,'dump');
+    }
+    my $exit_map = pipeline(@pipelines);
+
+    foreach my $f (values(%fifos)) {
+        unlink $f if -p $f;
+    }
+
+    $logparams{runtime} = time() - $start_time;
+    $logparams{exit} = 0;
+ PIPELINE:
+    foreach my $line (@pipelines) {
+    PIPE:
+        foreach my $p (@{$$line{pipes}}) {
+        STAGE:
+            my $stage = $$p{stage};
+            if (exists $$exit_map{$stage} and $$exit_map{$stage} != 0) {
+                $logparams{exit} = $$exit_map{$stage};
+                $logparams{failed_stage} = $stage;
+                last PIPELINE;
+            }
+        }
+    }
+    if ( $logparams{exit} == 0 and $config->checksum ) {
+        my $fh;
+        unless(open($fh,'<',$cfp)) {
+            $logparams{errno} = $ERRNO;
+            dlog('error', 'checksum file open failure', \%logparams);
+        }
+        my $line;
+    EOF:
+        while ( ! eof($fh) ) {
+            unless ( defined( $line = readline $fh ) ) {
+                $logparams{errno} = $ERRNO;
+                dlog('error', 'checksum file read error', \%logparams);
+            }
+            last EOF;
+        }
+        if($line and my ($hash) = $line =~ m{\A(.+?)\s+-}xms) {
+            $logparams{$config->checksum_binary} = $hash;
+            update_checksum_db($hash); # rely on logparams!
+        }
+        else {
+            dlog('error', 'checksum parse failure', \%logparams);
+        }
+        close $fh;
+    }
+    unlink $cfp if -f $cfp;
+    dlog( ($logparams{exit} == 0 ? 'info' : 'error'), 'dump status', \%logparams );
+    return ($logparams{exit}, $logparams{failed_stage});
+}
+
+sub dry_run_pipeline {
+    for my $line (@_) {
+        for my $p (0..(scalar @{$$line{pipes}}-1)) {
+            print ' | ' if $p != 0;
+            print join(' ',@{$$line{pipes}[$p]{exec}});
+            print ' < ' . $$line{input_file} if $p == 0 and $$line{input_file};
+            print ' > ' . $$line{output_file} if $p == (scalar @{$$line{pipes}}-1) and $$line{output_file};
+        }
+        print "\n";
+    }
+}
+
+sub build_postgresql_exec {
+    my $bin = shift;
+    my @com = ($config->postgresql_bindir ? File::Spec->catfile($config->postgresql_bindir,$bin) : $bin);
+
+    if( $config->postgresql_extra_option and scalar @{$config->postgresql_extra_option} > 0 ) {
+        push(@com, @{$config->postgresql_extra_option});
+    }
+
+    if ($config->postgresql_username) {
+        push(@com, '--username='.$config->postgresql_username);
+    }
+    if ($config->postgresql_host) {
+        push(@com, '--host='.$config->postgresql_host);
+    }
+    return @com;
+}
+
+sub update_checksum_db {
+    local %logparams = %logparams;
+    my $hash = shift;
+    print STDERR Dumper \%logparams if $DEBUG;
+    my $lock = lock_db($CHECKSUM_DB);
+    my %sums;
+    unless(tie %sums, 'AnyDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666) {
+        dlog('error', "unable to open database file ${CHECKSUM_DB}", {db_file => $CHECKSUM_DB});
+        return;
+    }
+    my $key = make_checksum_key($logparams{databasetype},$logparams{databasename},$logparams{start_time});
+    $sums{$key} = $hash;
+    untie %sums;
+    unlock_db($lock);
+}
+
+sub make_checksum_key {
+    my ($t, $d, $s) = @_;
+    return sprintf "%s*%s@%s", lc($t), $d, $s;
+}
+
+sub split_checksum_key {
+    if( my ($t,$d,$s) = $_[0] =~ m{(.+) [*] (.+) [@] (.+)}xms ) {
+        return($t,$d,$s,str2time($s));
+    }
+    return;
+}
+
+sub checksum_dump {
+    local %logparams = %logparams;
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
+    my %sums;
+    tie %sums, 'AnyDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
+    while(my ($k,$v)=each(%sums)) {
+        my ($t,$d,$s,$ss) = split_checksum_key($k);
+        print sprintf "%s\t%s\t%s: %s\n", $t, $d, $s, $v;
+    }
+    untie %sums;
+    unlock_db($lock);
+}
+
+sub checksum_verify_all {
+    local %logparams = %logparams;
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
+    my %_sums;
+    tie %_sums, 'AnyDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
+    my %sums = %_sums; # does this work?
+    untie %sums;
+    unlock_db($lock);
+
+    my $dumps = scan_existing();
+    # files get deleted so there is no reason to alert on this
+    # while(my ($k,$v)=each(%sums)) {
+    #     my ($t,$d,$s,$ss) = split_checksum_key($k) or die "unsplittable key ${k}";
+    #     unless ( exists $$dumps{$t}{$d}{str2time($s)} ) {
+    #         dlog('warning',"missing file",\%logparams,{databasetype => $t, databasename => $d, start_time => $s});
+    #     }
+    # }
+    while(my ($dbtype,$h) = each(%{$dumps})) {
+        while(my ($db,$th) = each(%{$h})) {
+            while(my ($ts,$dh) = each(%{$th})) {
+                #warn "${dbtype}\t${db}\t${ts}" if $DEBUG;
+                my $checksum_key = make_checksum_key($dbtype,
+                                                     $db,
+                                                     strftime($timestamp_format,
+                                                              localtime(int($ts))));
+                if( exists $sums{$checksum_key} ) {
+                    # warn sprintf "found dump in existing db: %s %s at %s with checksum %s stored in %s",
+                    #     $dbtype,
+                    #     $db,
+                    #     strftime($timestamp_format,localtime(int($ts))),
+                    #     $sums{$checksum_key},
+                    #     $$dh{path};
+                    $logparams{databasetype} = lc $dbtype;
+                    $logparams{databasename} = $db;
+                    $logparams{start_time} = strftime($timestamp_format,
+                                                      localtime(int($ts)));
+                    $logparams{checksum} = $sums{$checksum_key};
+                    checksum_verify_dump($dumps,$dh,$sums{$checksum_key});
+                }
+            }
+        }
+    }
+}
+
+sub find_dump_from_file {
+    local %logparams = %logparams;
+    my $path = shift;
+    my $dumps = scan_existing();
+ DBTYPE:
+    while(my ($dbtype,$h) = each(%{$dumps})) {
+        while(my ($db,$th) = each(%{$h})) {
+            while(my ($ts,$dh) = each(%{$th})) {
+                if ( $$dh{path} eq $path ) {
+                    return $dh;
+                }
+            }
+        }
+    }
+    return; # failed to find
+}
+
+sub checksum_verify {
+    local %logparams = %logparams;
+    my $path = shift;
+
+    my $dumps = scan_existing();
+    my $dump = build_dump_hash_from_path($path);
+    unless ($dump) {
+        dlog('error',"file not parseable as dump",\%logparams,{path => $path});
+        die "file not parseable as dump: ${path}";
+    }
+    if ($$dump{broken}) {
+        dlog('error', "checksum broken", \%logparams);
+        return;
+    }
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
+    my %_sums;
+    tie %_sums, 'AnyDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
+    my %sums = %_sums; # does this work?
+    untie %sums;
+    unlock_db($lock);
+
+    my $checksum_key = make_checksum_key(lc($$dump{databasetype}),
+                                         $$dump{databasename},
+                                         strftime($timestamp_format,
+                                                  localtime(int($$dump{timestamp}))));
+    $logparams{databasetype} = lc $$dump{databasetype};
+    $logparams{databasename} = $$dump{databasename};
+    $logparams{start_time} = strftime($timestamp_format,
+                                      localtime(int($$dump{timestamp})));
+    if( exists $sums{$checksum_key} ) {
+        $logparams{checksum} = $sums{$checksum_key};
+        return checksum_verify_dump($dumps,$dump,$sums{$checksum_key});
+    }
+    else {
+        dlog('warning',"checksum missing", \%logparams);
+    }
+    return;
+}
+
+sub restore {
+    local %logparams = %logparams;
+    my $path = shift;
+
+    my $dumps = scan_existing();
+    my $dump = build_dump_hash_from_path($path);
+    unless ($dump) {
+        dlog('error',"file not parseable as dump",\%logparams,{path => $path});
+        die "file not parseable as dump: ${path}";
+    }
+    if($$dump{broken}) {
+        dlog('error', "restore broken", \%logparams, {path => $path});
+        die "unable to restore broken link: ${path}";
+    }
+    my ($input_file,$pipes) = reconstruct_pipeline($dumps,$dump);
+    print STDERR Dumper $pipes if $DEBUG;
+    return pipeline({
+        input_file  => $input_file,
+        output_file => '/dev/stdout',
+        pipes       => $pipes,
+    });
+}
+
+sub reconstruct_pipeline {
+    local %logparams = %logparams;
+    my $dumps = shift; # all the dumps so xdelta can find parents
+    my $dump = shift;
+    -f $$dump{path} or die "file to be restored doesn't exist: $$dump{path}";
+    my @mb = ( $config->mbuffer_binary, '-q' );
+
+    my @pipes;
+    my $input_file;
+
+    if (my $compression = find_compressor($$dump{path})) {
+        print STDERR Dumper $config->compressor_uncompress->{$compression} if $DEBUG;
+        if ($compression eq 'xdelta') {
+            unless( exists $$dumps{$$dump{databasetype}}{$$dump{databasename}}{$$dump{full_timestamp}} ) {
+                warn "parent does not exist";
+                return;
+            }
+            my $parent = $$dumps{$$dump{databasetype}}{$$dump{databasename}}{$$dump{full_timestamp}};
+            $logparams{full_path} = $$parent{path};
+            print STDERR Dumper $parent if $DEBUG;
+            if ( my $secondary_compression = find_compressor($$parent{path}) ) {
+                print STDERR Dumper $config->compressor_uncompress->{$secondary_compression} if $DEBUG;
+                $input_file = $$parent{path};
+                push(@pipes,
+                     {
+                         'stage' => 'uncompress-parent',
+                         'exec'  => [split(/\s+/,$config->compressor_uncompress->{$secondary_compression})],
+                     },
+                 );
+                push @pipes, { 'stage' => 'mbuffer-parent', exec => [@mb] } if $config->mbuffer;
+                push(@pipes,
+                     {
+                         'stage' => 'uncompress',
+                         'exec'  => [split(/\s+/,$config->compressor_uncompress->{$compression}),
+                                     '-s',
+                                     '/dev/stdin',
+                                     $$dump{path}],
+                     }
+                 );
+            }
+            else { # uncompressed parent file
+                # input_file is undef
+                push(@pipes,{
+                    'stage' => 'uncompress',
+                    'exec'  => [split(/\s+/,$config->compressor_uncompress->{$compression}),
+                                '-s',
+                                $$parent{path},
+                                $$dump{path}],
+                });
+            }
+            push @pipes, { 'stage' => 'mbuffer-uncompress', exec => [@mb] } if $config->mbuffer;
+        }
+        else {
+            # normal compression
+            $input_file = $$dump{path};
+            push @pipes, { 'stage' => 'mbuffer-pre', exec => [@mb] } if $config->mbuffer;
+            push(@pipes,{
+                'stage' => 'uncompress',
+                'exec'  => [split(/\s+/,$config->compressor_uncompress->{$compression})],
+            });
+            push @pipes, { 'stage' => 'mbuffer-uncompress', exec => [@mb] } if $config->mbuffer;
+        }
+    }
+    else { #uncompressed
+        $input_file = $$dump{path};
+        push(@pipes,
+             {
+                 'stage' => 'uncompress',
+                 'exec' => $config->mbuffer ? \@mb : [split(/\s+/,$config->compressor_uncompress->{'none'})],
+             },
+         );
+    }
+    print Dumper \@pipes if $DEBUG;
+    return($input_file,[@pipes]);
+}
+
+sub checksum_verify_dump {
+    local %logparams = %logparams;
+    my $dumps = shift; # all the dumps so xdelta can find parents
+    my $dump = shift;
+    my $checksum = shift;
+    print STDERR Dumper $dump if $DEBUG;
+    -f $$dump{path} or die "file to be verified doesn't exist: $$dump{path}";
+    my ($th,$tf) = tempfile();
+    push @temp_files, $tf;
+    my ($input_file,$pipes) = reconstruct_pipeline($dumps,$dump);
+    push @{$pipes}, { 'stage' => 'checksum', 'exec' => [ $config->checksum_binary ] };
+    print Dumper $pipes if $DEBUG;
+    my $e = pipeline({
+        input_file  => $input_file,
+        output_file => $tf,
+        pipes => $pipes,
+    });
+
+    my $actual_checksum = checksum_from_file($tf);
+    close $th;unlink $tf;
+    if($actual_checksum and $checksum eq $actual_checksum) {
+        dlog('info',"checksum match",\%logparams,{path => $$dump{path}});
+        return $checksum;
+    }
+    dlog('error',"checksum mismatch",\%logparams,{path => $$dump{path}});
+    return;
+}
+
+sub checksum_from_file {
+    local %logparams = %logparams;
+    my $file = shift;
+    my $fh;
+    unless(open($fh,'<',$file)) {
+        $logparams{errno} = $ERRNO;
+        dlog('error', 'checksum file open failure', \%logparams);
+    }
+    my $line;
+ EOF:
+    while ( ! eof($fh) ) {
+        unless ( defined( $line = readline $fh ) ) {
+            $logparams{errno} = $ERRNO;
+            dlog('error', 'checksum file read error', \%logparams);
+            close $fh;
+            return;
+        }
+        last EOF;
+    }
+    if($line and my ($hash) = $line =~ m{\A(.+?)\s+-}xms) {
+        close $fh;
+        return $hash;
+    }
+    else {
+        dlog('error', 'checksum parse failure', \%logparams);
+    }
+    close $fh;
+    return;
+}
+
+sub sanity_check_config {
+  unless ($config->mysql or $config->postgresql or $config->mongodb) {
+    my $emsg='neither mysql nor postgresql not mongodb was specified, nothing to dump!';
+    dlog('error',$emsg,{});
+    die $emsg;
+  }
+}
+
+# turn symlinks in per-period directories into hardlinks to the actual
+# file, because the original will go away
+sub link_symlinks {
+    local %logparams = %logparams;
+    my $dbtype        = shift;
+    my $dbname        = shift;
+    return unless defined $dump_db{$dbtype}{$dbname};
+    foreach my $dump (values(%{$dump_db{$dbtype}{$dbname}})) {
+        next unless -l $$dump{path}; # skip the non-links
+        print Dumper $dump if $DEBUG;
+        my $target = readlink($$dump{path});
+        if (-f join('.',$target,'TEMP')) {
+            $target =  join('.',$target,'TEMP');
+        }
+        $logparams{dump_path}     = $$dump{path};
+        $logparams{target}        = $target;
+
+        # remove this link whether the target exists or not, if
+        # the target of a link is missing it's useless anyway:
+        my $oldwd = POSIX::getcwd();
+        chdir dirname($$dump{path}) or die "unable to chdir to ${$$dump{path}}";
+        if ( unlink($$dump{path}) ) {
+            dlog( 'debug', "unlink symlink", \%logparams );
+        }
+        else {
+            dlog( 'error', 'unlink symlink', \%logparams, { errno => $ERRNO } );
+        }
+        # create a hard link to a path that's about to disappear:
+        if ( link( $target, $$dump{path} ) ) {
+            dlog( 'debug', "link symlink", \%logparams );
+        }
+        else {
+            dlog(
+                'error', "link symlink",
+                \%logparams, { errno => $ERRNO }
+            );
+        }
+        chdir($oldwd) or die "unable to chdir to ${oldwd}";
+    }
+}
+
+sub rsync {
+    my ( $src, $dst ) = @_;
+    local %logparams = %logparams;
+    $logparams{src} = $src;
+    $logparams{dst} = $dst;
+    # because we use in place by default, we should consider the destination sus:
+    push @temp_files, $dst;
+    return system_runner(
+        'rsync copy',
+        sprintf( '%s %s %s %s',
+            $config->rsync_binary, $config->rsync_options, $src, $dst )
+    );
+    pop @temp_files;
+}
+
+# copied from the old version of List::Util:
+sub string_any {
+    my $s = shift;
+    foreach (@_) {
+        return 1 if $s eq $_;
+    }
+    return 0;
+}
+
+sub lock_db {
+    my $db_file = shift;
+    my $DB_LOCK = join('.',File::Spec->catfile($LOCK_DIR,basename($db_file)),'lock');
+    my $flags = shift;
+    $flags = LOCK_EX unless $flags;
+    my $db_lock_handle;
+    local %logparams = %logparams;
+    $logparams{db_lock} = $DB_LOCK;
+
+    unless ( open($db_lock_handle, '>', $DB_LOCK) ) {
+        dlog('error', "unable to open database file ${DB_LOCK}", \%logparams);
+        return;
+    }
+    unless ( flock( $db_lock_handle, LOCK_EX ) ) {
+        dlog('error', "unable to lock database file ${DB_LOCK}", \%logparams);
+        return;
+    }
+    return $db_lock_handle;
+}
+
+sub unlock_db {
+    flock($_[0],LOCK_UN);
+    close($_[0]);
+}
+
+# update the state database
+sub update_status_db {
+    my ($dbtype, $dbname, $value) = @_;
+
+    if ( defined $$value{start_time} ) {
+        $$value{start_time} = strftime($timestamp_format, localtime($$value{start_time}));
+    }
+    my $db_lock_handle = lock_db($DB_FILE);
+
+    my %status;
+    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_CREAT|O_RDWR, 0666) {
+        dlog('error', "unable to open database file ${DB_FILE}", {db_file => $DB_FILE});
+        return;
+    }
+    my $json = JSON->new();
+    $status{join('*', $dbtype, $dbname)} = $json->encode($value);
+
+    untie %status;
+    unlock_db($db_lock_handle);
+}
+
+sub status_delete {
+    my $h = lock_db($DB_FILE,LOCK_EX);
+
+    my %status;
+    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDWR, 0666) {
+        dlog('error', "unable to open database file ${DB_FILE} for deletions", {db_file => $DB_FILE});
+        return;
+    }
+
+    for my $k (@_) {
+        delete $status{$k} if exists $status{$k};
+    }
+
+    untie %status;
+    unlock_db($h);
+}
+
+sub status_json {
+    my $h = lock_db($DB_FILE,LOCK_SH);
+
+    my %status;
+    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
+        dlog('error', "unable to open database file ${DB_FILE} for reading", {db_file => $DB_FILE});
+        return;
+    }
+    my %data;
+    my $json = JSON->new->pretty();
+ STATUS:
+    while(my ($k,$v)=each(%status)) {
+        eval {
+            $data{$k} = $json->decode($v);
+        }
+        or do {
+            eval {
+                $data{$k} = thaw($v);
+            }
+            or do {
+                dlog('error', "unable to decode string in status database for ${k}", {db_file => $DB_FILE});
+                next STATUS;
+            };
+        };
+    }
+    untie %status;
+    unlock_db($h);
+    print $json->encode(\%data);
+}
+
+sub build_dump_hash_from_path {
+    local %logparams = %logparams;
+    my $file = shift;
+    $logparams{'file'} = $file;
+
+    state $d_q = '('.join('|',@dbtypes).')';
+    state $d_p = '('.join('|',@periods).')';
+
+    my $full_timestamp;
+    my $timestamp;
+    my ($type, $db, $period, $o, $i, $year, $month, $day, $hour, $minute);
+
+    my %dump = ( path => $file, full => $file =~ m{[.] vcdiff}xms ? 0 : 1, broken => 0 );
+    if ( -l $file and not -f $file ) {
+        # broken link
+        dlog( 'error', "broken link", \%logparams );
+        $dump{broken} = 1;
+    }
+    if ( ($db, $period, $year,$month,$day,$hour,$minute) = basename($file) =~ m{\A(.+) [.-] ${d_p} [.-] sql [.-] (\d\d\d\d) [.-] (\d\d) [.-] (\d\d) [.-] (\d\d) [.-] (\d\d)}xms ) {
+        $timestamp = mktime(0,
+                            $minute,
+                            $hour,
+                            $day,
+                            ($month - 1),
+                            ($year - 1900)
+                        );
+        $dump{timestamp} = $timestamp;
+        $dump{period} = $period;
+        $dump{full} = 1;
+        $dump{databasename} = $db;
+        $dump{databasetype} = 'mysql';
+    }
+    elsif ( ($db, $year, $month, $day, $hour, $minute )
+            = basename($file)
+            =~ m{\Apostgres [.-] (.+) [.-] sql [.-] (\d\d\d\d) [.-] (\d\d) [.-] (\d\d) [.-] (\d\d) [.-] (\d\d)}xms ) {
+        $db = 'all' if $db eq 'all-databases';
+        $type = 'postgresql';
+        $timestamp = mktime(0,
+                            $minute,
+                            $hour,
+                            $day,
+                            ($month - 1),
+                            ($year - 1900)
+                        );
+        $dump{timestamp} = $timestamp;
+        $dump{period} = basename(dirname($file));
+        $dump{databasetype} = lc $type;
+        $dump{databasename} = $db;
+    }
+    elsif ( ($db, $year, $month, $day ) = basename($file)
+            =~ m{\Apostgres [.-] (.+) [.-] sql [.-] (\d\d\d\d) [.-] (\d\d) [.-] (\d\d)}xms ) {
+        $db = 'all' if $db eq 'all-databases';
+        $type = 'postgresql';
+        $timestamp = mktime(0,
+                            0,
+                            0,
+                            $day,
+                            ($month - 1),
+                            ($year - 1900)
+                        );
+        $dump{timestamp} = $timestamp;
+        $dump{period} = basename(dirname($file));
+        $dump{databasetype} = lc $type;
+        $dump{databasename} = $db;
+    }
+    elsif ( ($type, $db, $o, $i) = basename($file) =~ m{\A${d_q} [-] (.+?) [-] ($iso8601_regex) [-_] ($iso8601_regex) [.] sql [.] vcdiff}xms ) {
+        # files like: daily/mysql-enchantress-2022-10-04T08:50:45.sql.zst
+        # should probably inlude more variations of the timestamp?
+        $full_timestamp = str2time($o) or die "unable to parse ${o} using str2time";
+        $timestamp = str2time($i) or die "unable to parse ${i} using str2time";
+        $dump{timestamp} = $timestamp;
+        $dump{full_timestamp} = $full_timestamp;
+        $dump{period} = basename(dirname($file));
+        $dump{databasetype} = lc $type;
+        $dump{databasename} = $db;
+    }
+    elsif ( ($type, $db, $i) = basename($file) =~ m{\A${d_q} [.-] (.+?) [.-] ($iso8601_regex) [.] sql}xms ) {
+        # files like: daily/mysql-enchantress-2022-10-04T08:50:45.sql.zst
+        # should probably inlude more variations of the timestamp?
+        $timestamp = str2time($i) or die "unable to parse ${i} using str2time";
+        $dump{timestamp} = $timestamp;
+        $dump{period} = basename(dirname($file));
+        $dump{databasetype} = lc $type;
+        $dump{databasename} = $db;
+    }
+    else {
+        dlog( 'error', "unable to parse time stamp from file", \%logparams );
+        return;
+    }
+    return \%dump;
+}
+
+
+=head1 NAME
+
+delta-dumper - wrapper for mysqldump, pg_dump, and xdelta
+
+=head1 SYNOPSIS
+
+B<delta-dumper> {B<-h|--help>} {B<--mysql|--no-mysql>} {B<--postgresql|--no-postgresql>}
+
+=head1 DESCRIPTION
+
+Parse a config file and command line, invoke various dump programs.
+
+=head1 OPTIONS
+
+=head2 MAJOR MODES
+
+delta-dumper's default mode is to dump databases and write them to the
+configured location.  What follows are a list of options that perform
+the documented action, then exit without performing backups.
+
+=over 4
+
+=item B<--restore>=I<dump>
+
+dd will effectively cat the output of the dump specified to the
+terminal, uncompressing or un-xdelta encoding the file as needed.
+
+=item B<--status-json>
+
+Print the status database as JSON.  Used by the check_mk plugin.
+Provides a moderately human-readable status of the last database
+dumps.
+
+=item B<--status-delete>=I<key>
+
+Use the same keys as printed in the --status-json output.
+
+Example:
+delta-dumper --status-delete 'mysql*mysql'
+
+=back
+
+=head2 CONFIGURATION OPTIONS
+
+=over 4
+
+=item B<--mysql|--no-mysql> C<mysql>
+
+Default: false
+
+Perform (or don't) mysql database dumps.
+
+=item B<--postgresql|--no-postgresql> C<postgresql>
+
+Default: false
+
+Perform (or don't) postgresql database dumps.
+
+=item B<--mongodb|--no-mongodb> C<mongodb>
+
+Default: false
+
+Perform (or don't) mongodb database dumps.
+
+=item B<--dry_run|--dry-run|--no-dry_run|--no-dry-run> C<dry_run>
+
+When set, print but don't execute commands or system calls that would
+take any real action.
+
+=item B<--backup_location>=I<dir> C<backup_location>
+
+This is where the final backups will end up, in sub-directories named
+weekly, current, etc.
+
+=item B<--old_backup_location>=I<dir> C<old_backup_location>
+
+Look here for backups created previously by delta-dumper,
+csg-db-backup.pl, and pgsql scripts in these directories so
+delta-dumper can clean up from old programs or old dumps stored in old
+locations.
+
+=item B<--tmpdir>=I<dir> C<tmpdir>
+
+Directory used to write the output of dump commands.  The default is
+to use the 'current' directory in the C<backup_location> directory.
+
+=item B<--localcow|--no-localcow> C<localcow> (Boolean)
+
+When localcow is set, we take great pains to ensure that we update the
+dump files with the latest changes using rsync, in hopes of minimizing
+the change in the file and therefore the amount of data used to
+capture those changes in a snapshot.
+
+localcow should be set when the backup_location is on a filesystem
+with cow or cow-like characteristics, ie: btrfs, zfs, netapp, etc.
+
+=item B<--postrun>=I<command> C<postrun>
+
+Run this command after all (not each) dumps.
+
+=item B<--prerun>=I<command> C<prerun>
+
+Run this command before all (not each) dumps.
+
+=item B<--mbuffer|--no-mbuffer> C<mbuffer>
+
+Insert mbuffer at various stages in the pipeline.
+
+=item B<--mbuffer_binary|--mbuffer-binary>=I<binary> C<mbuffer_binary>
+
+Execute this when mbuffer is enabled.
+
+Default: mbuffer
+
+=item B<--mbuffer_opts|--mbuffer-opts>=I<opts> C<mbuffer_opts>
+
+Append these options to mbuffer invocations. (ie: -m 1G)
+
+=item B<--rate_limit|--rate-limit>=I<rate> C<mbuffer_opts>
+
+Pass this option to pv -L, that is set the rate limitting factor for
+pv for testing.
+
+=item B<--checksum|--no-checksum> C<checksum>
+
+Write the checksum of the dump to the log file and database.
+
+=item B<--checksum_binary|--checksum-binary> C<checksum_binary>
+
+Pipe dump data to this binary.  Assumed to creat output like, md5sum,
+sha256sum, etc.
+
+Default: sha256sum
+
+
+=back
+
+=head2 LOGGING OPTIONS
+
+=over 4
+
+=item B<--file_logging|--no-file_logging> C<file_logging>
+
+Default: true
+
+Enable or disable logging to configured log location.  The minimum
+severity (level) logged to the file is controlled by the log_level
+parameter.
+
+=item B<--sys_logging|--syslog|--no-sys_logging|--no-syslog> C<sys_logging>
+
+Default: true
+
+Enable or disable logging syslog.  The minimum severity (level) logged
+to the file is controlled by the log_level parameter and the facility
+used is configured with the paramater of the same name.
+
+=item B<--terminal_logging|-t|--no-terminal_logging|--no-t> C<terminal_logging>
+
+Default: true if stdout is a terminal, false otherwise.
+
+Enable or disable logging to stderr.  The minimum severity (level)
+logged to stderr is controlled by the log_level parameter.
+
+=item B<--log_location> C<log_location> (String)
+
+Set the directory for logging.  Default for root is /var/log and the
+default for non-root users is ~/var/log.
+
+=item B<--log_level|--level|--log-level|--loglevel> C<log_level> (String)
+
+Default: info
+
+Log messags of this severity and above will be written to the various
+logging outputs, if enabled.  These correspond to the long names of
+the syslog severities:
+
+C<^(debug|info|notice|warning|error|critical|alert|emergency)$>
+
+=item B<--facility> C<facility> (String)
+
+Default: user
+
+Use this facility when logging to syslog which must match:
+
+C<^(auth|authpriv|cron|daemon|kern|local[0-7]|mail|news|syslog|user|uucp)$>
+
+=back
+
+=head2 COMPRESSION OPTIONS
+
+=over 4
+
+=item B<--compression> C<compresion> (String)
+
+Default: gzip
+
+Use pre-configured compression commands, gzip, bzip2, xz, and zstd.
+
+Also, C<none> is accepted along with C<custom> which requires setting
+the compress, uncompress, and suffix configuration items.
+
+=item C<compressor_compress>
+=item C<compressor_uncompress>
+=item C<compressor_suffix>
+
+[compressor]
+compress gzip = gzip -c --rsyncable
+uncompress gzip = gzcat
+extension gzip = gz
+
+=back
+
+=head2 MYSQL OPTIONS
+
+=over 4
+
+=item B<--mysql_bindir>=I<dir> C<mysql_bindir>
+
+If specified, use this directory to create the path to the mysql and
+mysqldump executables.  Otherwise, assume they are in the path.
+
+=item B<--mysql_defaults_file|--mysql_defaults-file|--defaults-file>=I<file>
+
+When invoking mysql and mysqldump, call them with --defaults-file and
+the value of this parameter.
+
+=item B<--mysql_single_transaction|--no-mysql_single_transaction|--single-transaction|--no-single-transaction> (Boolean)
+
+Default: true
+
+Pass --single-transaction to mysqldump, or not.
+
+=item B<--mysql_ignore_table>=I<table>
+
+Default: mysql.events
+
+Can be specified multiple times, each of which will be passed to the
+--ignore-table option of mysqldump.
+
+=item B<--mysql_user>=I<user>
+
+Passed to -u on mysql and mysqldump commands.
+
+=item B<--mysql_password>=I<password>
+
+Passed to -p on mysql and mysqldump commands.
+
+=item B<--mysql_hostname>=I<hostname>
+
+Passed to -h on mysql and mysqldump commands.
+
+=item B<--mysql_extra_option>=I<option> C<mysql_extra_option>
+
+Can be specified multiple times, options passed to mysqldump, if set.
+
+=item B<--mysql_verify|--no-mysql_verify> C<mysql_verify>
+
+Checks for a final line containing the string "Dump Completed"
+
+This is a flawed way to verify the database, but in general if
+mysqldump doens't output this line you can assume something has gone
+wrong.  However, the presence of this line in the output does not
+guarantee that the dump was successful, only that it was "completed."
+
+=back
+
+=head2 POSTGRESQL OPTIONS
+
+=over 4
+
+=item B<--postgresql_bindir>=I<dir> C<postgresql_bindir>
+
+If specified, use this directory to create the path to the postgresql
+dump executables.  Otherwise, assume they are in the path.
+
+=item B<--postgresql_dump_database>=I<db> C<postgresql_dump_database>
+
+List of databases to dump, can be specified multiple timees on the
+command line and in the config file.
+
+=item B<--postgresql_dump_all> C<postgresql_dump_all>
+
+Default: true
+
+If true, dump all.  If false assume that some list of databases was
+specified with the postgresql_dump_database directive.
+
+=item B<--postgresql_extra_option>=I<option> C<postgresql_extra_option>
+
+Default: --clean --if-exists
+
+Can be specified multiple times, options passed to dump or dump all.
+
+=item B<--postgresql_username>=I<username> C<postgresql_username>
+
+Default: postgres
+
+Passed to the --username= option of the dump programs.
+
+=item B<--postgresql_host>=I<hostname> C<postgresql_host>
+
+Passed to the --host= option of the dump programs.  If unset, don't
+pass --host at all.
+
+=back
+
+=head2 MONGODB OPTIONS
+
+=over 4
+
+=item B<--mongodb_bindir>=I<dir> C<mongodb_bindir>
+
+If specified, use this directory to create the path to the mongodb
+dump executable.  Otherwise, assume they are in the path.
+
+=item B<--mongodb_username>=I<username> C<mongodb_username>
+
+Passed to the --username= option of the dump programs.
+
+=item B<--mongodb_password>=I<password>
+
+Passed to --password on mongodump command.
+
+=item B<--mongodb_port>=I<port>
+
+Passed to --port on mongodump command.
+
+=item B<--mongodb_hostname>=I<hostname>
+
+Passed to --hostname on mongodump command.
+
+=item B<--mongodb_ssl|--no-mongodb_ssl>
+
+Default: true
+
+If true, pass --ssl to mongodump.
+
+=back
+
+=head2 RETENTION OPTIONS
+
+=over 4
+
+=item B<--daily>=I<count>
+
+Keep <count> days worth of daily dumps.
+
+=item B<--weekly>=I<count>
+
+Keep <count> weeks worth of weekly dumps.
+
+=item B<--monthly>=I<count>
+
+Keep <count> months worth of monthly dumps.
+
+=item B<--week_start>=I<day>
+
+Default: Sun
+
+When the day matches this string (Sun, Mon, etc.) then a weekly backup
+will be created in addition to the daily.
+
+=item B<--month_start>=I<day>
+
+Default: 1
+
+When the month day matches this a monthly backup will be created in
+addition to the daily.
+
+=item B<--maxage>=I<agespec> C<maxage>
+
+When using xdelta compression, if the newest full backup is older than
+this age specification create a new full backup instead of using
+xdelta.
+
+The specification is an integer followed by one of h, d, w, m, or y.
+
+These correspond with hours, days, weeks, months, and years. Months
+are considered to be 30 days long and years are 365 days.
+
+So, if you want a new full dump every 2 weeks:
+
+maxage = 2w
+
+=back
+
+=head2 RSYNC OPTIONS
+
+Rsync is used when rename won't work, which is when the temporary
+database file is across a filesystem boundary.
+
+=over 4
+
+=item B<--rsync_binary>
+
+DEFAULT: rsync
+
+Explicit path to rsync binary, if needed.
+
+=item B<--rsync_options>=I<option>
+
+DEFAULT: -a --inplace --no-whole-file
+
+Options to pass to rsync when copying files.
+
+=back
+
+=head1 RETURN VALUE
+
+=head1 ERRORS
+
+=head1 DIAGNOSTICS
+
+=head1 EXAMPLES
+
+=head1 ENVIRONMENT
+
+=head1 FILES
+
+=head2 F</etc/delta-dumper/config>
+
+Default config file when run as root.
+
+=head2 F<$HOME/.config/delta-dumper/config>
+
+Default config file when run as non-root.
+
+=head1 CAVEATS
+
+=head1 BUGS
+
+=head1 RESTRICTIONS
+
+=head1 NOTES
+
+=head1 AUTHOR
+
+Aran Cox <arancox@gmail.com>
+
+=head1 HISTORY
+
+=head1 SEE ALSO
+
+=over 4
+
+gzip(1), bzip2(1), zstd(1), xdelta(1)
+
+=back

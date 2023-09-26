@@ -1,0 +1,115 @@
+# example configuration file
+
+# see the output of delta-dumper --help for documentation of both the
+# command line options and config file parameters
+
+# backup these databases if set to on, there are multiple ways to
+# specify this in AppConfig configuration files:
+# mysql
+# nomysql
+# mysql = On
+# postgresql = On
+# mongodb = On
+# mysql = Off
+
+# used by Log::Dispatch to decide what gets logged:
+# log_level = notice
+# used by the syslog output of Log::Dispatch:
+# facility = deamon
+# enable or disable various logging outputs:
+# sys_logging = On
+# terminal_logging = On
+# file_fogging = On
+
+# checksum = On
+# checksum_binary = sha256sum
+# mbuffer_binary = mbuffer
+# mbuffer_opts = -v 1
+# rate_limit = 10M
+
+# lists are specified by specifiying the item multiple times:
+# mysql_skip_database = '#lost+found'
+# mysql_skip_database = 'performance_schema'
+# mysql_skip_database = 'information_schema'
+# postgresql_skip_database = '#lost+found'
+# compression = gzip
+# secondary_compression = none
+
+# AppConfig has hashes that are specified like so, but you can also
+# but config options in sections that allow you to skip the first part
+# of the specification:
+
+
+# backup_location = /var/somewhere
+# old_backup_location= /look/here/to
+# tmpdir = /var/tmp
+
+# log_location = /var/log/delta-dumper
+
+# [compresssor]
+# compress gzip = gzip -c
+# uncompress gzip = gzip -d -c
+# suffix gzip = gz
+
+# the above is the same as:
+# compressor_compress gzip = gzip -c
+# compressor_uncompress gzip = gzip -d -c
+# compressor_suffix gzip = gz
+
+# enable rsyncing the file on top of the existing backup:
+# localcow = On
+# see the docs
+
+# keep this many dumps:
+# daily = 5
+# weekly = 5
+# monthly = 2
+
+# maybe for Aussies:
+# week_start = Mon
+# be real:
+# month_start = 1
+
+# do a full dump when using xdelta after maxage days, hours, weeks, etc.
+# maxage = 2w
+
+# run after all dumps are complete
+# postrun = zfs snapshot something
+# run this before running any dumps, don't run anything if it exits
+# non-zero:
+# prerun = prepare-to-dump-script
+
+# [mysql]
+# bindir = /opt/mysql-alternate/bin
+# defaults_file = /etc/other/my.cnf
+# single_transaction = On
+# ignore_table = some_table
+# ignore_table = other_table
+# user = dump_user
+# password = dump_password
+# hostname = example.com
+# # extra options are specified on their own line:
+# extra_option = --flarb
+# extra_option = --floot
+# verify = on
+
+# [postgresql]
+# bindir = /opt/postg-alternate/bin
+# dump_database = all
+# # extra options were implmented as an array not a string:
+# extra_option = --clean
+# extra_option = --if-exists
+# username = postgres
+# host = otherhost
+
+# [rsync]
+# binary = rsync
+# options = '-a --inplace --no-whole-file'
+
+# [mongodb]
+# mongodb_bindir = /opt/mongodb/bin
+# username = flarb
+# password = flurb
+# port = 4444
+# hostname = example.com
+# ssl = On

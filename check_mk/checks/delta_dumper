@@ -1,0 +1,103 @@
+#!/usr/bin/python
+# -*- encoding: utf-8; py-indent-offset: 4 -*-
+
+# import sys
+import json
+import datetime
+import dateutil.parser
+import dateutil.tz
+
+factory_settings["delta_dumper_default_levels"] = {
+    "age": (86400, 172800)  # 1d/2d
+}
+
+
+def delta_dumper_make_datetime(val):
+    # this makes checking basestring work under python3:
+    try:
+        basestring
+    except NameError:
+        basestring = str
+
+    if isinstance(val, int) or isinstance(val, float):
+        # could raise ValueError (OverflowError in newer python) or OSError
+        return(datetime.datetime.utcfromtimestamp(val).replace(tzinfo=dateutil.tz.UTC))
+
+    if isinstance(val, basestring):
+        # use isoparse:
+        dt = dateutil.parser.isoparse(val)
+        # if the time zone isn't set, use the local one?
+        if not dt.tzinfo:
+            dt = dt.replace(tzinfo=dateutil.tz.gettz())
+        return(dt)
+
+    raise ValueError('date time is none of float, int, or string')
+
+
+def inventory_delta_dumper(info):
+    inventory = {}
+    big_string = ''
+    for line in info:
+        big_string += " ".join(line)
+    r_status = json.loads(big_string)
+
+    for src in r_status.keys():
+        elems = src.split('*')
+        if len(elems) != 2:
+            continue
+        inventory[('%s %s' % (elems[0],elems[1]), "delta_dumper_default_levels")] = 1
+    return inventory.keys()
+
+
+def check_delta_dumper(item, params, info):
+    elems = item.split()
+    key = '%s*%s' % (elems[0], elems[1])
+
+    big_string = ''
+    for line in info:
+        big_string += " ".join(line)
+
+    r_status = json.loads(big_string)
+    # sys.stderr.write("%s %d\n" % (key,len(info)))
+    warn, crit = params['age']
+    delt_warn = datetime.timedelta(seconds=warn)
+    delt_crit = datetime.timedelta(seconds=crit)
+
+    if key not in r_status.keys():
+        yield 3, 'delta-dumper status entry not found in plugin output'
+        return
+
+    for k in ('start_time', 'exit'):
+        if k not in r_status[key]:
+            yield 3, "missing elements in status database"
+            return
+
+    return_code = 0
+    try:
+        dt = delta_dumper_make_datetime(r_status[key]['start_time'])
+    except:
+        yield 3, 'unable to parse start_time key (%s) into a date' % (str(r_status[key]['start_time']))
+        return
+
+    dt_now = datetime.datetime.utcnow().replace(tzinfo=dateutil.tz.UTC)
+    msg = 'successful dump found completed at %s' % (dt.astimezone(dateutil.tz.gettz()))
+    if int(r_status[key]['exit']) != 0:
+        return_code = 2
+        msg = 'exited with error in %s stage %d: at %s' % (r_status[key]['stage'], int(r_status[key]['exit']), dt.astimezone(dateutil.tz.gettz()))
+    elif dt_now > (delt_crit + dt):
+        return_code = 2
+        msg = 'dump is older than %.1f days, last backup at %s' % (crit/86400, dt.astimezone(dateutil.tz.gettz()))
+    elif dt_now > (delt_warn + dt):
+        return_code = 1
+        msg = 'dump is older than %.1f days, last backup at %s' % (warn/86400, dt.astimezone(dateutil.tz.gettz()))
+    yield return_code, msg
+
+
+check_info['delta_dumper'] = {
+    "check_function"          : check_delta_dumper,
+    "inventory_function"      : inventory_delta_dumper,
+    "default_levels_variable" : "delta_dumper_default_levels",
+    "service_description"     : "Backup %s",
+    "has_perfdata"            : False,
+    'group'                   : 'backup_delta_dumper',
+}
