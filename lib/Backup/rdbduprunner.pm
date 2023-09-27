@@ -95,6 +95,8 @@ $LOG_DIR
 %children
 &merge_config_definition
 &find_configs
+%databasetype_case
+&stringy
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -139,6 +141,27 @@ Readonly our $EXIT_CODE => {
     },
     'duplicity' => { 0 => 'Success' },
 };
+
+# translate lowercase database types to funky case
+Readonly my %databasetype_case => (
+    'mysql'      => 'MySQL',
+    'postgresql' => 'PostgreSQL',
+    'mongodb'    => 'MongoDB',
+);
+
+Readonly my %tag_priorities => (
+    datetime          => -10,
+    hostname          => -9,
+    severity          => -8,
+    msg               => -5,
+    timestamp         => 50,
+    host              => 2, # transformed by stringy
+    tag               => 1, # transformed by stringy
+    backupdestination => 10,
+    dest              => 10,
+    gtag              => 10,
+    btype             => 10,
+);
 
 # supported config file extensions
 Readonly our @extensions => qw( conf yaml json rc );
@@ -889,18 +912,29 @@ sub dlog {
   return $str;
 }
 
+# string turns hash refs into a string of key value pairs, it does not recurse
 sub stringy {
   # each element passed to stringy should be a HASH REF
   my %a; # strings
+  my %specials  = (
+      tag => 1,
+      host => 1,
+  );
   foreach my $h (@_) {
     next unless ref $h eq 'HASH';
-    foreach my $key (keys(%$h)) {
-      next if ref ${$h}{$key}; # must not be a reference
-      my $val=${$h}{$key};
+    while( my ($key,$val) = each(%$h) ) {
+      next if ref $val; # must not be a reference
       $val =~ s/\n/NL/g; # remove newlines
       $val =~ s/"/\\"/g; # replace " with \"
-      if($key eq 'tag' or $key eq 'host') {
-        $a{"rdbduprunner_${key}"}=$val;
+      if ($key =~ /^pass/) {
+        $val = 'XXXXXXXX';
+      } elsif( $key eq 'databasetype' and defined $databasetype_case{$val}) {
+        $val = $databasetype_case{$val};
+      } elsif( $key eq 'runtime' or $key eq 'total_run_time_seconds' ){
+          $val = sprintf("%.5f", $val);
+      }
+      if($specials{$key}) {
+        $a{"${APP_NAME}_${key}"}=$val;
       } else {
         $a{$key}=$val;
       }
@@ -908,30 +942,25 @@ sub stringy {
   }
   my @f;
   foreach my $key (sort {&sort_tags} (keys(%a))) {
-    push(@f,"$key=\"$a{$key}\"");
+    push(@f,"${key}=\"$a{$key}\"");
   }
   return join(" ",@f);
 }
 
+# sort function, use the priority of a tag to compare,
+# otherwise use string compare (alphabetical)
 sub sort_tags {
-  return tag_prio($a) <=> tag_prio($b);
+    my $p = tag_prio($a) <=> tag_prio($b);
+    if ( $p == 0 ) {
+        return $a cmp $b;
+    }
+    return $p;
 }
 
+# look up the priority in the table, return 0 otherwise
 sub tag_prio {
-  my %prios=(
-             datetime  => -10,
-             severity  => -9,
-             msg       => -5,
-             timestamp => 50,
-             host      => 2,
-             tag       => 1,
-             backupdestination => 10,
-             dest      => 10,
-             gtag      => 10,
-             btype     => 10,
-            );
   my $t=lc $_[0];
-  return $prios{$t} if defined $prios{$t};
+  return $tag_priorities{$t} if defined $tag_priorities{$t};
   return 0;
 }
 
