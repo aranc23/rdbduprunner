@@ -7,6 +7,10 @@ use Fatal qw( :void open close link unlink symlink rename fork );
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(handler signal_handler normal-signals);
 
+use Backup::rdbduprunner qw($APP_NAME &stringy %databasetype_case);
+# use this string when refering to ourself:
+$APP_NAME = 'delta-dumper';
+
 # might be assumed to be installed on any perl system by default?
 use Data::Dumper;
 use Readonly;
@@ -37,19 +41,10 @@ use AppConfig qw(:expand :argcount);
 use Getopt::Long qw(:config pass_through) ; # use this to pull out the config file, then let AppConfig handle the rest
 
 ##### GLOBALS ##### # the horrror:
-# use this string when refering to ourself:
-Readonly my $APP_NAME => 'delta-dumper';
 
 # tease the user out of the environment, or just call getpwuid:
 my $USER
     = $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar( getpwuid($<) );
-
-# translate lowercase database types to funky case
-Readonly my %databasetype_case => (
-    'mysql'      => 'MySQL',
-    'postgresql' => 'PostgreSQL',
-    'mongodb'    => 'MongoDB',
-);
 
 # list of readonly periods:
 Readonly my @periods => qw( daily weekly monthly );
@@ -238,41 +233,6 @@ sub create_dispatcher {
   return $disp;
 }
 
-# string turns hash refs into a string of key value pairs, it does not recurse
-sub stringy {
-  # each element passed to stringy should be a HASH REF
-  my %a; # strings
-  my %specials  = (
-      tag => 1,
-      host => 1,
-  );
-  foreach my $h (@_) {
-    next unless ref $h eq 'HASH';
-    while( my ($key,$val) = each(%$h) ) {
-      next if ref ${$h}{$key}; # must not be a reference
-      $val =~ s/\n/NL/g; # remove newlines
-      $val =~ s/"/\\"/g; # replace " with \"
-      if ($key =~ /^pass/) {
-        $val = 'XXXXXXXX';
-      } elsif( $key eq 'databasetype' and defined $databasetype_case{$val}) {
-        $val = $databasetype_case{$val};
-      } elsif( $key eq 'runtime' or $key eq 'total_run_time_seconds' ){
-          $val = sprintf("%.5f", $val);
-      }
-      if($specials{$key}) {
-        $a{"${APP_NAME}_${key}"}=$val;
-      } else {
-        $a{$key}=$val;
-      }
-    }
-  }
-  my @f;
-  foreach my $key (sort {&sort_tags} (keys(%a))) {
-    push(@f,"${key}=\"$a{$key}\"");
-  }
-  return join(" ",@f);
-}
-
 # main logging function, using global dispatcher
 sub dlog {
     my $level = shift;
@@ -293,29 +253,6 @@ sub dlog {
         message => $str,
     );
     return $str;
-}
-
-# sort function, use the priority of a tag to compare,
-# otherwise use string compare (alphabetical)
-sub sort_tags {
-    my $p = tag_prio($a) <=> tag_prio($b);
-    if ( $p == 0 ) {
-        return $a cmp $b;
-    }
-    return $p;
-}
-
-sub tag_prio {
-  my %prios = (
-      'datetime'  => -10,
-      'hostname'  => -9,
-      'severity'  => -8,
-      'msg'       => -5,
-      'timestamp' => 50,
-  );
-  my $t = lc $_[0];
-  return $prios{$t} if defined $prios{$t};
-  return 0;
 }
 
 sub build_mysql_exec {
@@ -381,6 +318,24 @@ sub mysql_database_list {
   }
   else {
     dlog('critical','unable to launch mysql for listing databases',{return_code => POSIX::WEXITSTATUS($?)});
+  }
+  return @dl;
+}
+
+sub pgsql_database_list {
+  my $psql_com = join(' ',build_postgresql_exec('psql'));
+  my $psql_handle;
+  my @dl;
+  if (open $psql_handle, '-|', "${psql_com} -e \"SELECT datname from pg_database;\"") {
+    my $c=0;
+    foreach (<$psql_handle>) {
+      chomp $_;
+      push(@dl,$_) unless $c == 0;
+      $c++;
+    }
+  }
+  else {
+    dlog('critical','unable to launch psql for listing databases',{return_code => POSIX::WEXITSTATUS($?)});
   }
   return @dl;
 }
