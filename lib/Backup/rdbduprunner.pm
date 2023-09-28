@@ -105,7 +105,7 @@ our @EXPORT = qw(
 	
 );
 
-our $VERSION = '1.7.16';
+our $VERSION = '1.8.0';
 
 # constant name of the application
 our $APP_NAME = 'rdbduprunner';
@@ -143,13 +143,13 @@ Readonly our $EXIT_CODE => {
 };
 
 # translate lowercase database types to funky case
-Readonly my %databasetype_case => (
+Readonly our %databasetype_case => (
     'mysql'      => 'MySQL',
     'postgresql' => 'PostgreSQL',
     'mongodb'    => 'MongoDB',
 );
 
-Readonly my %tag_priorities => (
+Readonly our %tag_priorities => (
     datetime          => -10,
     hostname          => -9,
     severity          => -8,
