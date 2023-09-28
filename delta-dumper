@@ -2196,7 +2196,6 @@ sub build_dump_hash_from_path {
     elsif ( ($db, $year, $month, $day, $hour, $minute )
             = basename($file)
             =~ m{\Apostgres [.-] (.+) [.-] sql [.-] (\d\d\d\d) [.-] (\d\d) [.-] (\d\d) [.-] (\d\d) [.-] (\d\d)}xms ) {
-        $db = 'all' if $db eq 'all-databases';
         $type = 'postgresql';
         $timestamp = mktime(0,
                             $minute,
@@ -2212,7 +2211,6 @@ sub build_dump_hash_from_path {
     }
     elsif ( ($db, $year, $month, $day ) = basename($file)
             =~ m{\Apostgres [.-] (.+) [.-] sql [.-] (\d\d\d\d) [.-] (\d\d) [.-] (\d\d)}xms ) {
-        $db = 'all' if $db eq 'all-databases';
         $type = 'postgresql';
         $timestamp = mktime(0,
                             0,
