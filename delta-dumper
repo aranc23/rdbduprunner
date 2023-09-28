@@ -323,21 +323,24 @@ sub mysql_database_list {
 }
 
 sub pgsql_database_list {
-  my $psql_com = join(' ',build_postgresql_exec('psql'));
-  my $psql_handle;
-  my @dl;
-  if (open $psql_handle, '-|', "${psql_com} -e \"SELECT datname from pg_database;\"") {
-    my $c=0;
-    foreach (<$psql_handle>) {
-      chomp $_;
-      push(@dl,$_) unless $c == 0;
-      $c++;
+    my $psql_com = join(' ',build_postgresql_exec('psql'));
+    if ($config->postgresql_username) {
+        $psql_com = 'sudo -i -u ' . $config->postgresql_username . ' ' . $psql_com;
     }
-  }
-  else {
-    dlog('critical','unable to launch psql for listing databases',{return_code => POSIX::WEXITSTATUS($?)});
-  }
-  return @dl;
+    my @dl;
+    my $psql_handle;
+    if (open $psql_handle, '-|', "${psql_com} -q -t -c \"SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;\"") {
+        foreach (<$psql_handle>) {
+            chomp $_;
+            if(/\s+(.+)$/) {
+                push(@dl,$1);
+            }
+        }
+    }
+    else {
+        dlog('critical','unable to launch psql for listing databases',{return_code => POSIX::WEXITSTATUS($?)});
+    }
+    return @dl;
 }
 
 sub init_config {
@@ -490,10 +493,6 @@ sub init_config {
             ARGS     => '=s',
             ARGCOUNT => ARGCOUNT_ONE,
             VALIDATE => '^\/.+',        # require an absolute path?
-        },
-        'postgresql_dump_database' => {
-            ARGS     => '=s@',
-            ARGCOUNT => ARGCOUNT_LIST,
         },
         'postgresql_extra_option' => {
             DEFAULT  => ['--clean','--if-exists'],
@@ -737,12 +736,21 @@ sub main {
       next unless $config->get($dbtype);
   DB:
       foreach my $db ( $dbtype eq 'mysql' ? mysql_database_list()
-                       : ( $dbtype eq 'postgresql' ? @{$config->postgresql_dump_database}
+                       : ( $dbtype eq 'postgresql' ? pgsql_database_list()
                        : ( $dbtype eq 'mongodb' ? qw(all)
                        : ())) ) {
           if ( $dbtype eq 'mysql'
                and $config->mysql_skip_database
                and string_any($db,@{$config->mysql_skip_database}) ) {
+              dlog('notice',
+                   'skipping database',
+                   { databasetype => $dbtype, databasename => $db },
+               );
+              next DB;
+          }
+          elsif ( $dbtype eq 'postgresql'
+               and $config->postgresql_skip_database
+               and string_any($db,@{$config->postgresql_skip_database}) ) {
               dlog('notice',
                    'skipping database',
                    { databasetype => $dbtype, databasename => $db },
@@ -904,17 +912,6 @@ sub perform_backup {
                 )
             )
         );
-        push(
-            @alternates,
-            path_alternates(
-                File::Spec->catfile(
-                    $current_dir,
-                    backup_file_name_builder(
-                        'postgres', 'all-databases', \@suffix
-                    )
-                )
-            )
-        ) if $database eq 'all';
     }
 
     print Dumper \@alternates if $DEBUG;
@@ -1443,11 +1440,7 @@ sub generic_dump {
         $pipes[0]{'exec'} = [(build_mysql_exec('mysqldump'),$database)];
     }
     elsif ($dbtype eq 'postgresql') {
-        my @pg_exec = build_postgresql_exec( $database eq 'all' ? 'pg_dumpall' : 'pg_dump' );
-        if ( $database ne 'all' ) {
-            push(@pg_exec,$database);
-        }
-        $pipes[0]{'exec'} = \@pg_exec;
+        $pipes[0]{'exec'} = [(build_postgresql_exec('pg_dump'),$database)];
         $pipes[0]{'user'} = 'postgres';
     }
     elsif ($dbtype eq 'mongodb') {
@@ -1687,10 +1680,14 @@ sub build_postgresql_exec {
     my $bin = shift;
     my @com = ($config->postgresql_bindir ? File::Spec->catfile($config->postgresql_bindir,$bin) : $bin);
 
-    if( $config->postgresql_extra_option and scalar @{$config->postgresql_extra_option} > 0 ) {
-        push(@com, @{$config->postgresql_extra_option});
+    if($bin eq 'psql') {
+        # no special options here
     }
-
+    else {
+        if ( $config->postgresql_extra_option and scalar @{$config->postgresql_extra_option} > 0 ) {
+            push(@com, @{$config->postgresql_extra_option});
+        }
+    }
     if ($config->postgresql_username) {
         push(@com, '--username='.$config->postgresql_username);
     }
@@ -2522,6 +2519,11 @@ mysqldump doens't output this line you can assume something has gone
 wrong.  However, the presence of this line in the output does not
 guarantee that the dump was successful, only that it was "completed."
 
+=item B<--mysql_skip_database>=I<db> C<mysql_skip_database>
+
+List of databases to dump, can be specified multiple timees on the
+command line and in the config file.
+
 =back
 
 =head2 POSTGRESQL OPTIONS
@@ -2533,17 +2535,10 @@ guarantee that the dump was successful, only that it was "completed."
 If specified, use this directory to create the path to the postgresql
 dump executables.  Otherwise, assume they are in the path.
 
-=item B<--postgresql_dump_database>=I<db> C<postgresql_dump_database>
+=item B<--postgresql_skip_database>=I<db> C<postgresql_skip_database>
 
 List of databases to dump, can be specified multiple timees on the
 command line and in the config file.
-
-=item B<--postgresql_dump_all> C<postgresql_dump_all>
-
-Default: true
-
-If true, dump all.  If false assume that some list of databases was
-specified with the postgresql_dump_database directive.
 
 =item B<--postgresql_extra_option>=I<option> C<postgresql_extra_option>
 
