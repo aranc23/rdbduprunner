@@ -437,7 +437,7 @@ sub init_config {
         'compressor_uncompress|compressor-uncompress=s%' => {
             DEFAULT => {
                 'gzip'     => 'gzip -d -c',
-                'bzcat'    => 'bzcat',
+                'bzip2'    => 'bzcat',
                 'xz'       => 'xzcat',
                 'zstd'     => 'zstd --uncompress --stdout',
                 'compress' => 'uncompress -c',
