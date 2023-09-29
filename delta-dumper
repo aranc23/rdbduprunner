@@ -324,12 +324,9 @@ sub mysql_database_list {
 
 sub pgsql_database_list {
     my $psql_com = join(' ',build_postgresql_exec('psql'));
-    if ($config->postgresql_username) {
-        $psql_com = 'sudo -i -u ' . $config->postgresql_username . ' ' . $psql_com;
-    }
     my @dl;
     my $psql_handle;
-    if (open $psql_handle, '-|', "${psql_com} -q -t -c \"SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;\"") {
+    if (open $psql_handle, '-|', "su -c \"${psql_com} -q -t -c \\\"SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;\\\"\" " . $config->postgresql_username) {
         foreach (<$psql_handle>) {
             chomp $_;
             if(/\s+(.+)$/) {
