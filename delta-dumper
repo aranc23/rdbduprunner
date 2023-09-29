@@ -1554,7 +1554,7 @@ sub generic_dump {
          { output_file => $backup_path,
            pipes       => \@pipes,
        });
-    if ($config->mysql and $config->mysql_verify) {
+    if ($dbtype eq 'mysql' and $config->mysql_verify) {
         unless($config->dry_run) {
             mkfifo($fifos{verify}, 0600) or die "unable to create fifo for verifying mysql dump";
             push @temp_files, $fifos{verify};
