@@ -413,7 +413,7 @@ sub init_config {
             ARGS     => '=s',
         },
         'secondary_compression' => {
-            DEFAULT  => 'none',
+            DEFAULT  => 'gzip',
             ARGCOUNT => ARGCOUNT_ONE,
             ARGS     => '=s',
         },
