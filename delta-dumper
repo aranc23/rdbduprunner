@@ -649,6 +649,7 @@ sub init_config {
 }
 
 sub main {
+    chdir('/') or die 'unable to chdir to /';
   init_config();
   parse_config();
 
