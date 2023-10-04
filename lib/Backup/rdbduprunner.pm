@@ -25,10 +25,7 @@ use Getopt::Long qw(GetOptionsFromArray);
 use Fcntl qw(:DEFAULT :flock); # import LOCK_* constants
 use Storable qw( freeze thaw dclone );
 use Scalar::Util qw/reftype looks_like_number/;
-BEGIN {
-    @AnyDBM_File::ISA = qw(GDBM_File SDBM_File);
-}
-use AnyDBM_File;
+use GDBM_File;
 eval { use Time::HiRes qw( time ); };
 use Fatal qw( :void open close link unlink symlink rename fork );
 # added from CPAN or system packages
@@ -1380,7 +1377,7 @@ sub update_status_db {
     my $db_lock_handle = lock_db();
 
     my %status;
-    unless(tie %status, 'AnyDBM_File', $db_file, O_CREAT|O_RDWR, 0666) {
+    unless(tie %status, 'GDBM_File', $db_file, O_CREAT|O_RDWR, 0666) {
         error("unable to open database file ${db_file}");
         return;
     }
@@ -1409,7 +1406,7 @@ sub status_delete {
     my $h = lock_db(LOCK_EX);
 
     my %status;
-    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDWR, 0666) {
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDWR, 0666) {
         error("unable to open database file ${DB_FILE} for deletions");
         return;
     }
@@ -1426,7 +1423,7 @@ sub status_json {
     my $h = lock_db(LOCK_SH);
 
     my %status;
-    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, 0666) {
         error("unable to open database file ${DB_FILE} for reading");
         return;
     }
@@ -1444,7 +1441,7 @@ sub status_print {
     my $h = lock_db(LOCK_SH);
 
     my %status;
-    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, 0666) {
         error("unable to open database file ${DB_FILE} for reading");
         return;
     }
@@ -1468,7 +1465,7 @@ sub status_log {
     my $h = lock_db(LOCK_SH);
 
     my %status;
-    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, 0666) {
         error("unable to open database file ${DB_FILE} for reading");
         return;
     }
@@ -1490,7 +1487,7 @@ sub status_prom {
     my $h = lock_db(LOCK_SH);
 
     my %status;
-    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, 0666) {
         error("unable to open database file ${DB_FILE} for reading");
         return;
     }

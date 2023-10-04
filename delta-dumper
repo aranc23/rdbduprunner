@@ -25,11 +25,8 @@ eval { use Time::HiRes qw( time ); };
 use File::Spec;
 use File::Path qw( make_path );
 use Date::Parse;
-BEGIN {
-    @AnyDBM_File::ISA = qw(GDBM_File SDBM_File);
-}
 use JSON;
-use AnyDBM_File;
+use GDBM_File;
 use Storable qw( freeze thaw );
 
 # added from CPAN or system packages
@@ -1701,7 +1698,7 @@ sub update_checksum_db {
     print STDERR Dumper \%logparams if $DEBUG;
     my $lock = lock_db($CHECKSUM_DB);
     my %sums;
-    unless(tie %sums, 'AnyDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666) {
+    unless(tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666) {
         dlog('error', "unable to open database file ${CHECKSUM_DB}", {db_file => $CHECKSUM_DB});
         return;
     }
@@ -1727,7 +1724,7 @@ sub checksum_dump {
     local %logparams = %logparams;
     my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
     my %sums;
-    tie %sums, 'AnyDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
+    tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
     while(my ($k,$v)=each(%sums)) {
         my ($t,$d,$s,$ss) = split_checksum_key($k);
         print sprintf "%s\t%s\t%s: %s\n", $t, $d, $s, $v;
@@ -1740,7 +1737,7 @@ sub checksum_verify_all {
     local %logparams = %logparams;
     my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
     my %_sums;
-    tie %_sums, 'AnyDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
+    tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
     my %sums = %_sums; # does this work?
     untie %sums;
     unlock_db($lock);
@@ -1813,7 +1810,7 @@ sub checksum_verify {
     }
     my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
     my %_sums;
-    tie %_sums, 'AnyDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
+    tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
     my %sums = %_sums; # does this work?
     untie %sums;
     unlock_db($lock);
@@ -2101,7 +2098,7 @@ sub update_status_db {
     my $db_lock_handle = lock_db($DB_FILE);
 
     my %status;
-    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_CREAT|O_RDWR, 0666) {
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_CREAT|O_RDWR, 0666) {
         dlog('error', "unable to open database file ${DB_FILE}", {db_file => $DB_FILE});
         return;
     }
@@ -2116,7 +2113,7 @@ sub status_delete {
     my $h = lock_db($DB_FILE,LOCK_EX);
 
     my %status;
-    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDWR, 0666) {
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDWR, 0666) {
         dlog('error', "unable to open database file ${DB_FILE} for deletions", {db_file => $DB_FILE});
         return;
     }
@@ -2133,7 +2130,7 @@ sub status_json {
     my $h = lock_db($DB_FILE,LOCK_SH);
 
     my %status;
-    unless(tie %status, 'AnyDBM_File', $DB_FILE, O_RDONLY, 0666) {
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, 0666) {
         dlog('error', "unable to open database file ${DB_FILE} for reading", {db_file => $DB_FILE});
         return;
     }
