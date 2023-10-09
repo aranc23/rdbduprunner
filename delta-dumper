@@ -100,6 +100,8 @@ my $STATUS_JSON;
 my @STATUS_DELETE;
 # dump the checksums and exit
 my $CHECKSUM_DUMP;
+# validate and prune the database:
+my $CHECKSUM_FSCK;
 # verify the checksums and exit
 my $CHECKSUM_VERIFY_ALL;
 # verify just one dump:
@@ -666,6 +668,10 @@ sub main {
       checksum_dump();
       exit;
   }
+  if ( $CHECKSUM_FSCK ) {
+      checksum_fsck();
+      exit;
+  }
   if ( $CHECKSUM_VERIFY_ALL ) {
       checksum_verify_all();
       exit;
@@ -820,6 +826,7 @@ sub parse_config {
              'status_json|status-json!'                 => \$STATUS_JSON,
              'status_delete|status-delete=s@'           => \@STATUS_DELETE,
              'checksum_dump|checksum-dump!'             => \$CHECKSUM_DUMP,
+             'checksum_fsck|checksum-fsck!'             => \$CHECKSUM_FSCK,
              'checksum_verify|checksum-verify=s'        => \$CHECKSUM_VERIFY,
              'checksum_verify_all|checksum-verify-all!' => \$CHECKSUM_VERIFY_ALL,
              'restore=s'                                => \$RESTORE,
@@ -1728,6 +1735,30 @@ sub checksum_dump {
     while(my ($k,$v)=each(%sums)) {
         my ($t,$d,$s,$ss) = split_checksum_key($k);
         print sprintf "%s\t%s\t%s: %s\n", $t, $d, $s, $v;
+    }
+    untie %sums;
+    unlock_db($lock);
+}
+
+# maybe this should remove missing entries from the database, but not
+# for now, just delete unparseable entries!
+sub checksum_fsck {
+    local %logparams = %logparams;
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
+    my %sums;
+    my @deletes;
+    tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
+    while(my ($k,$v)=each(%sums)) {
+        my ($t,$d,$s,$ss);
+        unless(($t,$d,$s,$ss) = split_checksum_key($k)) {
+            warn "unable to parse garbage: $k, deleting";
+            push(@deletes,$k);
+            next;
+        }
+        print sprintf "%s\t%s\t%s: %s\n", $t, $d, $s, $v;
+    }
+    foreach my $k (@deletes) {
+        delete $sums{$k};
     }
     untie %sums;
     unlock_db($lock);
