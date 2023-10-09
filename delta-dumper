@@ -1757,6 +1757,13 @@ sub checksum_fsck {
         }
         print sprintf "%s\t%s\t%s: %s\n", $t, $d, $s, $v;
     }
+    my $dumps = scan_existing();
+    while(my ($k,$v)=each(%sums)) {
+        my ($t,$d,$s,$ss) = split_checksum_key($k) or die "unsplittable key ${k}";
+        unless ( exists $$dumps{$t}{$d}{str2time($s)} ) {
+            dlog('warning',"missing file",\%logparams,{databasetype => $t, databasename => $d, start_time => $s});
+        }
+    }
     foreach my $k (@deletes) {
         delete $sums{$k};
     }
