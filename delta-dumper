@@ -675,7 +675,7 @@ sub main {
       exit;
   }
 
-  if ($RESTORE and -f $RESTORE) {
+  if ( $RESTORE ) {
       restore($RESTORE);
       exit;
   }
