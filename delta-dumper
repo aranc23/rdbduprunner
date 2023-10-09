@@ -2265,14 +2265,20 @@ Parse a config file and command line, invoke various dump programs.
 
 delta-dumper's default mode is to dump databases and write them to the
 configured location.  What follows are a list of options that perform
-the documented action, then exit without performing backups.
+the documented action, then exit I<without> performing backups.
 
 =over 4
 
 =item B<--restore>=I<dump>
 
-dd will effectively cat the output of the dump specified to the
-terminal, uncompressing or un-xdelta encoding the file as needed.
+delta-dumper will effectively cat the output of the dump specified to
+the terminal, uncompressing or un-xdelta encoding the file as needed.
+The full path to the dump file must be specified, you cannot use the
+files in the "current" directory, only those found in daily, weekly,
+etc.
+
+Example:
+delta-dumper --restore /opt/csg-db-backup/daily/mysql-enchantressdev-2023-09-08T05:15:01-0500_2023-09-10T05:15:01-0500.sql.vcdiff
 
 =item B<--status-json>
 
@@ -2286,6 +2292,29 @@ Use the same keys as printed in the --status-json output.
 
 Example:
 delta-dumper --status-delete 'mysql*mysql'
+
+=item B<--checksum-verify>=I<dump>
+
+delta-dumper will uncompress the dump file as needed and calculate the
+checksum, then compare it with the checksum stored in the database.
+The full path to the dump file must be specified, you cannot use the
+files in the "current" directory, only those found in daily, weekly,
+etc.
+
+Example:
+delta-dumper --checksum-verify /opt/csg-db-backup/daily/mysql-enchantressdev-2023-09-08T05:15:01-0500_2023-09-10T05:15:01-0500.sql.vcdiff
+
+=item B<--checksum-verify-all>
+
+delta-dumper will attempt to verify the checksum of every dump in it's
+internal database of dump checksums, if those those dumps still exist
+at the configuration backup location.
+
+=item B<--checksum-dump>
+
+Dump the contents of the databse containing sha266 checksums of
+database dumps.  Mostly useful for verification purposes and
+debugging.
 
 =back
 
