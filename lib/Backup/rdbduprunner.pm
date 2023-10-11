@@ -94,6 +94,7 @@ $LOG_DIR
 &find_configs
 %databasetype_case
 &stringy
+&unlock_and_close
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -1363,7 +1364,7 @@ sub lock_db {
     return $db_lock_handle;
 }
 
-sub unlock_db {
+sub unlock_and_close {
     flock($_[0],LOCK_UN);
     close($_[0]);
 }
@@ -1396,7 +1397,7 @@ sub update_status_db {
         $status{$src} = freeze($hash);
     }
     untie %status;
-    unlock_db($db_lock_handle);
+    unlock_and_close($db_lock_handle);
     my $_msg = dlog('notice','backup status',
                     {'src' => $src},
                     $hash);
@@ -1416,7 +1417,7 @@ sub status_delete {
     }
 
     untie %status;
-    unlock_db($h);
+    unlock_and_close($h);
 }
 
 sub status_json {
@@ -1434,7 +1435,7 @@ sub status_json {
     }
     print Cpanel::JSON::XS->new->ascii->pretty->allow_nonref->encode(\%json);
     untie %status;
-    unlock_db($h);
+    unlock_and_close($h);
 }
 
 sub status_print {
@@ -1458,7 +1459,7 @@ sub status_print {
         print "\n";
     }
     untie %status;
-    unlock_db($h);
+    unlock_and_close($h);
 }
 
 sub status_log {
@@ -1480,7 +1481,7 @@ sub status_log {
                        $s);
     }
     untie %status;
-    unlock_db($h);
+    unlock_and_close($h);
 }
 
 sub status_prom {
@@ -1508,7 +1509,7 @@ sub status_prom {
         }
     }
     untie %status;
-    unlock_db($h);
+    unlock_and_close($h);
 }
 
 sub backup_sort {

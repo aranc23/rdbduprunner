@@ -7,7 +7,7 @@ use Fatal qw( :void open close link unlink symlink rename fork );
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(handler signal_handler normal-signals);
 
-use Backup::rdbduprunner qw($APP_NAME &stringy %databasetype_case &unlock_db);
+use Backup::rdbduprunner qw($APP_NAME &stringy %databasetype_case &unlock_and_close);
 # use this string when refering to ourself:
 $APP_NAME = 'delta-dumper';
 
@@ -720,7 +720,7 @@ sub main {
   }
   if ( $config->prerun ) {
       unless( system_runner('prerun', $config->prerun) ) {
-          unlock_db($GLOBAL_LOCK);
+          unlock_and_close($GLOBAL_LOCK);
           dlog('error',
                'exiting because prerun command failed',
                {'total_run_time_seconds' => time()-$RUNTIME});
@@ -772,7 +772,7 @@ sub main {
       system_runner('postrun', $config->postrun);
   }
 
-  unlock_db($GLOBAL_LOCK) unless $config->dry_run;
+  unlock_and_close($GLOBAL_LOCK) unless $config->dry_run;
   dlog('info',
        'exiting',
        {'total_run_time_seconds' => time()-$RUNTIME});
@@ -1708,7 +1708,7 @@ sub update_checksum_db {
     my $key = make_checksum_key($logparams{databasetype},$logparams{databasename},$logparams{start_time});
     $sums{$key} = $hash;
     untie %sums;
-    unlock_db($lock);
+    unlock_and_close($lock);
 }
 
 sub make_checksum_key {
@@ -1733,7 +1733,7 @@ sub checksum_dump {
         print sprintf "%s\t%s\t%s: %s\n", $t, $d, $s, $v;
     }
     untie %sums;
-    unlock_db($lock);
+    unlock_and_close($lock);
 }
 
 # maybe this should remove missing entries from the database, but not
@@ -1764,7 +1764,7 @@ sub checksum_fsck {
         delete $sums{$k};
     }
     untie %sums;
-    unlock_db($lock);
+    unlock_and_close($lock);
 }
 
 sub checksum_verify_all {
@@ -1774,7 +1774,7 @@ sub checksum_verify_all {
     tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
     my %sums = %_sums; # does this work?
     untie %sums;
-    unlock_db($lock);
+    unlock_and_close($lock);
 
     my $dumps = scan_existing();
     # files get deleted so there is no reason to alert on this
@@ -1847,7 +1847,7 @@ sub checksum_verify {
     tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
     my %sums = %_sums; # does this work?
     untie %sums;
-    unlock_db($lock);
+    unlock_and_close($lock);
 
     my $checksum_key = make_checksum_key(lc($$dump{databasetype}),
                                          $$dump{databasename},
@@ -2135,7 +2135,7 @@ sub update_status_db {
     $status{join('*', $dbtype, $dbname)} = $json->encode($value);
 
     untie %status;
-    unlock_db($db_lock_handle);
+    unlock_and_close($db_lock_handle);
 }
 
 sub status_delete {
@@ -2152,7 +2152,7 @@ sub status_delete {
     }
 
     untie %status;
-    unlock_db($h);
+    unlock_and_close($h);
 }
 
 sub status_json {
@@ -2181,7 +2181,7 @@ sub status_json {
         };
     }
     untie %status;
-    unlock_db($h);
+    unlock_and_close($h);
     print $json->encode(\%data);
 }
 
