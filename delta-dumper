@@ -194,10 +194,6 @@ sub lock_pid_file {
   close $LOCK;
   return;
 }
-sub unlock_pid_file {
-  flock($_[0],LOCK_UN);
-  close $_[0];
-}
 
 # create the dispatcher and return it
 sub create_dispatcher {
@@ -724,7 +720,7 @@ sub main {
   }
   if ( $config->prerun ) {
       unless( system_runner('prerun', $config->prerun) ) {
-          unlock_pid_file($GLOBAL_LOCK);
+          unlock_db($GLOBAL_LOCK);
           dlog('error',
                'exiting because prerun command failed',
                {'total_run_time_seconds' => time()-$RUNTIME});
@@ -776,7 +772,7 @@ sub main {
       system_runner('postrun', $config->postrun);
   }
 
-  unlock_pid_file($GLOBAL_LOCK) unless $config->dry_run;
+  unlock_db($GLOBAL_LOCK) unless $config->dry_run;
   dlog('info',
        'exiting',
        {'total_run_time_seconds' => time()-$RUNTIME});
