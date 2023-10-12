@@ -72,7 +72,6 @@ $RUNTIME
 @BACKUPS
 $APP_NAME
 $LOG_FILE
-$LOG_DIR
 %config_definition
 @INCREMENTS
 &perform_backups
