@@ -1930,7 +1930,7 @@ sub checksum_from_file {
         }
         last EOF;
     }
-    if($line and my ($hash) = $line =~ m{\A(.+?)\s+-}xms) {
+    if($line and my ($hash) = $line =~ m{ \A (.+?) \s+ [-] }xms) {
         close $fh;
         return $hash;
     }
