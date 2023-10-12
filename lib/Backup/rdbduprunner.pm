@@ -191,6 +191,11 @@ Readonly our $CONFIG_DIR =>
     : exists $ENV{'HOME'}            ? File::Spec->catfile($ENV{'HOME'}, '.config', $APP_NAME)
     : undef;
 
+# timestamp format to use in files and database entries:
+Readonly our $timestamp_format => '%FT%T%z';
+# pattern for matching *most of* iso 8601
+Readonly our $iso8601_regex => qr{\d\d\d\d . \d\d . \d\d T \d\d . \d\d . \d\d (?:[+-] \d\d\d\d){0,1}}xms;
+
 our %children; # store children for master backup loop
 our $RUNTIME; # storing the start time so we can calculate run time
 

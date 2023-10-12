@@ -43,11 +43,6 @@ Readonly my @periods => qw( daily weekly monthly );
 # list of readonly known database types:
 Readonly my @dbtypes => qw( mysql postgresql mongodb );
 
-# timestamp format to use in files and database entries:
-Readonly my $timestamp_format => '%FT%T%z';
-# pattern for matching *most of* iso 8601
-Readonly my $iso8601_regex => qr{\d\d\d\d . \d\d . \d\d T \d\d . \d\d . \d\d (?:[+-] \d\d\d\d){0,1}}xms;
-
 # global app configuration
 my $config;
 
