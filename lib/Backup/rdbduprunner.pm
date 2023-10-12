@@ -1176,7 +1176,7 @@ sub perform_backup {
   # store the results of each backup in this hash:
   # like { '/var', 'failure', 1684884888 )
   unless($CLI_CONFIG{test}) {
-    unless ($lock1=lock_pid_file($host)) {
+    unless ($lock1=lock_pid_file(key_selector('maxwait'),$host)) {
       dlog('error','lock failure',$_[0]);
       exit;
     }
@@ -1553,11 +1553,11 @@ sub lock_file_compose {
 }
 
 sub lock_pid_file {
+  my $maxwait = shift;
   my $LOCK_FILE=lock_file_compose(@_);
   my $LOCK;
   my $waittime=time();
   my $locked=0;
-  my $maxwait = key_selector('maxwait');
   unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
     error("unable to open pid file: $LOCK_FILE for writing");
     return 0; # false or fail
@@ -2452,7 +2452,7 @@ sub status_mode {
     push(@com,$$bh{dest});
     info(join(" ",@com));
     unless($CLI_CONFIG{test}) {
-      my $lock=lock_pid_file($$bh{host});
+      my $lock=lock_pid_file(key_selector('maxwait'),$$bh{host});
       set_env($bh);
       system(@com);
       unless($? == 0) {
@@ -2511,7 +2511,7 @@ sub cleanup_mode {
              $$bh{dest});
         info(join(" ",@com));
         unless($CLI_CONFIG{test}) {
-            my $lock=lock_pid_file($$bh{host});
+            my $lock=lock_pid_file(key_selector('maxwait'),$$bh{host});
             set_env($bh);
             system(@com);
             unless($? == 0) {
@@ -2526,7 +2526,7 @@ sub tidy_mode {
     foreach my $bh (sort backup_sort (BACKUPS())) {
       my $lock;
       unless($CLI_CONFIG{test}) {
-	$lock=lock_pid_file($$bh{host});
+	$lock=lock_pid_file(key_selector('maxwait'),$$bh{host});
       }
         tidy($bh);
       unless($CLI_CONFIG{test}) {
@@ -2581,7 +2581,7 @@ sub compare_mode {
 	
     info(join(" ",@com));
     unless($CLI_CONFIG{test}) {
-      my $lock=lock_pid_file($$bh{host});
+      my $lock=lock_pid_file(key_selector('maxwait'),$$bh{host});
       set_env($bh);
       system(@com);
       my $mainret=$?;
@@ -2605,7 +2605,7 @@ sub list_mode {
     push(@com,$$bh{dest});
     info(join(" ",@com));
     unless($CLI_CONFIG{test}) {
-      my $lock=lock_pid_file($$bh{host});
+      my $lock=lock_pid_file(key_selector('maxwait'),$$bh{host});
       set_env($bh);
       system(@com);
       unless($? == 0) {
