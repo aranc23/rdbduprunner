@@ -109,7 +109,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw(
 );
 
-our $VERSION = '1.8.6';
+our $VERSION = '1.9.0';
 
 # constant name of the application
 our $APP_NAME = basename($0);
