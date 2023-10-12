@@ -10,7 +10,7 @@ use warnings;
 
 use Test2::V0;
 use Backup::rdbduprunner qw(build_backup_command %CONFIG $LOG_DIR %CLI_CONFIG);
-
+use Env qw(HOME);
 use Data::Dumper;
 
 
@@ -104,10 +104,8 @@ use Data::Dumper;
     $$bh{dryrun} = 1;
     $$bh{sparse} = 1;
 
-    $LOG_DIR = '/var/log';
-
     is([build_backup_command($bh)],
-       [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --dry-run --checksum --sparse --bwlimit=4 -z --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
+       [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --dry-run --checksum --sparse --bwlimit=4 -z), "--log-file=${HOME}/.local/state/build_backup_command.t/server-tmp.log", qw(--temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope server:/tmp /some/where/server-tmp)],
        "rsync dry-run");
     $$bh{inplace} = 1;
     $$bh{stats} = 1;
@@ -116,7 +114,7 @@ use Data::Dumper;
     $$bh{dryrun} = 'false';
 
     is([build_backup_command($bh)],
-       [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --sparse --bwlimit=4 -z --stats --log-file=/var/log/server-tmp.log --temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
+       [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --sparse --bwlimit=4 -z --stats), "--log-file=${HOME}/.local/state/build_backup_command.t/server-tmp.log",qw(--temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
        "rsync");
 }
 
