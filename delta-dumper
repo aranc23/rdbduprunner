@@ -391,12 +391,6 @@ sub init_config {
             ARGS     => '!',
             ARGCOUNT => ARGCOUNT_NONE,
         },
-        'log_location' => {
-            DEFAULT => $LOG_DIR,
-            VALIDATE => '^\/.+',    # require an absolute path?
-            ARGS     => '=s',
-            ARGCOUNT => ARGCOUNT_ONE,
-        },
         'h|help!',
         'mysql_bindir' => {
             ARGS     => '=s',
@@ -711,7 +705,7 @@ sub system_runner {
     $logparams{cmd} = shift;
 
     my %pairs = ('BACKUP_LOCATION' => $config->backup_location,
-                 'LOG_LOCATION'    => $config->log_location,
+                 'LOG_DIR'         => $LOG_DIR,
                  'TMPDIR'          => $config->tmpdir,
                  'COMPRESSION'     => $config->compression,
                  'COMPRESS'        => $config->compressor_compress->{$config->compression},
@@ -2391,11 +2385,6 @@ Default: true if stdout is a terminal, false otherwise.
 
 Enable or disable logging to stderr.  The minimum severity (level)
 logged to stderr is controlled by the log_level parameter.
-
-=item B<--log_location> C<log_location> (String)
-
-Set the directory for logging.  Default for root is /var/log and the
-default for non-root users is ~/var/log.
 
 =item B<--log_level|--level|--log-level|--loglevel> C<log_level> (String)
 
