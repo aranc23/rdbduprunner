@@ -60,7 +60,7 @@ Backup::rdbduprunner::make_dirs();
 # the path to the config file to be parsed
 my $CONFIG_FILE = File::Spec->catfile($CONFIG_DIR, 'config');
 
-# unused, unloved, restore mode!
+# much loved, storied, and magical restore mode!
 my $RESTORE;
 # if true, print the database status and exit
 my $STATUS_JSON;
