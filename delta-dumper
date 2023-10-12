@@ -26,6 +26,7 @@ use Date::Parse;
 use JSON;
 use GDBM_File;
 use Storable qw( freeze thaw );
+use Data::UUID;
 
 # added from CPAN or system packages
 use Log::Dispatch;
@@ -608,7 +609,8 @@ sub main {
           exit;
       }
   }
-
+    # create a uuid for each backup for help in parsing logs
+    my $ug = Data::UUID->new;
  DBTYPE:
   foreach my $dbtype (qw(mysql postgresql mongodb)) {
       next unless $config->get($dbtype);
@@ -635,13 +637,14 @@ sub main {
                );
               next DB;
           }
+          my $uuid = $ug->to_string($ug->create());
           eval {
-              perform_backup($dbtype,$db);
+              perform_backup($dbtype,$db,$uuid);
           } or do {
               my $e = $@;
               dlog('error',
                    'perform_backup exception',
-                   { databasetype => $dbtype, databasename => $db, exception => $e },
+                   { databasetype => $dbtype, databasename => $db, exception => $e, uuid => $uuid },
                );
               die $e if $e =~ m{caught \s+ SIG .+ exiting}xms;
               next DB;
@@ -743,11 +746,13 @@ sub backup_file_name_builder {
 sub perform_backup {
     my $databasetype = shift;
     my $database = shift;
+    my $uuid = shift;
     local %logparams = (
         databasetype    => $databasetype_case{$databasetype},
         compression     => $config->compression,
         backup_location => $config->backup_location,
         databasename    => $database,
+        uuid            => $uuid,
     );
     # record the time for logging:
     my $start_time = time();
@@ -775,7 +780,7 @@ sub perform_backup {
     # the backup path is the full path to the database dump we are
     # trying to create:
     my $backup_path = File::Spec->catfile($current_dir,$file_name);
-    $logparams{backup_file} = $backup_path;
+    $logparams{backup_path} = $backup_path;
     # create a useful list of alternate possible last backups:
     my @alternates = path_alternates($backup_path);
     # look for postgres-* in the current directory if we are backing up postgresql
@@ -805,6 +810,7 @@ sub perform_backup {
                                        DIR => $config->tmpdir ? $config->tmpdir : $current_dir) or die "failed to create temp file";
         push @temp_files, $output_path;
     }
+    $logparams{output_path} = $output_path;
     # this timestamp should be used in the creation of the symlinks:
     my $backup_timestamp_format = strftime $timestamp_format,  localtime($start_time);
     $logparams{start_time} = $backup_timestamp_format;
@@ -821,6 +827,7 @@ sub perform_backup {
                                    strftime($timestamp_format, localtime($start_time)),
                                    \@suffix);
 
+    dlog('debug', 'perform_backup', \%logparams);
     my ($return_value,$stage)
         = generic_dump($databasetype,
                        $database,
