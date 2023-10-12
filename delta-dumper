@@ -872,24 +872,27 @@ sub perform_backup {
       # rename our temp file into the file we're trying to create:
       my $rename_result=0;
       unless($config->localcow) {
-        if(rename $output_path, $backup_path) {
-          $rename_result=1;
-        }
-        elsif( $! eq 'Invalid cross-device link' ) {
-          # this is ok to continue, we can just use rsync later
-          $rename_result=0;
-        }
-        else {
-          local %logparams = %logparams; # is this a copy???
-          $logparams{errno} = $!;
-          dlog('error', 'rename error', \%logparams);
-          unlink $output_path;
-          update_status_db($databasetype, $database, { exit => 1,
-                                                       stage => 'rename',
-                                                       start_time => $start_time,
-                                                       errno => $logparams{errno} });
-          return;
-        }
+          eval {
+              rename($output_path, $backup_path);
+              $rename_result=1;
+              dlog('debug', 'rename output_path to backup_path', \%logparams);
+          } or do {
+              my $errno = $EVAL_ERROR; # save me
+              if( $errno =~ /Invalid cross-device link/ ) {
+                  # this is ok to continue, we can just use rsync later
+                  dlog('debug', 'rename failed across devices', \%logparams, {'errno' => 'Invalid cross-device link'});
+                  $rename_result=0;
+              }
+              else {
+                  dlog('error', 'rename error', \%logparams, { errno => $errno, output_path => $output_path, backup_path => $backup_path });
+                  unlink $output_path;
+                  update_status_db($databasetype, $database, { exit => 1,
+                                                               stage => 'rename',
+                                                               start_time => $start_time,
+                                                               errno => 'unknown' });
+                  return;
+              }
+          }
       }
       if($rename_result == 0 or $config->localcow) {
           push @temp_files, $backup_path;
