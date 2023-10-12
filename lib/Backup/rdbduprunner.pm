@@ -96,12 +96,14 @@ $LOG_FILE
 &stringy
 &unlock_and_close
 &make_dirs
+$DISPATCHER
+$timestamp_format
+$iso8601_regex
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 
 our @EXPORT = qw(
-	
 );
 
 our $VERSION = '1.8.6';
@@ -908,7 +910,9 @@ sub dlog {
   my $str   = stringy({'msg'      => $msg,
                        'severity' => $level,
                        timestamp  => $time,
-                       datetime   => POSIX::strftime("%FT%T%z",localtime($time))},
+                       datetime   => POSIX::strftime($timestamp_format,localtime($time)),
+                       hostname   => hostname(),
+                       pid        => $$,},
                       @_);
   $DISPATCHER->log( level   => $level,
                     message => $str,
