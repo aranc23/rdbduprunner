@@ -1560,7 +1560,7 @@ sub lock_pid_file {
   my $locked=0;
   unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
     error("unable to open pid file: $LOCK_FILE for writing");
-    return 0; # false or fail
+    return;
   }
   debug("setting alarm for ${maxwait} seconds and locking ${LOCK_FILE}");
   eval {
@@ -1589,7 +1589,7 @@ sub lock_pid_file {
   # this is the fall through for the cases where we have received an alarm
   # or we failed to lock the file without receiving a signal
   close $LOCK;
-  return 0;
+  return;
 }
 
 sub unlock_pid_file {
