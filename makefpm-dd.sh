@@ -23,8 +23,8 @@ rm -f $tmp
 
 summary="script for managing compact mysql, postgres, and mongodb dumps"
 description="dumps databases and optionally compresses or diffs them using xdelta3"
-rpm_deps="-d perl-JSON -d perl-Log-Dispatch -d perl-AppConfig -d xdelta -d xz -d perl-Readonly"
-deb_deps="-d libjson-perl -d liblog-dispatch-perl -d libappconfig-perl -d xdelta3 -d xz-utils -d libreadonly-perl"
+rpm_deps="-d perl-JSON -d perl-Log-Dispatch -d perl-AppConfig -d xdelta -d xz -d perl-Readonly -d perl-Data-UUID"
+deb_deps="-d libjson-perl -d liblog-dispatch-perl -d libappconfig-perl -d xdelta3 -d xz-utils -d libreadonly-perl -d libdata-uuid-perl"
 common_deps="-d perl -d mbuffer -d gzip -d bzip2 -d zstd -d rsync"
 common_opts="-n ${pkg} --version $version --architecture noarch -C ${build_dir} -s dir"
 url="https://github.com/aranc23/rdbduprunner"
