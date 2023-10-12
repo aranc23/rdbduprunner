@@ -7,9 +7,7 @@ use Fatal qw( :void open close link unlink symlink rename fork );
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(handler signal_handler normal-signals);
 
-use Backup::rdbduprunner qw($APP_NAME &stringy %databasetype_case &unlock_and_close);
-# use this string when refering to ourself:
-$APP_NAME = 'delta-dumper';
+use Backup::rdbduprunner qw($APP_NAME $USER &stringy %databasetype_case &unlock_and_close);
 
 # might be assumed to be installed on any perl system by default?
 use Data::Dumper;
@@ -38,10 +36,6 @@ use AppConfig qw(:expand :argcount);
 use Getopt::Long qw(:config pass_through) ; # use this to pull out the config file, then let AppConfig handle the rest
 
 ##### GLOBALS ##### # the horrror:
-
-# tease the user out of the environment, or just call getpwuid:
-my $USER
-    = $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar( getpwuid($<) );
 
 # list of readonly periods:
 Readonly my @periods => qw( daily weekly monthly );

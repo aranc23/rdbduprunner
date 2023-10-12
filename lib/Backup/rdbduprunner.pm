@@ -62,6 +62,7 @@ our %EXPORT_TAGS = ( 'all' => [ qw(
 &dlog
 $EXIT_CODE
 &verbargs
+$USER
 $STATE_DIR
 $CONFIG_DIR
 $LOCK_DIR
@@ -106,7 +107,7 @@ our @EXPORT = qw(
 our $VERSION = '1.8.6';
 
 # constant name of the application
-our $APP_NAME = 'rdbduprunner';
+our $APP_NAME = basename($0);
 
 # from the man page for rsync 3.1.1
 Readonly our $EXIT_CODE => {
