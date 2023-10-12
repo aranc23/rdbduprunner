@@ -7,7 +7,7 @@ use Fatal qw( :void open close link unlink symlink rename fork );
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(handler signal_handler normal-signals);
 
-use Backup::rdbduprunner qw($APP_NAME $USER $STATE_DIR $LOCK_DIR $LOG_DIR $CONFIG_DIR $DISPATCHER &stringy %databasetype_case &unlock_and_close $timestamp_format $iso8601_regex &dlog);
+use Backup::rdbduprunner qw($APP_NAME $USER $STATE_DIR $LOCK_DIR $LOG_DIR $CONFIG_DIR $DISPATCHER &stringy %databasetype_case &unlock_and_close $timestamp_format $iso8601_regex &dlog &lock_db);
 
 # might be assumed to be installed on any perl system by default?
 use Data::Dumper;
@@ -1616,7 +1616,7 @@ sub update_checksum_db {
     local %logparams = %logparams;
     my $hash = shift;
     print STDERR Dumper \%logparams if $DEBUG;
-    my $lock = lock_db($CHECKSUM_DB);
+    my $lock = lock_db($CHECKSUM_DB,LOCK_EX,\%logparams);
     my %sums;
     unless(tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666) {
         dlog('error', "unable to open database file ${CHECKSUM_DB}", {db_file => $CHECKSUM_DB});
@@ -1642,7 +1642,7 @@ sub split_checksum_key {
 
 sub checksum_dump {
     local %logparams = %logparams;
-    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
     my %sums;
     tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
     while(my ($k,$v)=each(%sums)) {
@@ -1657,7 +1657,7 @@ sub checksum_dump {
 # for now, just delete unparseable entries!
 sub checksum_fsck {
     local %logparams = %logparams;
-    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
     my %sums;
     my @deletes;
     tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
@@ -1686,7 +1686,7 @@ sub checksum_fsck {
 
 sub checksum_verify_all {
     local %logparams = %logparams;
-    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
     my %_sums;
     tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
     my %sums = %_sums; # does this work?
@@ -1759,7 +1759,7 @@ sub checksum_verify {
         dlog('error', "checksum broken", \%logparams);
         return;
     }
-    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
     my %_sums;
     tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
     my %sums = %_sums; # does this work?
@@ -2014,26 +2014,6 @@ sub string_any {
     return 0;
 }
 
-sub lock_db {
-    my $db_file = shift;
-    my $DB_LOCK = join('.',File::Spec->catfile($LOCK_DIR,basename($db_file)),'lock');
-    my $flags = shift;
-    $flags = LOCK_EX unless $flags;
-    my $db_lock_handle;
-    local %logparams = %logparams;
-    $logparams{db_lock} = $DB_LOCK;
-
-    unless ( open($db_lock_handle, '>', $DB_LOCK) ) {
-        dlog('error', "unable to open database file ${DB_LOCK}", \%logparams);
-        return;
-    }
-    unless ( flock( $db_lock_handle, LOCK_EX ) ) {
-        dlog('error', "unable to lock database file ${DB_LOCK}", \%logparams);
-        return;
-    }
-    return $db_lock_handle;
-}
-
 # update the state database
 sub update_status_db {
     my ($dbtype, $dbname, $value) = @_;
@@ -2041,7 +2021,7 @@ sub update_status_db {
     if ( defined $$value{start_time} ) {
         $$value{start_time} = strftime($timestamp_format, localtime($$value{start_time}));
     }
-    my $db_lock_handle = lock_db($DB_FILE);
+    my $db_lock_handle = lock_db($DB_FILE,LOCK_EX,\%logparams);
 
     my %status;
     unless(tie %status, 'GDBM_File', $DB_FILE, O_CREAT|O_RDWR, 0666) {
@@ -2056,7 +2036,7 @@ sub update_status_db {
 }
 
 sub status_delete {
-    my $h = lock_db($DB_FILE,LOCK_EX);
+    my $h = lock_db($DB_FILE,LOCK_EX,\%logparams);
 
     my %status;
     unless(tie %status, 'GDBM_File', $DB_FILE, O_RDWR, 0666) {
@@ -2073,7 +2053,7 @@ sub status_delete {
 }
 
 sub status_json {
-    my $h = lock_db($DB_FILE,LOCK_SH);
+    my $h = lock_db($DB_FILE,LOCK_SH,\%logparams);
 
     my %status;
     unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, 0666) {
