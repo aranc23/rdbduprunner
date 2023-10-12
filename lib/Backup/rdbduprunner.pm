@@ -99,6 +99,7 @@ $LOG_FILE
 $DISPATCHER
 $timestamp_format
 $iso8601_regex
+&lock_db
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -184,7 +185,6 @@ Readonly our $STATE_DIR =>
 Readonly our $LOCK_DIR => ($USER eq 'root' ? File::Spec->catfile('/run',$APP_NAME) : $STATE_DIR);
 Readonly our $LOG_DIR => $USER eq 'root' ? File::Spec->catfile('/var/log',$APP_NAME) : $STATE_DIR;
 Readonly our $DB_FILE => File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
-Readonly our $DB_LOCK => join('.', File::Spec->catfile($LOCK_DIR,basename($DB_FILE)), 'lock');
 Readonly our $LOG_FILE => File::Spec->catfile( $LOG_DIR, 'rdbduprunner.log' );
 # can be overridden from the command line, but not the config
 Readonly our $CONFIG_DIR =>
@@ -1358,17 +1358,22 @@ sub perform_backup {
   }
   exit;
 }
+
 sub lock_db {
+    my $db_file = shift;
+    my $db_lock = join('.',File::Spec->catfile($LOCK_DIR,basename($db_file)),'lock');
+    my $extra_logs = {db_file => $db_file, db_lock => $db_lock};
     my $flags = shift;
     $flags = LOCK_EX unless $flags;
     my $db_lock_handle;
 
-    unless ( open($db_lock_handle, '>', $DB_LOCK) ) {
-        error("unable to open database file ${DB_LOCK}");
+    dlog('debug',"locking related file",$extra_logs, @_);
+    unless ( open($db_lock_handle, '>', $db_lock) ) {
+        dlog('error',"unable to open database file ${db_lock}", $extra_logs, @_);
         return;
     }
     unless ( flock( $db_lock_handle, LOCK_EX ) ) {
-        error("unable to lock database file ${DB_LOCK}");
+        dlog('error',"unable to lock database file ${db_lock}", $extra_logs, @_);
         return;
     }
     return $db_lock_handle;
@@ -1385,7 +1390,7 @@ sub update_status_db {
     my $db_file = File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
     my $db_lock_file = "${db_file}.lock";
 
-    my $db_lock_handle = lock_db();
+    my $db_lock_handle = lock_db($DB_FILE);
 
     my %status;
     unless(tie %status, 'GDBM_File', $db_file, O_CREAT|O_RDWR, 0666) {
@@ -1414,7 +1419,7 @@ sub update_status_db {
 }
 
 sub status_delete {
-    my $h = lock_db(LOCK_EX);
+    my $h = lock_db($DB_FILE,LOCK_EX);
 
     my %status;
     unless(tie %status, 'GDBM_File', $DB_FILE, O_RDWR, 0666) {
@@ -1431,7 +1436,7 @@ sub status_delete {
 }
 
 sub status_json {
-    my $h = lock_db(LOCK_SH);
+    my $h = lock_db($DB_FILE,LOCK_SH);
 
     my %status;
     unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, 0666) {
@@ -1449,7 +1454,7 @@ sub status_json {
 }
 
 sub status_print {
-    my $h = lock_db(LOCK_SH);
+    my $h = lock_db($DB_FILE,LOCK_SH);
 
     my %status;
     unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, 0666) {
@@ -1473,7 +1478,7 @@ sub status_print {
 }
 
 sub status_log {
-    my $h = lock_db(LOCK_SH);
+    my $h = lock_db($DB_FILE,LOCK_SH);
 
     my %status;
     unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, 0666) {
@@ -1495,7 +1500,7 @@ sub status_log {
 }
 
 sub status_prom {
-    my $h = lock_db(LOCK_SH);
+    my $h = lock_db($DB_FILE,LOCK_SH);
 
     my %status;
     unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, 0666) {
