@@ -915,21 +915,22 @@ sub perform_backup {
       # create a series of symlinks to this path...
       # we do this to keep rsync from having to work so hard
       # preserving the hard links:
-      symlink $relative_name,
-        File::Spec->catfile( $config->backup_location,
-                             'daily',
-                             $file_name_timestamp);
+      my %period_paths;
+      foreach my $p (qw(daily weekly monthly)) {
+          $period_paths{$p} =
+              File::Spec->catfile( $config->backup_location,
+                                   $p,
+                                   $file_name_timestamp);
+      }
+      symlink $relative_name, $period_paths{daily};
+      dlog('debug', 'symlink daily', { uuid => $uuid, relative_name => $relative_name, period => 'daily', 'path' => $period_paths{'daily'} });
       if ( strftime( "%a", localtime($start_time) ) eq $config->week_start ) {
-        symlink $relative_name,
-          File::Spec->catfile( $config->backup_location,
-                               'weekly',
-                               $file_name_timestamp);
+        symlink $relative_name, $period_paths{weekly};
+        dlog('debug', 'symlink weekly', { uuid => $uuid, relative_name => $relative_name, period => 'weekly', 'path' => $period_paths{'weekly'} });
       }
       if ( strftime( "%d", localtime($start_time) ) eq sprintf('%02d', $config->month_start) ) {
-        symlink $relative_name,
-          File::Spec->catfile( $config->backup_location,
-                               'monthly',
-                               $file_name_timestamp);
+        symlink $relative_name, $period_paths{monthly};
+        dlog('debug', 'symlink monthly', { uuid => $uuid, relative_name => $relative_name, period => 'monthly', 'path' => $period_paths{'monthly'} });
       }
       dlog('notice',
            "backup status",
