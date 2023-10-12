@@ -1324,7 +1324,7 @@ sub perform_backup {
       # zfs is path minus leading /
       if(my $zfs = find_zfs($$bh{'dest'})) {
         # snapshot is zfs plus a name
-        my $snap=$zfs.'@rdbduprunner-'.( $mainret == 0 ? 'success-' : 'failure-').strftime("%FT%T%z",localtime());
+        my $snap=$zfs.'@rdbduprunner-'.( $mainret == 0 ? 'success-' : 'failure-').strftime($timestamp_format,localtime());
         # snapshot commmand is straightforward
         my @com=($$bh{zfsbinary},
                  'snapshot',
