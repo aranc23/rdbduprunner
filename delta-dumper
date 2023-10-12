@@ -1917,8 +1917,15 @@ sub sanity_check_config {
   }
 }
 
+# this is invoked after a successful backup
 # turn symlinks in per-period directories into hardlinks to the actual
-# file, because the original will go away
+# file, because the prior backup/dump to which it is currently
+# symlinked is about to be deleted or overwritten
+# IF the target is a .TEMP file it's because localcow was enabled and
+# therefore we copied the backup/dump file in current in order to
+# hardlink to it because we are going to overwrite it using rsync
+# shortly
+
 sub link_symlinks {
     local %logparams = %logparams;
     my $dbtype        = shift;
@@ -1928,6 +1935,8 @@ sub link_symlinks {
         next unless -l $$dump{path}; # skip the non-links
         print Dumper $dump if $DEBUG;
         my $target = readlink($$dump{path});
+        my $oldwd = POSIX::getcwd();
+        chdir dirname($$dump{path}) or die "unable to chdir to ${$$dump{path}}";
         if (-f join('.',$target,'TEMP')) {
             $target =  join('.',$target,'TEMP');
         }
@@ -1936,8 +1945,6 @@ sub link_symlinks {
 
         # remove this link whether the target exists or not, if
         # the target of a link is missing it's useless anyway:
-        my $oldwd = POSIX::getcwd();
-        chdir dirname($$dump{path}) or die "unable to chdir to ${$$dump{path}}";
         if ( unlink($$dump{path}) ) {
             dlog( 'debug', "unlink symlink", \%logparams );
         }
