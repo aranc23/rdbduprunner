@@ -100,6 +100,8 @@ $DISPATCHER
 $timestamp_format
 $iso8601_regex
 &lock_db
+&lock_pid_file
+&lock_file_compose
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
