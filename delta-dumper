@@ -7,7 +7,7 @@ use Fatal qw( :void open close link unlink symlink rename fork );
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(handler signal_handler normal-signals);
 
-use Backup::rdbduprunner qw($APP_NAME $USER $STATE_DIR $LOCK_DIR $LOG_DIR $CONFIG_DIR $DISPATCHER &stringy %databasetype_case &unlock_and_close $timestamp_format $iso8601_regex &dlog &lock_db);
+use Backup::rdbduprunner qw($APP_NAME $USER $STATE_DIR $LOCK_DIR $LOG_DIR $CONFIG_DIR $DISPATCHER &stringy %databasetype_case &unlock_and_close $timestamp_format $iso8601_regex &dlog &lock_db &lock_pid_file &lock_file_compose);
 
 # might be assumed to be installed on any perl system by default?
 use Data::Dumper;
@@ -102,42 +102,6 @@ sub signal_handler {
         }
     };
     die "caught SIG${sig}, exiting after cleanup";
-}
-
-sub lock_file_compose {
-  return sprintf('%s/%s.lock',$LOCK_DIR,$_[0]);
-}
-sub lock_pid_file {
-  my $MAXWAIT=30;
-  my $LOCK_FILE=lock_file_compose(@_);
-  my $LOCK;
-  my $waittime=time();
-  my $locked=0;
-
-  unless(open($LOCK,'+<',$LOCK_FILE) or open($LOCK,'>',$LOCK_FILE)) {
-    return;
-  }
-  eval {
-    local $SIG{ALRM} = sub { die "alarm\n" }; # NB: \n required
-    alarm $MAXWAIT;
-    if (flock($LOCK,LOCK_EX)) {
-      $locked=1;
-    }
-    alarm 0;
-  };
-  if ($@) {
-    die unless $@ eq "alarm\n"; # propagate unexpected errors
-  } else {
-    if ($locked) {
-      truncate($LOCK,0); # this shouldn't fail if we have the file opened and locked!
-      print $LOCK $$."\n";      # who really cares if this fails?
-      return $LOCK;             # happiness is a locked file
-    }
-  }
-  # this is the fall through for the cases where we have received an alarm
-  # or we failed to lock the file without receiving a signal
-  close $LOCK;
-  return;
 }
 
 # create the dispatcher and return it
@@ -614,7 +578,7 @@ sub main {
   %dump_db = %{scan_existing()};
 
   # obtain the global lock, or die trying
-  my $GLOBAL_LOCK = $config->dry_run ? 1 : lock_pid_file($APP_NAME);
+  my $GLOBAL_LOCK = $config->dry_run ? 1 : lock_pid_file(30,$APP_NAME);
   unless ( $GLOBAL_LOCK ) {
     my $emsg='unable to lock pid file: '.lock_file_compose($APP_NAME);
     dlog('warning',$emsg,{});
