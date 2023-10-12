@@ -7,7 +7,7 @@ use Fatal qw( :void open close link unlink symlink rename fork );
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(handler signal_handler normal-signals);
 
-use Backup::rdbduprunner qw($APP_NAME $USER &stringy %databasetype_case &unlock_and_close);
+use Backup::rdbduprunner qw($APP_NAME $USER $STATE_DIR $LOCK_DIR &stringy %databasetype_case &unlock_and_close);
 
 # might be assumed to be installed on any perl system by default?
 use Data::Dumper;
@@ -51,14 +51,6 @@ Readonly my $iso8601_regex => qr{\d\d\d\d . \d\d . \d\d T \d\d . \d\d . \d\d (?:
 # global app configuration
 my $config;
 
-my $STATE_DIR =
-    $USER eq 'root'                 ? File::Spec->catfile('/var/lib', $APP_NAME)
-    : exists $ENV{'XDG_STATE_HOME'} ? File::Spec->catfile($ENV{'XDG_STATE_HOME'}, $APP_NAME)
-    : exists $ENV{'HOME'}           ? File::Spec->catfile($ENV{'HOME'}, '.local', 'state', $APP_NAME)
-    : undef;
-
-my $LOCK_DIR =
-    $USER eq 'root' ? File::Spec->catfile('/run',$APP_NAME) : $STATE_DIR;
 my $LOG_DIR =
     $USER eq 'root' ? '/var/log' : $STATE_DIR;
 
