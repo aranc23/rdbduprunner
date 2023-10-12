@@ -54,17 +54,8 @@ my $config;
 my $DB_FILE = File::Spec->catfile($STATE_DIR, "${APP_NAME}.db");
 my $CHECKSUM_DB = File::Spec->catfile($STATE_DIR, "${APP_NAME}-checksum.db");
 
-for my $dir ($STATE_DIR,$CONFIG_DIR) {
-    unless ( -d $dir ) {
-        my @created;
-        unless ( @created = make_path($dir, { mode => 0700 }) ) {
-            die "unable to create directory: ${dir}";
-        }
-        unless ($created[0] eq $dir) {
-            die "make_path did not return the expected result trying to create ${dir}";
-        }
-    }
-}
+# create our state, config, lock and log directories if they don't exist:
+Backup::rdbduprunner::make_dirs();
 
 # the path to the config file to be parsed
 my $CONFIG_FILE = File::Spec->catfile($CONFIG_DIR, 'config');

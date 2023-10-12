@@ -95,6 +95,7 @@ $LOG_FILE
 %databasetype_case
 &stringy
 &unlock_and_close
+&make_dirs
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
