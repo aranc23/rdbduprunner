@@ -1977,13 +1977,11 @@ sub rsync {
     $logparams{src} = $src;
     $logparams{dst} = $dst;
     # because we use in place by default, we should consider the destination sus:
-    push @temp_files, $dst;
     return system_runner(
         'rsync copy',
         sprintf( '%s %s %s %s',
             $config->rsync_binary, $config->rsync_options, $src, $dst )
     );
-    pop @temp_files;
 }
 
 # copied from the old version of List::Util:
