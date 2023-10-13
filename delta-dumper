@@ -393,9 +393,8 @@ sub init_config {
             ARGCOUNT => ARGCOUNT_NONE,
         },
         'terminal_logging' => {
-
             # if stderr is a terminal, enable terminal_loging
-            DEFAULT  => -t STDERR ? 1 : 0,
+            DEFAULT  => IO::Interactive::is_interactive() ? 1 : 0,
             ARGS     => '!',
             ALIAS    => 't',
             ARGCOUNT => ARGCOUNT_NONE,
