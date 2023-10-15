@@ -745,13 +745,11 @@ sub backup_file_name_builder {
 sub perform_backup {
     my $databasetype = shift;
     my $database = shift;
-    my $uuid = shift;
     local %logparams = (
         databasetype    => $databasetype_case{$databasetype},
         compression     => $config->compression,
         backup_location => $config->backup_location,
         databasename    => $database,
-        uuid            => $uuid,
     );
     # record the time for logging:
     my $start_time = time();
