@@ -616,33 +616,27 @@ sub main {
                        : ( $dbtype eq 'postgresql' ? pgsql_database_list()
                        : ( $dbtype eq 'mongodb' ? qw(all)
                        : ())) ) {
-          if ( $dbtype eq 'mysql'
+          $uuid = uuid_gen();
+          if (( $dbtype eq 'mysql'
                and $config->mysql_skip_database
-               and string_any($db,@{$config->mysql_skip_database}) ) {
+                and string_any($db,@{$config->mysql_skip_database}) )
+              or
+              ( $dbtype eq 'postgresql'
+                and $config->postgresql_skip_database
+                and string_any($db,@{$config->postgresql_skip_database}) ))
+          {
               dlog('notice',
-                   'skipping database',
-                   { databasetype => $dbtype, databasename => $db },
-               );
+                   "skipping database ${dbtype}:${db}",
+                   { databasetype => $dbtype, databasename => $db });
               next DB;
           }
-          elsif ( $dbtype eq 'postgresql'
-               and $config->postgresql_skip_database
-               and string_any($db,@{$config->postgresql_skip_database}) ) {
-              dlog('notice',
-                   'skipping database',
-                   { databasetype => $dbtype, databasename => $db },
-               );
-              next DB;
-          }
-          my $uuid = $ug->to_string($ug->create());
           eval {
-              perform_backup($dbtype,$db,$uuid);
+              perform_backup($dbtype,$db);
           } or do {
               my $e = $@;
               dlog('error',
-                   'perform_backup exception',
-                   { databasetype => $dbtype, databasename => $db, exception => $e, uuid => $uuid },
-               );
+                   "exception performing dump of ${dbtype}:${db}",
+                   { 'databasetype' => $dbtype, 'databasename' => $db, 'exception' => $e });
               die $e if $e =~ m{caught \s+ SIG .+ exiting}xms;
               next DB;
           }
