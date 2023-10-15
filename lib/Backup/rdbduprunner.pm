@@ -39,6 +39,7 @@ use Carp;
 #from a standard perl distribution, on UNIX at least
 use Pod::Usage;
 use Sys::Hostname;
+use Data::UUID;
 
 our @ISA = qw(Exporter);
 
@@ -102,6 +103,8 @@ $iso8601_regex
 &lock_db
 &lock_pid_file
 &lock_file_compose
+$uuid
+&uuid_gen
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -175,6 +178,11 @@ our $VALID_BACKUP_TYPE_REGEX = qr{^ ( rdiff [-] backup | rsync | duplicity ) $}x
 
 # dispatcher needs a handle to write to:
 our $DISPATCHER;
+
+# localize this for use in logging,
+# create a uuid for each backup for help in parsing logs
+our $uuid;
+our $uuid_gen = Data::UUID->new;
 
 Readonly our $USER => $ENV{LOGNAME} || $ENV{USERNAME} || $ENV{USER} || scalar(getpwuid($<));
 
@@ -933,6 +941,7 @@ sub stringy {
   foreach my $h (@_) {
     next unless ref $h eq 'HASH';
     while( my ($key,$val) = each(%$h) ) {
+        next unless defined $val;
       next if ref $val; # must not be a reference
       $val =~ s/\n/NL/g; # remove newlines
       $val =~ s/"/\\"/g; # replace " with \"
@@ -2826,6 +2835,11 @@ sub exit_status {
     POSIX::WIFEXITED($_[0]) and return int(POSIX::WEXITSTATUS($_[0]));
     POSIX::WIFSIGNALED($_[0]) and return int(POSIX::WTERMSIG($$_[0])) * -1;
     return int(-1);
+}
+
+# create a random uuid for logging bits
+sub uuid_gen {
+    return $uuid_gen->to_string($uuid_gen->create());
 }
 
 # Preloaded methods go here.
