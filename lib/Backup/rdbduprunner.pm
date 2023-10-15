@@ -915,15 +915,19 @@ sub emergency {
 
 sub dlog {
   my $level = shift;
-  my $msg   = shift;
-  my $time  = time();
-  my $str   = stringy({'msg'      => $msg,
-                       'severity' => $level,
-                       timestamp  => $time,
-                       datetime   => POSIX::strftime($timestamp_format,localtime($time)),
-                       hostname   => hostname(),
-                       pid        => $$,},
-                      @_);
+  my $msg = shift;
+  my $time = time();
+  my $str = stringy(
+      {
+          'msg'       => $msg,
+          'severity'  => $level,
+          'timestamp' => $time,
+          'datetime'  => POSIX::strftime($timestamp_format,localtime($time)),
+          'hostname'  => hostname(),
+          'pid'       => $$,
+          'uuid'      => $uuid,
+      },
+      @_);
   $DISPATCHER->log( level   => $level,
                     message => $str,
                   );

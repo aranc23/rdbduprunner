@@ -608,8 +608,6 @@ sub main {
           exit;
       }
   }
-    # create a uuid for each backup for help in parsing logs
-    my $ug = Data::UUID->new;
  DBTYPE:
   foreach my $dbtype (qw(mysql postgresql mongodb)) {
       next unless $config->get($dbtype);
