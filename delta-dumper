@@ -653,14 +653,18 @@ sub main {
        {'total_run_time_seconds' => time()-$RUNTIME});
 }
 
+# returns 1 for success or null for failure?
+# needs work
 sub system_runner {
-    local %logparams = %logparams;
+    my %logparams;
     local %ENV = %ENV;
     my $prefix = uc $APP_NAME;
     $prefix =~ s/\-/_/g;
 
     my $tag = shift;
-    $logparams{cmd} = shift;
+    my $cmd = shift;
+    $logparams{cmd} = $cmd;
+    $logparams{tag} = $tag;
 
     my %pairs = ('BACKUP_LOCATION' => $config->backup_location,
                  'LOG_DIR'         => $LOG_DIR,
@@ -673,20 +677,28 @@ sub system_runner {
     while ( my ($k,$v) = each %pairs) {
         $ENV{join('_',$prefix, uc $k)} = $v;
     }
-
+    dlog('debug',
+         "system('${cmd}')",
+         \%logparams);
     unless ($config->dry_run) {
         unless ( POSIX::WIFEXITED(system( $logparams{cmd} ) ) ) {
             $logparams{errno} = "${ERRNO}";
-            dlog( 'error', $tag, \%logparams );
+            dlog('error',
+                 "failed with errno: $logparams{errno} system('${cmd}')",
+                 \%logparams );
             return;
         }
         $logparams{exit} = POSIX::WEXITSTATUS($CHILD_ERROR);
         unless ( $logparams{exit} == 0 ) {
-            dlog( 'error', $tag, \%logparams );
+            dlog('error',
+                 "failed with WEXITSTATUS: $logparams{exit} system('${cmd}')",
+                 \%logparams );
             return;
         }
     }
-    dlog( 'info', $tag, \%logparams );
+    dlog('info',
+         "succeeded: system('${cmd}')",
+         \%logparams );
     return 1;
 }
 
