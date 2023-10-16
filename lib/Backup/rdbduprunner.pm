@@ -1878,16 +1878,9 @@ sub update_bd_space {
 
 sub log_exit_status {
   my($bh,$exit)=@_;
-  my $msg = dlog('notice','exit status',
-                 {'exit' => $exit},
-                 $bh);
-  $msg =~ s/\"/\\\"/g;
-  unless($$bh{local}) {
-      my $facility = key_selector('facility');
-    my $com="ssh -x -o BatchMode=yes $$bh{host} \"logger -t rdbduprunner -p ${facility}.notice '${msg}'\" < /dev/null";
-    #print $com."\n";
-    system($com);
-  }
+  dlog('notice','exit status',
+       {'msgcode' => 'exit status', 'exit' => $exit},
+       $bh);
 }
 
 
