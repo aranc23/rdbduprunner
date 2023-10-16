@@ -1270,10 +1270,8 @@ sub split_fork_exec {
                 exit(1);
             }
         }
-        local %logparams = %logparams;
-        $logparams{exec} = join(' ',@_);
 
-        dlog('debug','split_fork_exec',\%logparams);
+        dlog('debug',"split_fork_exec ".join(' ',@_),{msgcode => 'split_fork_exec', 'exec' => join(' ',@_)});
         exec(@_);
         warn 'unable to exec: '.join(' ',@_);
         exit(1);
@@ -2085,7 +2083,7 @@ sub build_dump_hash_from_path {
     my %dump = ( path => $file, full => $file =~ m{[.] vcdiff}xms ? 0 : 1, broken => 0 );
     if ( -l $file and not -f $file ) {
         # broken link
-        dlog( 'error', "broken link", \%logparams );
+        dlog( 'error', "broken link ${file}", {msgcode => 'broken link'}, \%logparams );
         $dump{broken} = 1;
     }
     if ( ($db, $period, $year,$month,$day,$hour,$minute) = basename($file) =~ m{\A(.+) [.-] ${d_p} [.-] sql [.-] (\d\d\d\d) [.-] (\d\d) [.-] (\d\d) [.-] (\d\d) [.-] (\d\d)}xms ) {
