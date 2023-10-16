@@ -600,7 +600,7 @@ sub main {
     }
   }
   if ( $config->prerun ) {
-      unless( system_runner('prerun', $config->prerun) ) {
+      unless( system_runner($config->prerun) ) {
           unlock_and_close($GLOBAL_LOCK);
           dlog('error',
                'exiting because prerun command failed',
@@ -644,7 +644,7 @@ sub main {
   }
 
   if ( $config->postrun ) {
-      system_runner('postrun', $config->postrun);
+      system_runner($config->postrun);
   }
 
   unlock_and_close($GLOBAL_LOCK) unless $config->dry_run;
@@ -661,10 +661,8 @@ sub system_runner {
     my $prefix = uc $APP_NAME;
     $prefix =~ s/\-/_/g;
 
-    my $tag = shift;
     my $cmd = shift;
     $logparams{cmd} = $cmd;
-    $logparams{tag} = $tag;
 
     my %pairs = ('BACKUP_LOCATION' => $config->backup_location,
                  'LOG_DIR'         => $LOG_DIR,
@@ -681,7 +679,7 @@ sub system_runner {
          "system('${cmd}')",
          \%logparams);
     unless ($config->dry_run) {
-        unless ( POSIX::WIFEXITED(system( $logparams{cmd} ) ) ) {
+        unless ( POSIX::WIFEXITED(system( $cmd ) ) ) {
             $logparams{errno} = "${ERRNO}";
             dlog('error',
                  "failed with errno: $logparams{errno} system('${cmd}')",
@@ -1975,15 +1973,24 @@ sub link_symlinks {
 
 sub rsync {
     my ( $src, $dst ) = @_;
-    local %logparams = %logparams;
-    $logparams{src} = $src;
-    $logparams{dst} = $dst;
-    # because we use in place by default, we should consider the destination sus:
-    return system_runner(
-        'rsync copy',
-        sprintf( '%s %s %s %s',
-            $config->rsync_binary, $config->rsync_options, $src, $dst )
+    my %logparams = (
+        src => $src,
+        dst => $dst,
+        rsync_binary => $config->rsync_binary,
+        rsync_options => $config->rsync_options,
     );
+    # because we use in place by default, we should consider the destination sus:
+    dlog('debug',
+         "rsync file copy from ${src} to ${dst}",
+         \%logparams);
+    my $result = system_runner(
+        sprintf( '%s %s %s %s',
+                 $config->rsync_binary, $config->rsync_options, $src, $dst ),
+    );
+    $logparams{result} = $result == 1 ? 'succeeded' : 'failed';
+    dlog($result == 1 ? 'info' : 'debug',
+         "${logparams{result}}: rsync file copy from ${src} to ${dst}",
+         \%logparams);
 }
 
 # copied from the old version of List::Util:
