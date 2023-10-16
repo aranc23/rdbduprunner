@@ -2001,7 +2001,6 @@ sub parse_config_backups {
                 debug("skipping backup on ${host} due to filter");
                 next BS;
             }
-            dlog('debug','backupset',$bs);
 
             if (defined $$bs{backupdestination}) {
                 $backupdest=$$bs{backupdestination};
@@ -2033,6 +2032,7 @@ sub parse_config_backups {
                 error("${bstag} is a duplicity backup with host set to $$bs{host}: duplicity backups must have a local source!");
                 next BS;
             }
+            dlog('debug',"backupset host: ${host} btype: ${btype} backupdest: ${backupdest}",$bs,{msgcode => 'backupdest'});
 
             # paths can be a singleton or array, because that's how
             # Config::General works:
@@ -2121,7 +2121,7 @@ sub parse_config_backups {
                                        $$bh{host},
                                        $$bh{path});
                 }
-                dlog('debug','backup',$bh);
+                dlog('debug',"backup tag: $$bh{tag} btype: $$bh{btype} host: $$bh{host} path: $$bh{path} dest: $$bh{dest}",$bh,{msgcode => 'backup'});
                 push(@BACKUPS,$bh);
             }
         }
