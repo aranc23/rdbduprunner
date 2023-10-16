@@ -1930,7 +1930,7 @@ sub sanity_check_config {
 # shortly
 
 sub link_symlinks {
-    local %logparams = %logparams;
+    my %logparams;
     my $dbtype        = shift;
     my $dbname        = shift;
     return unless defined $dump_db{$dbtype}{$dbname};
@@ -1949,19 +1949,19 @@ sub link_symlinks {
         # remove this link whether the target exists or not, if
         # the target of a link is missing it's useless anyway:
         if ( unlink($$dump{path}) ) {
-            dlog( 'debug', "unlink symlink", \%logparams );
+            dlog( 'debug', "unlink symlink $$dump{path}", {msgcode => 'unlink symlink'}, \%logparams );
         }
         else {
-            dlog( 'error', 'unlink symlink', \%logparams, { errno => $ERRNO } );
+            dlog( 'error', "unlink symlink $$dump{path}", \%logparams, { errno => $ERRNO, msgcode => 'unlink symlink' } );
         }
         # create a hard link to a path that's about to disappear:
         if ( link( $target, $$dump{path} ) ) {
-            dlog( 'debug', "link symlink", \%logparams );
+            dlog( 'debug', "link former symlink $$dump{path} -> ${target}", {msgcode => 'link symlink'}, \%logparams );
         }
         else {
             dlog(
-                'error', "link symlink",
-                \%logparams, { errno => $ERRNO }
+                'error', "failed to link format symlink $$dump{path} -> ${target}",
+                \%logparams, { msgcode => 'link symlink', errno => $ERRNO }
             );
         }
         chdir($oldwd) or die "unable to chdir to ${oldwd}";
