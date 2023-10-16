@@ -7,7 +7,7 @@ use Fatal qw( :void open close link unlink symlink rename fork );
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(handler signal_handler normal-signals);
 
-use Backup::rdbduprunner qw($APP_NAME $USER $STATE_DIR $LOCK_DIR $LOG_DIR $CONFIG_DIR $DISPATCHER &stringy %databasetype_case &unlock_and_close $timestamp_format $iso8601_regex &dlog &lock_db &lock_pid_file &lock_file_compose $uuid &uuid_gen);
+use Backup::rdbduprunner qw($APP_NAME $USER $STATE_DIR $LOCK_DIR $LOG_DIR $CONFIG_DIR $DISPATCHER &stringy %databasetype_case &unlock_and_close $timestamp_format $iso8601_regex &dlog &lock_db &lock_pid_file &lock_file_compose $uuid &uuid_gen &callback_format &callback_format_terminal);
 
 # might be assumed to be installed on any perl system by default?
 use Data::Dumper;
@@ -71,13 +71,6 @@ my $CHECKSUM_VERIFY_ALL;
 # verify just one dump:
 my $CHECKSUM_VERIFY;
 
-# create the call back for the dispatcher at the top level (probably
-# not needed)
-my $callback_clean = sub { my %t=@_;
-                           chomp $t{message};
-                           return $t{message}."\n"; # add a newline
-                         };
-
 # create a logparams for logging, intended to be localized:
 our %logparams=();
 
@@ -107,7 +100,7 @@ sub signal_handler {
 
 # create the dispatcher and return it
 sub create_dispatcher {
-  my $disp=Log::Dispatch->new( callbacks => $callback_clean );
+    my $disp=Log::Dispatch->new();
 
   if ($config->sys_logging) {
     $disp->add(Log::Dispatch::Syslog->new(name      => 'syslog',
@@ -115,13 +108,16 @@ sub create_dispatcher {
                                           ident     => $APP_NAME.'['.$$.']',
                                           facility  => $config->facility,
                                           socket    => 'unix',
-                                         )
+                                          callbacks => \&callback_format
+                                      )
               );
   }
   if ($config->terminal_logging) {
     $disp->add(Log::Dispatch::Screen->new(name      => 'screen',
                                           min_level => $config->log_level,
                                           stderr    => 1,
+                                          newline   => 1,
+                                          callbacks => IO::Interactive::is_interactive() ? \&callback_format_terminal : \&callback_format,
                                          )
               );
   }
@@ -132,7 +128,9 @@ sub create_dispatcher {
                                         min_level => $config->level,
                                         filename  => File::Spec->catfile($LOG_DIR,"${APP_NAME}.log-".strftime('%Y%m%d',localtime(time()))),
                                         mode      => '>>',
-                                       )
+                                        newline   => 1,
+                                        callbacks => \&callback_format
+          )
               );
   }
   return $disp;
@@ -906,7 +904,8 @@ sub perform_backup {
               local %logparams = %logparams;
               $logparams{backup_path} = $backup_path;
               $logparams{output_path} = $output_path;
-              dlog('error', "unable to rsync from output path to backup location", \%logparams);
+              dlog('error',
+                   "unable to rsync from output path (${output_path}) to backup path (${backup_path})", \%logparams);
               unlink $output_path if -f $output_path;
               update_status_db(
                   $databasetype,
@@ -1991,6 +1990,7 @@ sub rsync {
     dlog($result == 1 ? 'info' : 'debug',
          "${logparams{result}}: rsync file copy from ${src} to ${dst}",
          \%logparams);
+    return $result;
 }
 
 # copied from the old version of List::Util:
