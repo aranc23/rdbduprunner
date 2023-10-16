@@ -1409,7 +1409,7 @@ sub lock_db {
     $flags = LOCK_EX unless $flags;
     my $db_lock_handle;
 
-    dlog('debug',"locking related file",$extra_logs, @_);
+    dlog('debug',"locking related file ${db_lock} for ${db_file}",$extra_logs, {msgcode => 'locking related file'},@_);
     unless ( open($db_lock_handle, '>', $db_lock) ) {
         dlog('error',"unable to open database file ${db_lock}", $extra_logs, @_);
         return;
