@@ -867,9 +867,9 @@ sub perform_backup {
           # enabled:
           next unless -f $alt;
           next if ( $config->localcow and $backup_path eq $alt );
-          dlog('debug', "unlink alternate", \%logparams, {alternate_file => $alt});
+          dlog('debug', "unlink alternate ${alt}", \%logparams, {msgcode => 'unlink alternate', alternate_file => $alt});
           unless(unlink $alt) {
-              dlog('error', "unlink alternate", \%logparams, {errno => $ERRNO, alternate_file => $alt});
+              dlog('error', "failed unlink alternate ${alt}", \%logparams, {msgcode => 'unlink alternate', errno => $ERRNO, alternate_file => $alt});
           }
       }
 
@@ -884,7 +884,7 @@ sub perform_backup {
               my $errno = $EVAL_ERROR; # save me
               if( $errno =~ /Invalid cross-device link/ ) {
                   # this is ok to continue, we can just use rsync later
-                  dlog('debug', 'rename failed across devices', \%logparams, {'errno' => 'Invalid cross-device link'});
+                  dlog('debug', 'rename failed across devices, using rsync to copy', \%logparams, {'errno' => 'Invalid cross-device link'});
                   $rename_result=0;
               }
               else {
@@ -931,14 +931,17 @@ sub perform_backup {
                                    $file_name_timestamp);
       }
       symlink $relative_name, $period_paths{daily};
-      dlog('debug', 'symlink daily', { uuid => $uuid, relative_name => $relative_name, period => 'daily', 'path' => $period_paths{'daily'} });
+      dlog('debug', "symlink daily ${period_paths{daily}} -> ${relative_name}",
+           { msgcode => 'symlink daily', uuid => $uuid, relative_name => $relative_name, period => 'daily', 'path' => $period_paths{'daily'} });
       if ( strftime( "%a", localtime($start_time) ) eq $config->week_start ) {
         symlink $relative_name, $period_paths{weekly};
-        dlog('debug', 'symlink weekly', { uuid => $uuid, relative_name => $relative_name, period => 'weekly', 'path' => $period_paths{'weekly'} });
+        dlog('debug', "symlink weekly ${period_paths{weekly}} -> ${relative_name}",
+             { msgcode => 'symlink weekly', uuid => $uuid, relative_name => $relative_name, period => 'weekly', 'path' => $period_paths{'weekly'} });
       }
       if ( strftime( "%d", localtime($start_time) ) eq sprintf('%02d', $config->month_start) ) {
         symlink $relative_name, $period_paths{monthly};
-        dlog('debug', 'symlink monthly', { uuid => $uuid, relative_name => $relative_name, period => 'monthly', 'path' => $period_paths{'monthly'} });
+        dlog('debug', "symlink monthly ${period_paths{monthly}} -> ${relative_name}",
+             { msgcode => 'symlink monthly', uuid => $uuid, relative_name => $relative_name, period => 'monthly', 'path' => $period_paths{'monthly'} });
       }
       dlog('notice',
            "backup status",
