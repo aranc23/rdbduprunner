@@ -879,7 +879,7 @@ sub perform_backup {
           eval {
               rename($output_path, $backup_path);
               $rename_result=1;
-              dlog('debug', 'rename output_path to backup_path', \%logparams);
+              dlog('debug', "renamed ${output_path} to ${backup_path}", \%logparams);
           } or do {
               my $errno = $EVAL_ERROR; # save me
               if( $errno =~ /Invalid cross-device link/ ) {
@@ -888,7 +888,7 @@ sub perform_backup {
                   $rename_result=0;
               }
               else {
-                  dlog('error', 'rename error', \%logparams, { errno => $errno, output_path => $output_path, backup_path => $backup_path });
+                  dlog('error', "error during rename(${output_path},${backup_path})", \%logparams, { msgcode => 'rename error', errno => $errno, output_path => $output_path, backup_path => $backup_path });
                   unlink $output_path;
                   update_status_db($databasetype, $database, { exit => 1,
                                                                stage => 'rename',
@@ -945,6 +945,7 @@ sub perform_backup {
       }
       dlog('notice',
            "backup status",
+           {msgcode => 'backup status'},
            \%logparams);
       $dump_db{$databasetype}{$database}{$start_time} = {
           timestamp      => $start_time,
