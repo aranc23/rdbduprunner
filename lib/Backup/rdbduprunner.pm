@@ -105,6 +105,8 @@ $iso8601_regex
 &lock_file_compose
 $uuid
 &uuid_gen
+&callback_format
+&callback_format_terminal
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -850,16 +852,28 @@ our %config_load_dispatch = (
     'json' => \&load_config_json,
 );
 
-my $callback_clean = sub { my %t=@_;
-                           chomp $t{message};
-                           return $t{message}."\n"; # add a newline
-                         };
+# callback for format into key/value pairs:
+sub callback_format {
+    my %t=@_;
+    return stringy({msg => $t{message}},@{$t{tags}});
+}
+
+# formatting for plain terminal output, without messy key value pairs:
+sub callback_format_terminal {
+    my %t=@_;
+    # sometimes datetime, isn't defined so now is fine!
+    my $dt = (defined $t{tags} and defined $t{tags}[0] and defined $t{tags}[0]{datetime}) ?
+        $t{tags}[0]{datetime} :
+        POSIX::strftime($timestamp_format,localtime(time()));
+    return "${dt}: (${t{level}}) ${t{message}}";
+}
+
 sub create_dispatcher {
     my ( $IDENT, $FACILITY, $LOG_LEVEL, $LOG_FILE ) = @_;
     print STDERR Data::Dumper->Dump([$IDENT, $FACILITY, $LOG_LEVEL, $LOG_FILE],
                                     [qw(ident facility log_level log_file)]) if $DEBUG;
 
-    $DISPATCHER = Log::Dispatch->new( callbacks => $callback_clean );
+    $DISPATCHER = Log::Dispatch->new( );
 
     $DISPATCHER->add(
         Log::Dispatch::Syslog->new(
@@ -868,6 +882,7 @@ sub create_dispatcher {
             ident     => $IDENT . '[' . $$ . ']',
             facility  => $FACILITY,
             socket    => 'unix',
+            callbacks => \&callback_format
         )
     );
 
@@ -876,6 +891,8 @@ sub create_dispatcher {
             name      => 'screen',
             min_level => $LOG_LEVEL,
             stderr    => 0,
+            newline   => 1,
+            callbacks => \&callback_format
         )
     );
     $DISPATCHER->add(
@@ -884,6 +901,8 @@ sub create_dispatcher {
             min_level => $LOG_LEVEL,
             filename  => $LOG_FILE,
             mode      => '>>',
+            newline   => 1,
+            callbacks => \&callback_format
         )
     );
 }
@@ -917,21 +936,28 @@ sub dlog {
   my $level = shift;
   my $msg = shift;
   my $time = time();
-  my $str = stringy(
-      {
-          'msg'       => $msg,
-          'severity'  => $level,
-          'timestamp' => $time,
-          'datetime'  => POSIX::strftime($timestamp_format,localtime($time)),
-          'hostname'  => hostname(),
-          'pid'       => $$,
-          'uuid'      => $uuid,
-      },
-      @_);
+  my $default_tags = {
+      'severity'  => $level,
+      'timestamp' => $time,
+      'datetime'  => POSIX::strftime($timestamp_format,localtime($time)),
+      'hostname'  => hostname(),
+      'pid'       => $$,
+      'uuid'      => $uuid,
+  };
   $DISPATCHER->log( level   => $level,
-                    message => $str,
-                  );
-  return $str;
+                    message => $msg,
+                    tags => [
+                        $default_tags,
+                        @_,
+                    ],
+                );
+  if ( wantarray ) {
+      return($default_tags,@_);
+  }
+  elsif( defined wantarray ) {
+      return stringy($default_tags,@_);
+  }
+  return;
 }
 
 # string turns hash refs into a string of key value pairs, it does not recurse
