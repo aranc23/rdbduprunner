@@ -40,6 +40,7 @@ use Carp;
 use Pod::Usage;
 use Sys::Hostname;
 use Data::UUID;
+use IO::Interactive;
 
 our @ISA = qw(Exporter);
 
@@ -892,7 +893,7 @@ sub create_dispatcher {
             min_level => $LOG_LEVEL,
             stderr    => 0,
             newline   => 1,
-            callbacks => \&callback_format
+            callbacks => IO::Interactive::is_interactive() ? \&callback_format_terminal : \&callback_format,
         )
     );
     $DISPATCHER->add(
