@@ -315,6 +315,7 @@ sub init_config {
                 'compress' => 'compress -c',
                 'none'     => 'cat',
                 'xdelta'   => 'xdelta3 -e -D',
+                'lz4'      => 'lz4 --stdout',
             },
             ARGCOUNT => ARGCOUNT_HASH,
         },
@@ -327,6 +328,7 @@ sub init_config {
                 'compress' => 'uncompress -c',
                 'none'     => 'cat',
                 'xdelta'   => 'xdelta3 -d -D',
+                'lz'       => 'lz4 --uncompress --stdout',
             },
         },
         'compressor_suffix|compressor-suffix=s%' => {
@@ -338,6 +340,7 @@ sub init_config {
                 'compress' => 'Z',
                 # 'none' => 'cat', # leave undefined
                 'xdelta' => 'vcdiff',
+                'lz4' => 'lz4',
             },
         },
         'backup_location=s' => {
