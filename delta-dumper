@@ -176,7 +176,13 @@ sub build_mongodb_exec {
     push @options, '--archive';
     foreach my $p (qw( username hostname password port )) {
         if ( $config->get('mongodb_'.$p) ) {
-            push(@options, '--'.$p.'='.$config->get('mongodb_'.$p));
+            if ( $p eq 'hostname' ) {
+                # hostname is --host but for laziness sake I'll fix it here:
+                push(@options, '--host='.$config->get('mongodb_'.$p));
+            }
+            else {
+                push(@options, '--'.$p.'='.$config->get('mongodb_'.$p));
+            }
         }
     }
     if ( $config->mongodb_ssl ) {
