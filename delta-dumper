@@ -176,7 +176,7 @@ sub build_mongodb_exec {
     push @options, '--archive';
     foreach my $p (qw( username hostname password port )) {
         if ( $config->get('mongodb_'.$p) ) {
-            push(@options, '--'.$p.$config->get('mongodb_'.$p));
+            push(@options, '--'.$p.'='.$config->get('mongodb_'.$p));
         }
     }
     if ( $config->mongodb_ssl ) {
