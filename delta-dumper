@@ -1926,10 +1926,25 @@ sub checksum_from_file {
 }
 
 sub sanity_check_config {
+    my $msg;
+    foreach my $compy ($config->compression,$config->secondary_compression) {
+        unless( defined $config->compressor_compress->{$compy} and
+                defined $config->compressor_uncompress->{$compy} and
+                defined $config->compressor_suffix->{$compy} ) {
+            $msg = sprintf "requested compression (%s/%s) is not defined in the config!", $config->compression,$config->secondary_compression;
+            dlog('critical',
+                 $msg,
+                 {
+                     'compression' => $config->compression,
+                     'secondary_compression' => $config->secondary_compression,
+                 });
+            die $msg;
+        }
+    }
   unless ($config->mysql or $config->postgresql or $config->mongodb) {
-    my $emsg='neither mysql nor postgresql not mongodb was specified, nothing to dump!';
-    dlog('error',$emsg,{});
-    die $emsg;
+    $msg='neither mysql nor postgresql not mongodb was specified, nothing to dump!';
+    dlog('error',$msg,{});
+    die $msg;
   }
 }
 
