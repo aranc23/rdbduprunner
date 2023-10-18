@@ -1888,11 +1888,11 @@ sub checksum_verify_dump {
     my $actual_checksum = checksum_from_file($tf);
     close $th;unlink $tf;
     if($actual_checksum and $checksum eq $actual_checksum) {
-        dlog('info',"checksum match $$dump{path}",
+        dlog('info',"checksum match $$dump{path} ${checksum}",
              \%logparams,{path => $$dump{path}, msgcode => 'checksum mismatch'});
         return $checksum;
     }
-    dlog('error',"checksum mismatch $$dump{path}",\%logparams,{path => $$dump{path}, msgcode => 'checksum mismatch'});
+    dlog('error',"checksum mismatch $$dump{path} ${checksum}!=${actual_checksum}",\%logparams,{path => $$dump{path}, msgcode => 'checksum mismatch'});
     return;
 }
 
