@@ -328,7 +328,7 @@ sub init_config {
                 'compress' => 'uncompress -c',
                 'none'     => 'cat',
                 'xdelta'   => 'xdelta3 -d -D',
-                'lz'       => 'lz4 --uncompress --stdout',
+                'lz4'      => 'lz4 --uncompress --stdout',
             },
         },
         'compressor_suffix|compressor-suffix=s%' => {
