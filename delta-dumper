@@ -1403,7 +1403,7 @@ sub generic_dump {
             warn "use this compressor/uncompressor: ${c}" if $DEBUG;
             push @delta_exec, '-s', $fifos{delta};
             unless($config->dry_run) {
-                mkfifo($fifos{delta}, 0600) or die "unable to create fifo for decompressing";
+                mkfifo($fifos{delta}, oct(600)) or die "unable to create fifo for decompressing";
                 push @temp_files, $fifos{delta};
             }
             $decomp_hash = {
@@ -1455,7 +1455,7 @@ sub generic_dump {
        });
     if ($dbtype eq 'mysql' and $config->mysql_verify) {
         unless($config->dry_run) {
-            mkfifo($fifos{verify}, 0600) or die "unable to create fifo for verifying mysql dump";
+            mkfifo($fifos{verify}, oct(600)) or die "unable to create fifo for verifying mysql dump";
             push @temp_files, $fifos{verify};
         }
         my @vpipes;
@@ -1482,7 +1482,7 @@ sub generic_dump {
     }
     if ($config->checksum) {
         unless($config->dry_run) {
-            mkfifo($fifos{hash}, 0600) or die "unable to create fifo for hashing dump";
+            mkfifo($fifos{hash}, oct(600)) or die "unable to create fifo for hashing dump";
             push @temp_files, $fifos{hash};
         }
         my @cpipes;
@@ -1602,7 +1602,7 @@ sub update_checksum_db {
     print STDERR Dumper \%logparams if $DEBUG;
     my $lock = lock_db($CHECKSUM_DB,LOCK_EX,\%logparams);
     my %sums;
-    unless(tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666) {
+    unless(tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666)) {
         dlog('error', "unable to open database file ${CHECKSUM_DB}", {db_file => $CHECKSUM_DB});
         return;
     }
@@ -1628,7 +1628,7 @@ sub checksum_dump {
     local %logparams = %logparams;
     my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
     my %sums;
-    tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
+    tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666) or die "unable to tie ${CHECKSUM_DB}";
     while(my ($k,$v)=each(%sums)) {
         my ($t,$d,$s,$ss) = split_checksum_key($k);
         print sprintf "%s\t%s\t%s: %s\n", $t, $d, $s, $v;
@@ -1644,7 +1644,7 @@ sub checksum_fsck {
     my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
     my %sums;
     my @deletes;
-    tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
+    tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666) or die "unable to tie ${CHECKSUM_DB}";
     while(my ($k,$v)=each(%sums)) {
         my ($t,$d,$s,$ss);
         unless(($t,$d,$s,$ss) = split_checksum_key($k)) {
@@ -1672,7 +1672,7 @@ sub checksum_verify_all {
     local %logparams = %logparams;
     my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
     my %_sums;
-    tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
+    tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666) or die "unable to tie ${CHECKSUM_DB}";
     my %sums = %_sums; # does this work?
     untie %sums;
     unlock_and_close($lock);
@@ -1745,7 +1745,7 @@ sub checksum_verify {
     }
     my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
     my %_sums;
-    tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, 0666 or die "unable to tie ${CHECKSUM_DB}";
+    tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666) or die "unable to tie ${CHECKSUM_DB}";
     my %sums = %_sums; # does this work?
     untie %sums;
     unlock_and_close($lock);
@@ -2039,7 +2039,7 @@ sub update_status_db {
     my $db_lock_handle = lock_db($DB_FILE,LOCK_EX,\%logparams);
 
     my %status;
-    unless(tie %status, 'GDBM_File', $DB_FILE, O_CREAT|O_RDWR, 0666) {
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_CREAT|O_RDWR, oct(666)) {
         dlog('error', "unable to open database file ${DB_FILE}", {db_file => $DB_FILE});
         return;
     }
@@ -2054,7 +2054,7 @@ sub status_delete {
     my $h = lock_db($DB_FILE,LOCK_EX,\%logparams);
 
     my %status;
-    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDWR, 0666) {
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDWR, oct(666)) {
         dlog('error', "unable to open database file ${DB_FILE} for deletions", {db_file => $DB_FILE});
         return;
     }
@@ -2071,7 +2071,7 @@ sub status_json {
     my $h = lock_db($DB_FILE,LOCK_SH,\%logparams);
 
     my %status;
-    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, 0666) {
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, oct(666)) {
         dlog('error', "unable to open database file ${DB_FILE} for reading", {db_file => $DB_FILE});
         return;
     }
