@@ -1930,7 +1930,7 @@ sub sanity_check_config {
     foreach my $compy ($config->compression,$config->secondary_compression) {
         unless( defined $config->compressor_compress->{$compy} and
                 defined $config->compressor_uncompress->{$compy} and
-                defined $config->compressor_suffix->{$compy} ) {
+                ($compy eq 'none' ? 1 : defined $config->compressor_suffix->{$compy}) ) {
             $msg = sprintf "requested compression (%s/%s) is not defined in the config!", $config->compression,$config->secondary_compression;
             dlog('critical',
                  $msg,
