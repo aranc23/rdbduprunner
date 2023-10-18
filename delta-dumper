@@ -875,8 +875,19 @@ sub perform_backup {
           # the one we intend to write in this pass and localcow is
           # enabled:
           next unless -f $alt;
-          next if ( $config->localcow and $backup_path eq $alt );
-          dlog('debug', "unlink alternate ${alt}", \%logparams, {msgcode => 'unlink alternate', alternate_file => $alt});
+          if ( $config->localcow and $backup_path eq $alt ) {
+              dlog('debug',
+                   "not unlinking alternate ${alt} because it is our target (${backup_path})",
+                   \%logparams,
+                   {backup_path => $backup_path, alternate_file => $alt});
+              next;
+          }
+          dlog('debug',
+               ( $backup_path eq $alt ?
+                 "unlink old backup file ${alt}" :
+                 "unlink alternate ${alt}" ),
+               \%logparams,
+               {msgcode => 'unlink alternate', alternate_file => $alt});
           unless(unlink $alt) {
               dlog('error', "failed unlink alternate ${alt}", \%logparams, {msgcode => 'unlink alternate', errno => $ERRNO, alternate_file => $alt});
           }
