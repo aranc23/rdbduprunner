@@ -1122,7 +1122,7 @@ sub clean_old_dumps {
         if( (time() - $$fhash{timestamp}) > $period_times{$$fhash{period}} ) {
             if( unlink $$fhash{path} ) {
                 dlog('info',
-                     sprintf('unlink dump file %s for being older then %d %s backups (aka %d seconds)',
+                     sprintf('unlink dump file %s for being older than %d %s backups (aka %d seconds)',
                              $$fhash{path},
                              $config->get($$fhash{period}) ? $config->get($$fhash{period}) : 0,
                              $$fhash{period},
