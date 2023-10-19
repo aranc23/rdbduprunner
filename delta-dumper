@@ -1079,7 +1079,6 @@ sub scan_existing {
 sub clean_old_dumps {
     my $databasetype = shift;
     my $databasename = shift;
-    local %logparams = %logparams;
     # we shouldn't calculate this on each call, but here we are:
     my %period_times;
     unless ( exists $dump_db{$databasetype}
@@ -1097,27 +1096,42 @@ sub clean_old_dumps {
     }
  FILE:
     foreach my $fhash (values(%{$dump_db{$databasetype}{$databasename}})) {
-        local %logparams = %logparams;
         if ( -l $$fhash{path} and -f $$fhash{path} ) {
             next FILE; # we do not act on non-broken symlinks... but maybe we should?
         }
         next unless ( -f $$fhash{path} or -l $$fhash{path} ) ; # do not act on non-regular files
         next unless unused_dump($$fhash{timestamp}, values(%{$dump_db{$databasetype}{$databasename}}));
-        $logparams{'period'} = $$fhash{period};
-        $logparams{'file'} = $$fhash{path};
-        $logparams{file_timestamp} = $$fhash{timestamp};
-        $logparams{file_datetime} = localtime($$fhash{timestamp});
+        my %logparams = (
+            'msgcode'        => 'unlink dump',
+            'period'         => $$fhash{period},
+            'file'           => $$fhash{path},
+            'file_timestamp' => $$fhash{timestamp},
+            'file_datetime'  => localtime( $$fhash{timestamp} ),
+        );
         if( (time() - $$fhash{timestamp}) > $period_times{$$fhash{period}} ) {
             if( unlink $$fhash{path} ) {
-                dlog('info','unlink dump', \%logparams );
+                dlog('info',
+                     sprintf('unlink dump file %s for being older then %d %s backups (aka %d seconds)',
+                             $$fhash{path},
+                             $config->get($$fhash{period}) ? $config->get($$fhash{period}) : 0,
+                             $$fhash{period},
+                             $period_times{$$fhash{period}}),
+                     \%logparams );
             }
             else {
-                dlog('error','unlink dump', \%logparams );
+                $logparams{errno} = $ERRNO;
+                dlog('error',
+                     sprintf('failed to unlink dump file %s: errno %s', $$fhash{path}, $logparams{errno}),
+                     \%logparams );
             }
         }
     }
 }
 
+# look for the timestamp as referenced by another existing
+# backup/dump, and return failure if it is in use, return 1 if it
+# isn't in use and therefore "unused" and a potential candidate for
+# removal in clean_old_dumps()
 sub unused_dump {
     my $timestamp = shift;
     foreach my $fh (@_) {
