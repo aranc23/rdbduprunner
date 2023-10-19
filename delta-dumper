@@ -964,7 +964,7 @@ sub perform_backup {
              { msgcode => 'symlink monthly', uuid => $uuid, relative_name => $relative_name, period => 'monthly', 'path' => $period_paths{'monthly'} });
       }
       dlog('notice',
-           "succeded: backup of ${databasetype}:${database}",
+           "succeeded: backup of ${databasetype}:${database}",
            {msgcode => 'backup status'},
            \%logparams);
       $dump_db{$databasetype}{$database}{$start_time} = {
