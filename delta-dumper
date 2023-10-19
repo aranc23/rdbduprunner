@@ -1056,6 +1056,10 @@ sub scan_existing {
     # per-period directories:
     my $csg_db_backup_pat = File::Spec->catfile('{'.join(',',@locations).'}',
                                                 '*{'.join(',',@periods).'}*sql*');
+    dlog('debug',"patterns delta_pat: ${delta_pat} csg_db_backup_pat: ${csg_db_backup_pat}",
+         {delta_pat => $delta_pat,
+          csg_db_backup_pat => $csg_db_backup_pat});
+
  FILE:
     foreach my $file (glob($delta_pat),glob($csg_db_backup_pat)) {
         if (my $dump = build_dump_hash_from_path($file) ) {
