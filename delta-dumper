@@ -1111,7 +1111,7 @@ sub clean_old_dumps {
             next FILE; # we do not act on non-broken symlinks... but maybe we should?
         }
         next unless ( -f $$fhash{path} or -l $$fhash{path} ) ; # do not act on non-regular files
-        next unless unused_dump($$fhash{timestamp}, values(%{$dump_db{$databasetype}{$databasename}}));
+        next unless unused_dump($$fhash{timestamp}, @{$dump_db{$databasetype}{$databasename}});
         my %logparams = (
             'msgcode'        => 'unlink dump',
             'period'         => $$fhash{period},
@@ -1473,7 +1473,6 @@ sub generic_dump {
                  },
              );
         }
-        #delete $dump_db{$dbtype}->{$database}->{$$full_dump{timestamp}};
     }
     elsif ( $compression ne 'none' ) {
         push(@pipes,{
