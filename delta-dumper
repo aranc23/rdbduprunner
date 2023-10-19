@@ -1570,7 +1570,10 @@ sub generic_dump {
         close $fh;
     }
     unlink $cfp if -f $cfp;
-    dlog( ($logparams{exit} == 0 ? 'info' : 'error'), 'dump status', \%logparams );
+    dlog( ($logparams{exit} == 0 ? 'info' : 'error'),
+          "dump exited $logparams{exit}",
+          \%logparams,
+          { 'msgcode' => 'dump status' });
     return ($logparams{exit}, $logparams{failed_stage});
 }
 
