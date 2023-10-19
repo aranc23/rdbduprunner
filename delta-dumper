@@ -1704,7 +1704,12 @@ sub checksum_fsck {
     while(my ($k,$v)=each(%sums)) {
         my ($t,$d,$s,$ss) = split_checksum_key($k) or die "unsplittable key ${k}";
         unless ( exists $$dumps{$t}{$d} and find_dump_by_timestamp(str2time($s),$$dumps{$t}{$d}) ) {
-            dlog('warning',"missing file",\%logparams,{databasetype => $t, databasename => $d, start_time => $s});
+            dlog('warning',
+                 sprintf("missing file for $t:$d at %s",
+                         strftime($timestamp_format,
+                                  localtime(str2time($s)))),
+                 \%logparams,
+                 {databasetype => $t, databasename => $d, start_time => $s});
         }
     }
     foreach my $k (@deletes) {
