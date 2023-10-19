@@ -964,7 +964,7 @@ sub perform_backup {
              { msgcode => 'symlink monthly', uuid => $uuid, relative_name => $relative_name, period => 'monthly', 'path' => $period_paths{'monthly'} });
       }
       dlog('notice',
-           "backup status",
+           "succeded: backup of ${databasetype}:${database}",
            {msgcode => 'backup status'},
            \%logparams);
       $dump_db{$databasetype}{$database}{$start_time} = {
@@ -990,7 +990,9 @@ sub perform_backup {
                                                    stage => $stage,
                                                    start_time => $start_time });
   }
-  dlog('error','perform backup fall through failure', \%logparams);
+    dlog('error',"failed: backup of ${databasetype}:${database} exited ${return_value}",
+         \%logparams,
+         { 'msgcode' => 'perform backup fall through failure' });
   return;
 }
 
@@ -1321,13 +1323,17 @@ sub find_compressor {
 }
 
 sub generic_dump {
-    local %logparams = %logparams;
     # pass the type, database, and path? or also the primary dump exec command?
     my $dbtype = shift;
     my $database = shift;
     my $compression = shift;
     my $backup_path = shift;
     my $full_dump = shift; # only used if xdelta is in effect
+    my %logparams = (
+        'dbtype' => $dbtype,
+        'database' => $database,
+        'compression' => $compression,
+        'backup_path' => $backup_path );
 
     # if you specify a template, it must include the temporary
     # directory if you don't want it to end up in your current
@@ -1571,7 +1577,8 @@ sub generic_dump {
     }
     unlink $cfp if -f $cfp;
     dlog( ($logparams{exit} == 0 ? 'info' : 'error'),
-          "dump exited $logparams{exit}",
+          ($logparams{exit} == 0 ? "succeeded" : "failed").
+          ": dump of ${dbtype}:${database} exited with $logparams{exit}",
           \%logparams,
           { 'msgcode' => 'dump status' });
     return ($logparams{exit}, $logparams{failed_stage});
