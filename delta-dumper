@@ -960,6 +960,9 @@ sub perform_backup {
            "succeeded: backup of ${databasetype}:${database}",
            {msgcode => 'backup status'},
            \%logparams);
+
+      # we update this data structure so when clean_old_dumps runs, it
+      # has the most recent successful run in the database:
       $dump_db{$databasetype}{$database}{$start_time} = {
           timestamp      => $start_time,
           path           => File::Spec->catfile(
