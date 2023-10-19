@@ -808,17 +808,23 @@ sub perform_backup {
     my $backup_timestamp_format = strftime $timestamp_format,  localtime($start_time);
     $logparams{start_time} = $backup_timestamp_format;
 
-    my $file_name_timestamp
-        = ( $effective_compresssion_method eq 'xdelta' )
-        ? backup_file_name_builder(@file_parts,
-                                   join('_',
-                                        strftime($timestamp_format, localtime($$full_dump{timestamp})),
-                                        strftime($timestamp_format, localtime($start_time))
-                                    ),
-                                   \@suffix)
-        : backup_file_name_builder(@file_parts,
-                                   strftime($timestamp_format, localtime($start_time)),
-                                   \@suffix);
+    # this is the name of the file/symlink that will be placed in the
+    # daily/weekly/monthly directory after a successful backup:
+    my $file_name_timestamp = backup_file_name_builder(
+        @file_parts,
+        $effective_compresssion_method eq 'xdelta'
+        # two timestamps, the full dump and the new:
+        ? join(
+            '_',
+            strftime(
+                $timestamp_format, localtime( $$full_dump{timestamp} )
+            ),
+            strftime( $timestamp_format, localtime($start_time) )
+            )
+        # only one timestamp:
+        : strftime( $timestamp_format, localtime($start_time) ),
+        \@suffix
+    );
 
     dlog('debug', 'perform_backup', \%logparams);
     my ($return_value,$stage)
