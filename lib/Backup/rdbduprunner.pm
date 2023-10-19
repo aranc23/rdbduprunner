@@ -891,7 +891,7 @@ sub create_dispatcher {
         Log::Dispatch::Screen->new(
             name      => 'screen',
             min_level => $LOG_LEVEL,
-            stderr    => 0,
+            stderr    => 1,
             newline   => 1,
             callbacks => IO::Interactive::is_interactive() ? \&callback_format_terminal : \&callback_format,
         )
