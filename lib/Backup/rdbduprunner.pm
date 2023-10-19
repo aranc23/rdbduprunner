@@ -108,6 +108,7 @@ $uuid
 &uuid_gen
 &callback_format
 &callback_format_terminal
+&backup_file_name_builder
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -2864,6 +2865,18 @@ sub exit_status {
 # create a random uuid for logging bits
 sub uuid_gen {
     return $uuid_gen->to_string($uuid_gen->create());
+}
+
+# pass an array of elemeents to join, and an option arrayref of
+# suffixes:
+sub backup_file_name_builder {
+    my $sufs = pop;
+    unless( ref $sufs eq 'ARRAY' ) {
+        push @_, $sufs;
+        undef $sufs;
+    }
+    # two array refs
+    return join('-',@_).($sufs ? '.'.join('.', @{$sufs}) : '');
 }
 
 # Preloaded methods go here.
