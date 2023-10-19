@@ -963,7 +963,7 @@ sub perform_backup {
 
       # we update this data structure so when clean_old_dumps runs, it
       # has the most recent successful run in the database:
-      $dump_db{$databasetype}{$database}{$start_time} = {
+      insert_into_dump_db(\%dump_db,$databasetype, $database, {
           timestamp      => $start_time,
           path           => File::Spec->catfile(
               $config->backup_location, 'daily', $file_name_timestamp
@@ -971,7 +971,7 @@ sub perform_backup {
           period         => 'daily',
           full           => $effective_compresssion_method eq 'xdelta' ? 0 : 1,
           full_timestamp => $effective_compresssion_method eq 'xdelta' ? $$full_dump{timestamp} : undef,
-      };
+      });
       print Dumper \%dump_db if $DEBUG;
       clean_old_dumps($databasetype, $database);
       update_status_db($databasetype, $database, { exit => 0,
@@ -992,6 +992,17 @@ sub perform_backup {
   return;
 }
 
+sub insert_into_dump_db {
+    my $dump_db = shift;
+    my $dbtype = shift;
+    my $db = shift;
+    my $dump = shift;
+    unless ( defined $$dump_db{$dbtype}{$db} ) {
+        $$dump_db{$dbtype}{$db} = [];
+    }
+    push(@{$$dump_db{$dbtype}{$db}},$dump);
+}
+
 sub timestamp_sort {
     return int($$a{timestamp}) <=> int($$b{timestamp});
 }
@@ -1002,7 +1013,7 @@ sub find_most_recent_dump {
     unless(exists $dump_db{$databasetype}{$databasename}) {
         return; # fail to find
     }
-    my @vals = values(%{$dump_db{$databasetype}{$databasename}});
+    my @vals = @{$dump_db{$databasetype}{$databasename}};
     @vals = grep {$$_{full}} @vals;
     return unless scalar @vals > 0;
     @vals = sort timestamp_sort @vals;
@@ -1064,7 +1075,7 @@ sub scan_existing {
     foreach my $file (glob($delta_pat),glob($csg_db_backup_pat)) {
         if (my $dump = build_dump_hash_from_path($file) ) {
             print STDERR Dumper $dump if $DEBUG;
-            $$dump_db{$$dump{databasetype}}{$$dump{databasename}}{$$dump{timestamp}} = $dump;
+            insert_into_dump_db($dump_db,$$dump{databasetype},$$dump{databasename},$dump);
         }
         else {
             dlog( 'error', "unable to parse information from file", \%logparams );
@@ -1095,7 +1106,7 @@ sub clean_old_dumps {
         $period_times{$period} = $n;
     }
  FILE:
-    foreach my $fhash (values(%{$dump_db{$databasetype}{$databasename}})) {
+    foreach my $fhash (@{$dump_db{$databasetype}{$databasename}}) {
         if ( -l $$fhash{path} and -f $$fhash{path} ) {
             next FILE; # we do not act on non-broken symlinks... but maybe we should?
         }
@@ -1692,7 +1703,7 @@ sub checksum_fsck {
     my $dumps = scan_existing();
     while(my ($k,$v)=each(%sums)) {
         my ($t,$d,$s,$ss) = split_checksum_key($k) or die "unsplittable key ${k}";
-        unless ( exists $$dumps{$t}{$d}{str2time($s)} ) {
+        unless ( exists $$dumps{$t}{$d} and find_dump_by_timestamp(str2time($s),$$dumps{$t}{$d}) ) {
             dlog('warning',"missing file",\%logparams,{databasetype => $t, databasename => $d, start_time => $s});
         }
     }
@@ -1722,12 +1733,12 @@ sub checksum_verify_all {
     # }
     while(my ($dbtype,$h) = each(%{$dumps})) {
         while(my ($db,$th) = each(%{$h})) {
-            while(my ($ts,$dh) = each(%{$th})) {
+            foreach my $dh (@{$th}) {
                 #warn "${dbtype}\t${db}\t${ts}" if $DEBUG;
                 my $checksum_key = make_checksum_key($dbtype,
                                                      $db,
                                                      strftime($timestamp_format,
-                                                              localtime(int($ts))));
+                                                              localtime(int($$dh{timestamp}))));
                 if( exists $sums{$checksum_key} ) {
                     # warn sprintf "found dump in existing db: %s %s at %s with checksum %s stored in %s",
                     #     $dbtype,
@@ -1738,7 +1749,7 @@ sub checksum_verify_all {
                     $logparams{databasetype} = lc $dbtype;
                     $logparams{databasename} = $db;
                     $logparams{start_time} = strftime($timestamp_format,
-                                                      localtime(int($ts)));
+                                                      localtime(int($$dh{timestamp})));
                     $logparams{checksum} = $sums{$checksum_key};
                     checksum_verify_dump($dumps,$dh,$sums{$checksum_key});
                 }
@@ -1754,7 +1765,7 @@ sub find_dump_from_file {
  DBTYPE:
     while(my ($dbtype,$h) = each(%{$dumps})) {
         while(my ($db,$th) = each(%{$h})) {
-            while(my ($ts,$dh) = each(%{$th})) {
+            foreach my $dh (@{$th}) {
                 if ( $$dh{path} eq $path ) {
                     return $dh;
                 }
@@ -1826,6 +1837,15 @@ sub restore {
     });
 }
 
+sub find_dump_by_timestamp {
+    my $timestamp = shift;
+    my $dumps = shift;
+    foreach my $dump (@$dumps) {
+        return $dump if int($$dump{timestamp}) == int($timestamp);
+    }
+    return;
+}
+
 sub reconstruct_pipeline {
     local %logparams = %logparams;
     my $dumps = shift; # all the dumps so xdelta can find parents
@@ -1839,11 +1859,13 @@ sub reconstruct_pipeline {
     if (my $compression = find_compressor($$dump{path})) {
         print STDERR Dumper $config->compressor_uncompress->{$compression} if $DEBUG;
         if ($compression eq 'xdelta') {
-            unless( exists $$dumps{$$dump{databasetype}}{$$dump{databasename}}{$$dump{full_timestamp}} ) {
+            my $parent = find_dump_by_timestamp( $$dump{full_timestamp},
+                $$dumps{ $$dump{databasetype} }{ $$dump{databasename} } );
+            unless( $parent ) {
+                dlog('error',"unable to find parent of $$dump{path}",\%logparams);
                 warn "parent does not exist";
                 return;
             }
-            my $parent = $$dumps{$$dump{databasetype}}{$$dump{databasename}}{$$dump{full_timestamp}};
             $logparams{full_path} = $$parent{path};
             print STDERR Dumper $parent if $DEBUG;
             if ( my $secondary_compression = find_compressor($$parent{path}) ) {
@@ -1998,7 +2020,7 @@ sub link_symlinks {
     my $dbtype        = shift;
     my $dbname        = shift;
     return unless defined $dump_db{$dbtype}{$dbname};
-    foreach my $dump (values(%{$dump_db{$dbtype}{$dbname}})) {
+    foreach my $dump (@{$dump_db{$dbtype}{$dbname}}) {
         next unless -l $$dump{path}; # skip the non-links
         print Dumper $dump if $DEBUG;
         my $target = readlink($$dump{path});
