@@ -2003,7 +2003,7 @@ sub link_symlinks {
         }
         else {
             dlog(
-                'error', "failed to link format symlink $$dump{path} -> ${target}",
+                'error', "failed to link former symlink $$dump{path} -> ${target}",
                 \%logparams, { msgcode => 'link symlink', errno => $ERRNO }
             );
         }
