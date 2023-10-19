@@ -642,7 +642,7 @@ sub main {
           } or do {
               my $e = $@;
               dlog('error',
-                   "exception performing dump of ${dbtype}:${db}",
+                   "exception performing dump of ${dbtype}:${db} ${e}",
                    { 'databasetype' => $dbtype, 'databasename' => $db, 'exception' => $e });
               die $e if $e =~ m{caught \s+ SIG .+ exiting}xms;
               next DB;
