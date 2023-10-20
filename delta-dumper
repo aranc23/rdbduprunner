@@ -1662,7 +1662,7 @@ sub split_checksum_key {
 
 sub checksum_dump {
     local %logparams = %logparams;
-    my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
     my %sums;
     tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666) or die "unable to tie ${CHECKSUM_DB}";
     while(my ($k,$v)=each(%sums)) {
@@ -1677,7 +1677,7 @@ sub checksum_dump {
 # for now, just delete unparseable entries!
 sub checksum_fsck {
     local %logparams = %logparams;
-    my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
     my %sums;
     my @deletes;
     tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666) or die "unable to tie ${CHECKSUM_DB}";
@@ -1711,7 +1711,7 @@ sub checksum_fsck {
 
 sub checksum_verify_all {
     local %logparams = %logparams;
-    my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
     my %_sums;
     tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666) or die "unable to tie ${CHECKSUM_DB}";
     my %sums = %_sums; # does this work?
@@ -1784,7 +1784,7 @@ sub checksum_verify {
         dlog('error', "checksum broken", \%logparams);
         return;
     }
-    my $lock = lock_db($CHECKSUM_DB,LOCK_SH,\%logparams);
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
     my %_sums;
     tie %_sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666) or die "unable to tie ${CHECKSUM_DB}";
     my %sums = %_sums; # does this work?
@@ -2088,7 +2088,7 @@ sub update_status_db {
     if ( defined $$value{start_time} ) {
         $$value{start_time} = strftime($timestamp_format, localtime($$value{start_time}));
     }
-    my $db_lock_handle = lock_db($DB_FILE,LOCK_EX,\%logparams);
+    my $db_lock_handle = lock_db($DB_FILE,LOCK_EX);
 
     my %status;
     unless(tie %status, 'GDBM_File', $DB_FILE, O_CREAT|O_RDWR, oct(666)) {
@@ -2103,7 +2103,7 @@ sub update_status_db {
 }
 
 sub status_delete {
-    my $h = lock_db($DB_FILE,LOCK_EX,\%logparams);
+    my $h = lock_db($DB_FILE,LOCK_EX);
 
     my %status;
     unless(tie %status, 'GDBM_File', $DB_FILE, O_RDWR, oct(666)) {
@@ -2120,7 +2120,7 @@ sub status_delete {
 }
 
 sub status_json {
-    my $h = lock_db($DB_FILE,LOCK_SH,\%logparams);
+    my $h = lock_db($DB_FILE,LOCK_SH);
 
     my %status;
     unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, oct(666)) {
