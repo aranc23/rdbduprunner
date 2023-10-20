@@ -972,6 +972,34 @@ sub perform_backup {
             full           => $effective_compresssion_method eq 'xdelta' ? 0 : 1,
             full_timestamp => $effective_compresssion_method eq 'xdelta' ? $$full_dump{timestamp} : undef,
         });
+        if($config->checksum) {
+            my $sum;
+            # drop the .Z part? add .md5 part?
+            my $sum_file = File::Spec->catfile( $config->backup_location,
+                                 $p,backup_file_name_builder(
+                @file_parts,
+                $effective_compresssion_method eq 'xdelta'
+                # two timestamps, the full dump and the new:
+                ? join(
+                    '_',
+                    strftime(
+                        $timestamp_format, localtime( $$full_dump{timestamp} )
+                    ),
+                    $timestamp_format_start_time,
+                )
+                # only one timestamp:
+                : $timestamp_format_start_time,
+                ['sql'],
+            ));
+warn $sum_file;
+            if(open($sum, '>', join('.', $sum_file, $config->checksum_algorithm))) {
+                my $_checksum = checksum_lookup($databasetype,$database,$start_time);
+                my ($algo,$checksum) = checksum_lookup($databasetype,$database,$start_time);
+                print $sum sprintf('%s  %s'."\n",
+                                   basename($sum_file),
+                                   $checksum);
+            }
+        }
         print Dumper \%dump_db if $DEBUG;
     }
     eval { unlink $output_path; };
@@ -1724,6 +1752,26 @@ sub checksum_fsck {
     }
     untie %sums;
     unlock_and_close($lock);
+}
+
+# given dbtype, dbname, and timestamp:
+# return algo and hash value if it exists
+sub checksum_lookup {
+    my $key = make_checksum_key($_[0],$_[1],strftime($timestamp_format,localtime(int($_[2]))));
+    return unless $key;
+    my $lock = lock_db($CHECKSUM_DB,LOCK_SH);
+    my %sums;
+    tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666) or die "unable to tie ${CHECKSUM_DB}";
+    my ($a,$v) = (undef,undef);
+    if ( exists $sums{$key} ) {
+        unless( ($a,$v) = $sums{$key} =~ /^(.+)=(.+)/xms ) {
+            $a = 'sha256';
+            $v = $sums{$key};
+        }
+    }
+    untie %sums;
+    unlock_and_close($lock);
+    return ($a,$v);
 }
 
 sub checksum_verify_all {
