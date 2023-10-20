@@ -7,7 +7,7 @@ use Fatal qw( :void open close link unlink symlink rename fork );
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(handler signal_handler normal-signals);
 
-use Backup::rdbduprunner qw($APP_NAME $USER $STATE_DIR $LOCK_DIR $LOG_DIR $CONFIG_DIR $DISPATCHER &stringy %databasetype_case &unlock_and_close $timestamp_format $iso8601_regex &dlog &lock_db &lock_pid_file &lock_file_compose $uuid &uuid_gen &callback_format &callback_format_terminal &backup_file_name_builder);
+use Backup::rdbduprunner qw($APP_NAME $USER $STATE_DIR $LOCK_DIR $LOG_DIR $CONFIG_DIR $DISPATCHER &stringy %databasetype_case &unlock_and_close $timestamp_format $iso8601_regex &dlog &lock_db &lock_pid_file &lock_file_compose $uuid &uuid_gen &callback_format &callback_format_terminal &backup_file_name_builder &unlink_alternates);
 
 # might be assumed to be installed on any perl system by default?
 use Data::Dumper;
@@ -392,7 +392,19 @@ sub init_config {
         'mysql!',
         'postgresql!',
         'mongodb!',
-        'localcow!',
+        'rsyncable!',
+        'rsyncable_location' => {
+            ALIAS    => 'rsyncable-location',
+            ARGS     => '=s',
+            VALIDATE => '^\/.+',       # require an absolute path?
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'sys_logging' => {
+            DEFAULT  => 1,
+            ARGS     => '!',
+            ALIAS    => 'syslog',
+            ARGCOUNT => ARGCOUNT_NONE,
+        },
         'sys_logging' => {
             DEFAULT  => 1,
             ARGS     => '!',
@@ -749,8 +761,6 @@ sub perform_backup {
     );
     # record the time for logging:
     my $start_time = time();
-    # this is the directory we intend to write the dump to:
-    my $current_dir = File::Spec->catfile($config->backup_location,'current');
     # suffix or not:
     my @suffix = ( 'sql' ) ;
     # this is a hash from the dump_db with keys, timestamp, path, full, and period
@@ -769,46 +779,10 @@ sub perform_backup {
 
     # the components of the file name to eventually create:
     my @file_parts = ( $databasetype, $database );
-    my $file_name = backup_file_name_builder(@file_parts,\@suffix);
-    # the backup path is the full path to the database dump we are
-    # trying to create:
-    my $backup_path = File::Spec->catfile($current_dir,$file_name);
-    $logparams{backup_path} = $backup_path;
-    # create a useful list of alternate possible last backups:
-    my @alternates = path_alternates($backup_path);
-    # look for postgres-* in the current directory if we are backing up postgresql
-    if ( $databasetype eq 'postgresql' ) {
-        push(
-            @alternates,
-            path_alternates(
-                File::Spec->catfile(
-                    $current_dir,
-                    backup_file_name_builder(
-                        'postgres', $database, \@suffix
-                    )
-                )
-            )
-        );
-    }
 
-    print Dumper \@alternates if $DEBUG;
-    # output_path is a full path to a temporary file to initially dump
-    # the database into:
-    my ($_of,$output_path);
-    if($config->dry_run) {
-        $output_path = File::Spec->catfile($config->tmpdir ? $config->tmpdir : $current_dir, "${file_name}.XXXXXXXX");
-    }
-    else {
-        ($_of,$output_path) = tempfile("${file_name}.XXXXXXXX",
-                                       DIR => $config->tmpdir ? $config->tmpdir : $current_dir) or die "failed to create temp file";
-        push @temp_files, $output_path;
-    }
-    $logparams{output_path} = $output_path;
     # this timestamp should be used in the creation of the symlinks:
-    my $backup_timestamp_format = strftime $timestamp_format,  localtime($start_time);
-    $logparams{start_time} = $backup_timestamp_format;
-
-    # this is the name of the file/symlink that will be placed in the
+    my $timestamp_format_start_time = strftime $timestamp_format, localtime($start_time);
+    # this is the name of the file/link that will be placed in the
     # daily/weekly/monthly directory after a successful backup:
     my $file_name_timestamp = backup_file_name_builder(
         @file_parts,
@@ -819,14 +793,40 @@ sub perform_backup {
             strftime(
                 $timestamp_format, localtime( $$full_dump{timestamp} )
             ),
-            strftime( $timestamp_format, localtime($start_time) )
+            $timestamp_format_start_time,
             )
         # only one timestamp:
-        : strftime( $timestamp_format, localtime($start_time) ),
+        : $timestamp_format_start_time,
         \@suffix
     );
+    # output_path is a full path to a temporary file to initially dump
+    # the database into:
+    my ($_of,$output_path);
+    if ( $config->dry_run ) {
+        $output_path
+            = File::Spec->catfile(
+            $config->tmpdir ? $config->tmpdir : $config->backup_location,
+            "${file_name_timestamp}.XXXXXXXX" );
+    }
+    else {
+        ( $_of, $output_path ) = tempfile( "${file_name_timestamp}.XXXXXXXX",
+            DIR => $config->tmpdir
+            ? $config->tmpdir
+            : $config->backup_location )
+            or die "failed to create temp file";
+        push @temp_files, $output_path;
+    }
+    $logparams{output_path} = $output_path;
+    $logparams{start_time} = $timestamp_format_start_time;
 
-    dlog('debug', 'perform_backup', \%logparams);
+    # this is historical, clean up the junk!
+    link_symlinks( $databasetype, $database );
+
+    dlog('debug', "perform_backup is calling generic_dump on ${databasetype}:${database} using ${effective_compresssion_method} to ${output_path}",
+         {
+             'msgcode' => 'perform_backup',
+         },
+         \%logparams);
     my ($return_value,$stage)
         = generic_dump($databasetype,
                        $database,
@@ -836,160 +836,143 @@ sub perform_backup {
 
     return $start_time if $config->dry_run;
 
-    if (defined $return_value and $return_value == 0) {
-      # this is the relative link path to the most recent backup in current:
-      my $relative_name = File::Spec->catfile('..','current',$file_name);
+    unless (defined $return_value and $return_value == 0) {
+        # presumed to have failed... I think we need to clean up manually
+        dlog('info','perform cleanup', \%logparams);
+        eval { unlink $output_path if -f $output_path; };
+        update_status_db($databasetype, $database, { exit => $return_value,
+                                                     stage => $stage,
+                                                     start_time => $start_time });
+        dlog('error',"failed: backup of ${databasetype}:${database} exited ${return_value}",
+             \%logparams,
+             { 'msgcode' => 'perform backup fall through failure' });
+        return;
+    }
 
-      if($config->localcow and -f $backup_path) {
-        local %logparams = %logparams;
-        $logparams{temp_file} = join('.',$backup_path,'TEMP');
-        push @temp_files, $logparams{temp_file};
+    # rsync the file into it's generically named place!
+    if ($config->rsyncable and $effective_compresssion_method eq 'xdelta') {
+        dlog('error', "rsyncable and xdelta are currently incompatible", \%logparams);
+    }
+    if ($config->rsyncable and $effective_compresssion_method ne 'xdelta') {
+        # this is the directory we intend to write the dump to:
+        my $rsync_dir = $config->rsyncable_location ?
+            $config->rsyncable_location :
+            File::Spec->catfile($config->backup_location,'current');
+        if ($effective_compresssion_method eq 'xdelta') {
+            dlog('error', "rsyncable and xdelta are currently incompatible", \%logparams);
+        } else {
+            my $rsyncable_file_name = backup_file_name_builder(@file_parts,\@suffix);
+            my $rsyncable_path = File::Spec->catfile(
+                $rsync_dir,
+                $rsyncable_file_name);
 
-        unless ( rsync($backup_path, $logparams{temp_file}) ) {
-            dlog('error', "unable to rsync from backup to location to temp file", \%logparams);
-            eval { unlink $logparams{temp_file}; }; # it's ok if this failed, maybe it was never created
-            update_status_db($databasetype, $database, { exit => 1,
-                                                         stage => 'rsync',
-                                                         start_time => $start_time, });
-            return;
+            # create a useful list of alternate possible last backups:
+            my @alternates = path_alternates($rsyncable_path);
+            # look for postgres-* in the current directory if we are backing up postgresql
+            if ( $databasetype eq 'postgresql' ) {
+                push(
+                    @alternates,
+                    path_alternates(
+                        File::Spec->catfile(
+                            $rsync_dir,
+                            backup_file_name_builder(
+                                'postgres', $database, \@suffix
+                            )
+                        )
+                    )
+                );
+            }
+            print Dumper \@alternates if $DEBUG;
+            if ( rsync($output_path, $rsyncable_path) ) {
+                unlink_alternates($rsyncable_path, @alternates);
+            } else {
+                local %logparams = %logparams;
+                $logparams{rsyncable_path} = $rsyncable_path;
+                $logparams{output_path} = $output_path;
+                dlog('error',
+                     "unable to rsync from output path (${output_path}) to backup path (${rsyncable_path})", \%logparams);
+                eval { unlink $rsyncable_path if -f $rsyncable_path; };
+            }
         }
-        link_symlinks( $databasetype, $database );
-        unlink $logparams{temp_file};
-      }
-      else {
-          # look in each directory for symlinks to the current file:
-          link_symlinks($databasetype,$database);
-      }
+    }
 
-      # remove the old output file, now that the hard links will
-      # preserve it:
-      foreach my $alt (@alternates) {
-          # delete all the current files for this backup, unless it's
-          # the one we intend to write in this pass and localcow is
-          # enabled:
-          next unless -f $alt;
-          if ( $config->localcow and $backup_path eq $alt ) {
-              dlog('debug',
-                   "not unlinking alternate ${alt} because it is our target (${backup_path})",
-                   \%logparams,
-                   {backup_path => $backup_path, alternate_file => $alt});
-              next;
-          }
-          dlog('debug',
-               ( $backup_path eq $alt ?
-                 "unlink old backup file ${alt}" :
-                 "unlink alternate ${alt}" ),
-               \%logparams,
-               {msgcode => 'unlink alternate', alternate_file => $alt});
-          unless(unlink $alt) {
-              dlog('error', "failed unlink alternate ${alt}", \%logparams, {msgcode => 'unlink alternate', errno => $ERRNO, alternate_file => $alt});
-          }
-      }
+    # initially attempt to hard link the output_path to the daily file
+    my $link_target = $output_path;
+ PERIOD:
+    foreach my $p (qw(daily weekly monthly)) {
+        # do the weekly if needed:
+        if ( $p eq 'weekly' and strftime( "%a", localtime($start_time) ) ne $config->week_start ) {
+            next PERIOD;
+        }
+        if ( $p eq 'monthly' and strftime( "%d", localtime($start_time) ) ne sprintf('%02d', $config->month_start) ) {
+            next PERIOD;
+        }
+        my $period_path =
+            File::Spec->catfile( $config->backup_location,
+                                 $p,
+                                 $file_name_timestamp);
+        if (link $link_target, $period_path) {
+            $link_target = $period_path;
+            dlog('debug', "success link/copy ${p} ${period_path}",
+                 {
+                     msgcode => 'link/copy',
+                     period => $p,
+                     path => $period_path,
+                 });
+        } else {
+            my $errno = $ERRNO;
+            # just in case:
+            eval { unlink $period_path; };
+            dlog('debug',
+                 "unable to hard link ${period_path} -> ${link_target} with errno: ${errno}",
+                 {
+                     $p => $period_path,'errno' => $errno},
+                 \%logparams);
 
-      # rename our temp file into the file we're trying to create:
-      my $rename_result=0;
-      unless($config->localcow) {
-          eval {
-              rename($output_path, $backup_path);
-              $rename_result=1;
-              dlog('debug', "renamed ${output_path} to ${backup_path}", \%logparams);
-          } or do {
-              my $errno = $EVAL_ERROR; # save me
-              if( $errno =~ /Invalid cross-device link/ ) {
-                  # this is ok to continue, we can just use rsync later
-                  dlog('debug', 'rename failed across devices, using rsync to copy', \%logparams, {'errno' => 'Invalid cross-device link'});
-                  $rename_result=0;
-              }
-              else {
-                  dlog('error', "error during rename(${output_path},${backup_path})", \%logparams, { msgcode => 'rename error', errno => $errno, output_path => $output_path, backup_path => $backup_path });
-                  unlink $output_path;
-                  update_status_db($databasetype, $database, { exit => 1,
-                                                               stage => 'rename',
-                                                               start_time => $start_time,
-                                                               errno => 'unknown' });
-                  return;
-              }
-          }
-      }
-      if($rename_result == 0 or $config->localcow) {
-          push @temp_files, $backup_path;
-          unless ( rsync($output_path,$backup_path) ) {
-              local %logparams = %logparams;
-              $logparams{backup_path} = $backup_path;
-              $logparams{output_path} = $output_path;
-              dlog('error',
-                   "unable to rsync from output path (${output_path}) to backup path (${backup_path})", \%logparams);
-              unlink $output_path if -f $output_path;
-              update_status_db(
-                  $databasetype,
-                  $database,
-                  {   exit       => 1,
-                      stage      => 'rsync',
-                      start_time => $start_time,
-                  }
-              );
-              return;
-          }
-          pop @temp_files;
-          unlink $output_path if -f $output_path;
-      }
-      # create a series of symlinks to this path...
-      # we do this to keep rsync from having to work so hard
-      # preserving the hard links:
-      my %period_paths;
-      foreach my $p (qw(daily weekly monthly)) {
-          $period_paths{$p} =
-              File::Spec->catfile( $config->backup_location,
-                                   $p,
-                                   $file_name_timestamp);
-      }
-      symlink $relative_name, $period_paths{daily};
-      dlog('debug', "symlink daily ${period_paths{daily}} -> ${relative_name}",
-           { msgcode => 'symlink daily', uuid => $uuid, relative_name => $relative_name, period => 'daily', 'path' => $period_paths{'daily'} });
-      if ( strftime( "%a", localtime($start_time) ) eq $config->week_start ) {
-        symlink $relative_name, $period_paths{weekly};
-        dlog('debug', "symlink weekly ${period_paths{weekly}} -> ${relative_name}",
-             { msgcode => 'symlink weekly', uuid => $uuid, relative_name => $relative_name, period => 'weekly', 'path' => $period_paths{'weekly'} });
-      }
-      if ( strftime( "%d", localtime($start_time) ) eq sprintf('%02d', $config->month_start) ) {
-        symlink $relative_name, $period_paths{monthly};
-        dlog('debug', "symlink monthly ${period_paths{monthly}} -> ${relative_name}",
-             { msgcode => 'symlink monthly', uuid => $uuid, relative_name => $relative_name, period => 'monthly', 'path' => $period_paths{'monthly'} });
-      }
-      dlog('notice',
-           "succeeded: backup of ${databasetype}:${database}",
-           {msgcode => 'backup status'},
-           \%logparams);
+            my $rsync_result = rsync($link_target, $period_path);
+            if ($rsync_result == 1) {
+                # success!
+                $link_target = $period_path;
+            } else {
+                eval { unlink $period_path; };
+                dlog('error',
+                     "failed: backup of ${databasetype}:${database}",
+                     {
+                         msgcode => 'backup status', 'exit' => 1},
+                     \%logparams);
+                update_status_db(
+                    $databasetype,
+                    $database,
+                    {   exit       => 1,
+                        stage      => 'rsync',
+                        start_time => $start_time,
+                    }
+                );
+                return;         # failure of sorts
+            }
+        }
+        # successful execution continues here!
+        # we update this data structure so when clean_old_dumps runs, it
+        # has the most recent successful run in the database:
+        insert_into_dump_db(\%dump_db,$databasetype, $database, {
+            timestamp      => $start_time,
+            path           => $period_path,
+            period         => $p,
+            full           => $effective_compresssion_method eq 'xdelta' ? 0 : 1,
+            full_timestamp => $effective_compresssion_method eq 'xdelta' ? $$full_dump{timestamp} : undef,
+        });
+        print Dumper \%dump_db if $DEBUG;
+    }
+    dlog('notice',
+         "succeeded: backup of ${databasetype}:${database}",
+         {
+             msgcode => 'backup status'},
+         \%logparams);
+    update_status_db($databasetype, $database, { exit => 0,
+                                                 start_time => $start_time, });
 
-      # we update this data structure so when clean_old_dumps runs, it
-      # has the most recent successful run in the database:
-      insert_into_dump_db(\%dump_db,$databasetype, $database, {
-          timestamp      => $start_time,
-          path           => File::Spec->catfile(
-              $config->backup_location, 'daily', $file_name_timestamp
-          ),
-          period         => 'daily',
-          full           => $effective_compresssion_method eq 'xdelta' ? 0 : 1,
-          full_timestamp => $effective_compresssion_method eq 'xdelta' ? $$full_dump{timestamp} : undef,
-      });
-      print Dumper \%dump_db if $DEBUG;
-      clean_old_dumps($databasetype, $database);
-      update_status_db($databasetype, $database, { exit => 0,
-                                                   start_time => $start_time, });
-      return $start_time;
-  }
-  else {
-      # presumed to have failed... I think we need to clean up manually
-      dlog('info','perform cleanup', \%logparams);
-      unlink $output_path if -f $output_path;
-      update_status_db($databasetype, $database, { exit => $return_value,
-                                                   stage => $stage,
-                                                   start_time => $start_time });
-  }
-    dlog('error',"failed: backup of ${databasetype}:${database} exited ${return_value}",
-         \%logparams,
-         { 'msgcode' => 'perform backup fall through failure' });
-  return;
+    clean_old_dumps($databasetype, $database);
+    return $start_time;
 }
 
 sub insert_into_dump_db {
@@ -1953,7 +1936,7 @@ sub checksum_verify_dump {
              \%logparams,{path => $$dump{path}, msgcode => 'checksum mismatch'});
         return $checksum;
     }
-    dlog('error',"checksum mismatch $$dump{path} ${checksum}!=${actual_checksum}",\%logparams,{path => $$dump{path}, msgcode => 'checksum mismatch'});
+    dlog('error',"checksum mismatch $$dump{path} = ${actual_checksum} != ${checksum}",\%logparams,{path => $$dump{path}, msgcode => 'checksum mismatch'});
     return;
 }
 
@@ -2364,15 +2347,23 @@ locations.
 Directory used to write the output of dump commands.  The default is
 to use the 'current' directory in the C<backup_location> directory.
 
-=item B<--localcow|--no-localcow> C<localcow> (Boolean)
+=item B<--rsyncable|--no-rsyncable> C<rsyncable> (Boolean)
 
-When localcow is set, we take great pains to ensure that we update the
-dump files with the latest changes using rsync, in hopes of minimizing
-the change in the file and therefore the amount of data used to
-capture those changes in a snapshot.
+When rsyncable is set delta-dumper tries to overwrite the same
+unchanging file name in /current/ of the backup_location or
+C<rsyncable_location> if set.
 
-localcow should be set when the backup_location is on a filesystem
-with cow or cow-like characteristics, ie: btrfs, zfs, netapp, etc.
+delta-dumper uses rsync --inplace --no-whole-file to update only
+changed parts of the backup.  This is best paired with compression
+methods that have an --rsyncable option but still works with other
+compression methods.  The goal of rsyncable mode is to make minimal
+changes to the file on COW-style filesystem (zfs, btrfs, and many
+more) to avoid bloating snapshots.
+
+=item B<--rsyncable_location>=I<dir> C<rsyncable_location>
+
+This is where the rsyncable fixed filename backups are placed if
+C<rsyncable> is set.  When not set, use /current/ in backup_location.
 
 =item B<--postrun>=I<command> C<postrun>
 
