@@ -935,6 +935,7 @@ sub perform_backup {
                 $link_target = $period_path;
             } else {
                 eval { unlink $period_path; };
+                eval { unlink $output_path; };
                 dlog('error',
                      "failed: backup of ${databasetype}:${database}",
                      {
@@ -963,6 +964,7 @@ sub perform_backup {
         });
         print Dumper \%dump_db if $DEBUG;
     }
+    eval { unlink $output_path; };
     dlog('notice',
          "succeeded: backup of ${databasetype}:${database}",
          {
