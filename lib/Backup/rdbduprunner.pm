@@ -109,6 +109,7 @@ $uuid
 &callback_format
 &callback_format_terminal
 &backup_file_name_builder
+&unlink_alternates
 ) ] );
 
 our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
@@ -2877,6 +2878,23 @@ sub backup_file_name_builder {
     }
     # two array refs
     return join('-',@_).($sufs ? '.'.join('.', @{$sufs}) : '');
+}
+
+sub unlink_alternates {
+    my $rp = shift;
+ ALT:
+    foreach my $alt (@_) {
+        next unless -f $alt;
+        next if $alt eq $rp;
+        my %logparams = ( 'msgcode' => 'unlkink alternate', 'backup_path' => $rp, 'alternate_file' => $alt );
+        if(unlink $alt) {
+            dlog('debug',
+                 "unlinked old rsyncable backup file ${alt}",
+                 \%logparams);
+        } else {
+            dlog('error', "failed unlink rsyncable ${alt}", \%logparams, {errno => $ERRNO});
+        }
+    }
 }
 
 # Preloaded methods go here.
