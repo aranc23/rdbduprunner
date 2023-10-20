@@ -830,6 +830,7 @@ sub perform_backup {
     my ($return_value,$stage)
         = generic_dump($databasetype,
                        $database,
+                       $start_time,
                        $effective_compresssion_method,
                        $output_path,
                        $full_dump);
@@ -1336,6 +1337,7 @@ sub generic_dump {
     # pass the type, database, and path? or also the primary dump exec command?
     my $dbtype = shift;
     my $database = shift;
+    my $start_time = shift;
     my $compression = shift;
     my $backup_path = shift;
     my $full_dump = shift; # only used if xdelta is in effect
@@ -1532,8 +1534,6 @@ sub generic_dump {
     if ($decomp_hash) {
         push @pipelines, $decomp_hash;
     }
-
-    my $start_time = time();
 
     if($config->dry_run) {
         dry_run_pipeline(@pipelines);
