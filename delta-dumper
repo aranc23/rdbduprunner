@@ -1577,7 +1577,10 @@ sub generic_dump {
         }
         if($line and my ($hash) = $line =~ m{\A(.+?)\s+-}xms) {
             $logparams{$config->checksum_binary} = $hash;
-            update_checksum_db($hash); # rely on logparams!
+            update_checksum_db($dbtype,
+                               $database,
+                               $start_time,
+                               $hash);
         }
         else {
             dlog('error', 'checksum parse failure', \%logparams);
@@ -1627,17 +1630,20 @@ sub build_postgresql_exec {
 }
 
 sub update_checksum_db {
-    local %logparams = %logparams;
+    my $databasetype = shift;
+    my $databasename = shift;
+    my $start_time = shift;
     my $hash = shift;
-    print STDERR Dumper \%logparams if $DEBUG;
-    my $lock = lock_db($CHECKSUM_DB,LOCK_EX,\%logparams);
+
+    my $lock = lock_db($CHECKSUM_DB,LOCK_EX);
     my %sums;
     unless(tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666)) {
         dlog('error', "unable to open database file ${CHECKSUM_DB}", {db_file => $CHECKSUM_DB});
         return;
     }
-    my $key = make_checksum_key($logparams{databasetype},$logparams{databasename},$logparams{start_time});
-    $sums{$key} = $hash;
+    $sums{make_checksum_key($databasetype,
+                            $databasename,
+                            $start_time)} = $hash;
     untie %sums;
     unlock_and_close($lock);
 }
