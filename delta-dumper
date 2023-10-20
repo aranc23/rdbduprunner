@@ -256,11 +256,20 @@ sub init_config {
             ARGS     => '!',
             ARGCOUNT => ARGCOUNT_NONE,
         },
-        'checksum_binary' => {
+        'checksum_algorithm' => {
             ARGS     => '=s',
-            ALIAS    => 'checksum-binary',
-            DEFAULT  => 'sha256sum',
+            ALIAS    => 'checksum-algorithm',
+            DEFAULT  => 'sha256',
             ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'checksum_binaries' => {
+            ARGS    => '=s%',
+            DEFAULT => {
+                'sha256'   => 'sha256sum',
+                'md5'      => 'md5sum',
+                'sha512'   => 'sha512sum',
+            },
+            ARGCOUNT => ARGCOUNT_HASH,
         },
         'mbuffer' => {
             ARGS     => '!',
@@ -1523,7 +1532,7 @@ sub generic_dump {
               );
         }
         push(@cpipes,
-             { 'stage' => 'checksum', 'exec' => [ $config->checksum_binary ] },
+             { 'stage' => 'checksum', 'exec' => [ $config->checksum_binaries->{$config->checksum_algorithm} ] },
          );
         push(@pipelines,{
             input_file    => $fifos{hash},
@@ -1576,10 +1585,11 @@ sub generic_dump {
             last EOF;
         }
         if($line and my ($hash) = $line =~ m{\A(.+?)\s+-}xms) {
-            $logparams{$config->checksum_binary} = $hash;
+            $logparams{$config->checksum_algorithm} = $hash;
             update_checksum_db($dbtype,
                                $database,
                                $start_time,
+                               $config->checksum_algorithm,
                                $hash);
         }
         else {
@@ -1633,6 +1643,7 @@ sub update_checksum_db {
     my $databasetype = shift;
     my $databasename = shift;
     my $start_time = shift;
+    my $checksum_algorithm = shift;
     my $hash = shift;
 
     my $lock = lock_db($CHECKSUM_DB,LOCK_EX);
@@ -1643,7 +1654,8 @@ sub update_checksum_db {
     }
     $sums{make_checksum_key($databasetype,
                             $databasename,
-                            $start_time)} = $hash;
+                            strftime($timestamp_format,localtime(int($start_time))))
+      } = "${checksum_algorithm}=${hash}";
     untie %sums;
     unlock_and_close($lock);
 }
@@ -1655,6 +1667,7 @@ sub make_checksum_key {
 
 sub split_checksum_key {
     if( my ($t,$d,$s) = $_[0] =~ m{(.+) [*] (.+) [@] (.+)}xms ) {
+        return unless str2time($s);
         return($t,$d,$s,str2time($s));
     }
     return;
@@ -1667,7 +1680,7 @@ sub checksum_dump {
     tie %sums, 'GDBM_File', $CHECKSUM_DB, O_CREAT|O_RDWR, oct(666) or die "unable to tie ${CHECKSUM_DB}";
     while(my ($k,$v)=each(%sums)) {
         my ($t,$d,$s,$ss) = split_checksum_key($k);
-        print sprintf "%s\t%s\t%s: %s\n", $t, $d, $s, $v;
+        print sprintf "%s\t%s\t%s: %s\n", $t, $d, $s, $v =~ /[=]/ ? $v : "sha256=${v}";
     }
     untie %sums;
     unlock_and_close($lock);
@@ -1688,11 +1701,15 @@ sub checksum_fsck {
             push(@deletes,$k);
             next;
         }
-        print sprintf "%s\t%s\t%s: %s\n", $t, $d, $s, $v;
+        print sprintf "%s\t%s\t%s: %s\n", $t, $d, $s, $v =~ /[=]/ ? $v : "sha256=${v}";
     }
     my $dumps = scan_existing();
     while(my ($k,$v)=each(%sums)) {
-        my ($t,$d,$s,$ss) = split_checksum_key($k) or die "unsplittable key ${k}";
+        my ($t,$d,$s,$ss);
+        unless(($t,$d,$s,$ss) = split_checksum_key($k)) {
+            warn "unsplittable key ${k}";
+            next;
+        }
         unless ( exists $$dumps{$t}{$d} and find_dump_by_timestamp(str2time($s),$$dumps{$t}{$d}) ) {
             dlog('warning',
                  sprintf("missing file for $t:$d at %s",
@@ -1923,13 +1940,25 @@ sub checksum_verify_dump {
     local %logparams = %logparams;
     my $dumps = shift; # all the dumps so xdelta can find parents
     my $dump = shift;
-    my $checksum = shift;
     print STDERR Dumper $dump if $DEBUG;
+    my $_checksum = shift;
+    my ($algo,$checksum);
+    unless( ($algo,$checksum) = $_checksum =~ m{(.+) [=] (.+)}xms ) {
+        $algo = 'sha256';
+        $checksum = $_checksum;
+        dlog('debug', "unable to parse algorithm from key value: ${_checksum}",
+             \%logparams);
+    }
+    unless(exists $config->checksum_binaries->{$algo}) {
+        dlog('error', "specified algorithm isn't defined in the config: ${algo}",
+             \%logparams);
+        return;
+    }
     -f $$dump{path} or die "file to be verified doesn't exist: $$dump{path}";
     my ($th,$tf) = tempfile();
     push @temp_files, $tf;
     my ($input_file,$pipes) = reconstruct_pipeline($dumps,$dump);
-    push @{$pipes}, { 'stage' => 'checksum', 'exec' => [ $config->checksum_binary ] };
+    push @{$pipes}, { 'stage' => 'checksum', 'exec' => [ $config->checksum_binaries->{$algo} ] };
     print Dumper $pipes if $DEBUG;
     my $e = pipeline({
         input_file  => $input_file,
@@ -1940,11 +1969,11 @@ sub checksum_verify_dump {
     my $actual_checksum = checksum_from_file($tf);
     close $th;unlink $tf;
     if($actual_checksum and $checksum eq $actual_checksum) {
-        dlog('info',"checksum match $$dump{path} ${checksum}",
+        dlog('info',"${algo} checksum match $$dump{path} ${checksum}",
              \%logparams,{path => $$dump{path}, msgcode => 'checksum mismatch'});
         return $checksum;
     }
-    dlog('error',"checksum mismatch $$dump{path} = ${actual_checksum} != ${checksum}",\%logparams,{path => $$dump{path}, msgcode => 'checksum mismatch'});
+    dlog('error',"${algo} checksum mismatch $$dump{path} = ${actual_checksum} != ${checksum}",\%logparams,{path => $$dump{path}, msgcode => 'checksum mismatch'});
     return;
 }
 
