@@ -868,41 +868,61 @@ sub perform_backup {
         my $rsync_dir = $config->rsyncable_location ?
             $config->rsyncable_location :
             File::Spec->catfile($config->backup_location,'current');
-        if ($effective_compresssion_method eq 'xdelta') {
-            dlog('error', "rsyncable and xdelta are currently incompatible", \%logparams);
-        } else {
-            my $rsyncable_file_name = backup_file_name_builder(@file_parts,\@suffix);
-            my $rsyncable_path = File::Spec->catfile(
-                $rsync_dir,
-                $rsyncable_file_name);
+        my $rsyncable_file_name = backup_file_name_builder(@file_parts,\@suffix);
+        my $rsyncable_path = File::Spec->catfile(
+            $rsync_dir,
+            $rsyncable_file_name);
 
-            # create a useful list of alternate possible last backups:
-            my @alternates = path_alternates($rsyncable_path);
-            # look for postgres-* in the current directory if we are backing up postgresql
-            if ( $databasetype eq 'postgresql' ) {
-                push(
-                    @alternates,
-                    path_alternates(
-                        File::Spec->catfile(
-                            $rsync_dir,
-                            backup_file_name_builder(
-                                'postgres', $database, \@suffix
-                            )
+        if($config->checksum) {
+            my $sum;
+            # drop the .Z part? add .md5 part?
+            my $sum_file = File::Spec->catfile(
+                $rsync_dir,
+                backup_file_name_builder(@file_parts,
+                                         ['sql',$config->checksum_algorithm]));
+            if(open($sum, '>', $sum_file)) {
+                my $_checksum = checksum_lookup($databasetype,$database,$start_time);
+                my ($algo,$checksum) = checksum_lookup($databasetype,$database,$start_time);
+                # literally two spaces, look it up!
+                print $sum sprintf('%s  %s'."\n",
+                                   backup_file_name_builder(@file_parts,
+                                                            ['sql']),
+                                   $checksum);
+                close $sum;
+            }
+            else {
+                dlog('error',
+                     "unable to write checksum file ${sum_file}",
+                     {msgcode => 'checksum file',
+                      sum_file => $sum_file});
+            }
+        }
+        # create a useful list of alternate possible last backups:
+        my @alternates = path_alternates($rsyncable_path);
+        # look for postgres-* in the current directory if we are backing up postgresql
+        if ( $databasetype eq 'postgresql' ) {
+            push(
+                @alternates,
+                path_alternates(
+                    File::Spec->catfile(
+                        $rsync_dir,
+                        backup_file_name_builder(
+                            'postgres', $database, \@suffix
                         )
                     )
-                );
-            }
-            print Dumper \@alternates if $DEBUG;
-            if ( rsync($output_path, $rsyncable_path) ) {
-                unlink_alternates($rsyncable_path, @alternates);
-            } else {
-                local %logparams = %logparams;
-                $logparams{rsyncable_path} = $rsyncable_path;
-                $logparams{output_path} = $output_path;
-                dlog('error',
-                     "unable to rsync from output path (${output_path}) to backup path (${rsyncable_path})", \%logparams);
-                eval { unlink $rsyncable_path if -f $rsyncable_path; };
-            }
+                )
+            );
+        }
+        print Dumper \@alternates if $DEBUG;
+        if ( rsync($output_path, $rsyncable_path) ) {
+            unlink_alternates($rsyncable_path, @alternates);
+        } else {
+            local %logparams = %logparams;
+            $logparams{rsyncable_path} = $rsyncable_path;
+            $logparams{output_path} = $output_path;
+            dlog('error',
+                 "unable to rsync from output path (${output_path}) to backup path (${rsyncable_path})", \%logparams);
+            eval { unlink $rsyncable_path if -f $rsyncable_path; };
         }
     }
 
@@ -972,34 +992,6 @@ sub perform_backup {
             full           => $effective_compresssion_method eq 'xdelta' ? 0 : 1,
             full_timestamp => $effective_compresssion_method eq 'xdelta' ? $$full_dump{timestamp} : undef,
         });
-        if($config->checksum) {
-            my $sum;
-            # drop the .Z part? add .md5 part?
-            my $sum_file = File::Spec->catfile( $config->backup_location,
-                                 $p,backup_file_name_builder(
-                @file_parts,
-                $effective_compresssion_method eq 'xdelta'
-                # two timestamps, the full dump and the new:
-                ? join(
-                    '_',
-                    strftime(
-                        $timestamp_format, localtime( $$full_dump{timestamp} )
-                    ),
-                    $timestamp_format_start_time,
-                )
-                # only one timestamp:
-                : $timestamp_format_start_time,
-                ['sql'],
-            ));
-warn $sum_file;
-            if(open($sum, '>', join('.', $sum_file, $config->checksum_algorithm))) {
-                my $_checksum = checksum_lookup($databasetype,$database,$start_time);
-                my ($algo,$checksum) = checksum_lookup($databasetype,$database,$start_time);
-                print $sum sprintf('%s  %s'."\n",
-                                   basename($sum_file),
-                                   $checksum);
-            }
-        }
         print Dumper \%dump_db if $DEBUG;
     }
     eval { unlink $output_path; };
