@@ -1379,13 +1379,19 @@ sub generic_dump {
     # if you specify a template, it must include the temporary
     # directory if you don't want it to end up in your current
     # directory:
+    # this is the output file for checksums, if used!
     my ($cfh,$cfp);
-    if($config->dry_run) {
-        $cfp = '/tmp/dd.XXXXXXXX';
-    }
-    else {
-        ($cfh,$cfp) = tempfile() or die "unable to create a temp file, that's bad";
-        push @temp_files, $cfp;
+    if($config->checksum) {
+        if ($config->dry_run) {
+            $cfp = '/tmp/dd.XXXXXXXX';
+        } else {
+            unless(($cfh,$cfp) = tempfile()) {
+                my $m = 'unable to create a temp file?, that is bad';
+                dlog('error',$m,\%logparams);
+                die $m;
+            }
+            push @temp_files, $cfp;
+        }
     }
     my @pipelines;
     my @mb = ( $config->mbuffer_binary, '-q' );
@@ -1617,7 +1623,7 @@ sub generic_dump {
         }
         close $fh;
     }
-    unlink $cfp if -f $cfp;
+    unlink $cfp if (defined $cfp and -f $cfp);
     dlog( ($logparams{exit} == 0 ? 'info' : 'error'),
           ($logparams{exit} == 0 ? "succeeded" : "failed").
           ": dump of ${dbtype}:${database} exited with $logparams{exit}",
