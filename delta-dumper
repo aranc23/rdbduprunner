@@ -320,7 +320,7 @@ sub init_config {
                 'gzip'     => 'gzip -c',
                 'bzip2'    => 'bzip2 -c',
                 'xz'       => 'xz --stdout',
-                'zstd'     => 'zstd --stdout',
+                'zstd'     => 'zstd --stdout --rsyncable',
                 'compress' => 'compress -c',
                 'none'     => 'cat',
                 'xdelta'   => 'xdelta3 -e -D',
