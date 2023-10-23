@@ -2884,8 +2884,9 @@ sub unlink_alternates {
     my $rp = shift;
  ALT:
     foreach my $alt (@_) {
+        next unless $alt;
         next unless -f $alt;
-        next if $alt eq $rp;
+        next if string_any($alt, @$rp);
         my %logparams = ( 'msgcode' => 'unlkink alternate', 'backup_path' => $rp, 'alternate_file' => $alt );
         if(unlink $alt) {
             dlog('debug',
