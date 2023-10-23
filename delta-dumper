@@ -1824,6 +1824,7 @@ sub checksum_fsck {
                                   localtime(str2time($s)))),
                  \%logparams,
                  {databasetype => $t, databasename => $d, start_time => $s});
+            push(@deletes,$k);
         }
     }
     foreach my $k (@deletes) {
