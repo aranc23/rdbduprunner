@@ -2536,6 +2536,8 @@ to use the 'current' directory in the C<backup_location> directory.
 
 =item B<--rsyncable|--no-rsyncable> C<rsyncable> (Boolean)
 
+Default: false
+
 When rsyncable is set delta-dumper tries to overwrite the same
 unchanging file name in /current/ of the backup_location or
 C<rsyncable_location> if set.
@@ -2583,18 +2585,6 @@ Append these options to mbuffer invocations. (ie: -m 1G)
 
 Pass this option to pv -L, that is set the rate limitting factor for
 pv for testing.
-
-=item B<--checksum|--no-checksum> C<checksum>
-
-Write the checksum of the dump to the log file and database.
-
-=item B<--checksum_binary|--checksum-binary> C<checksum_binary>
-
-Pipe dump data to this binary.  Assumed to creat output like, md5sum,
-sha256sum, etc.
-
-Default: sha256sum
-
 
 =back
 
@@ -2666,6 +2656,37 @@ the compress, uncompress, and suffix configuration items.
 compress gzip = gzip -c --rsyncable
 uncompress gzip = gzcat
 extension gzip = gz
+
+=back
+
+=head2 CHECKSUM OPTIONS
+
+=over 4
+
+=item B<--checksum|--no-checksum> C<checksum> (Boolean)
+
+Default: false
+
+Calculate the checksum of the dump using the algorithm specified by
+C<checksum_algorithm> and store that in a database and in a file
+adjacent to C<rsyncable> files if enabled.
+
+=item B<--checksum_algorithm|--checksum-algorithm> C<checksum_algorithm>
+
+Default: sha256
+
+Use this algorithm via the configured C<checksum_binaries>
+configuration option.
+
+=item B<--checksum_binaries|> C<checksum_binaries>
+
+Hash mapping algorithm to checksumming binaries.
+
+Defaults:
+
+checksum_binaries sha256 = sha256sum
+checksum_binaries md5 = md5sum
+checksum_binaries sha512 = sha512sum
 
 =back
 
