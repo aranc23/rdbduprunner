@@ -3,7 +3,8 @@
 use strict;
 use warnings;
 use v5.16;
-use Fatal qw( :void open close link unlink symlink rename fork );
+#use Fatal qw( :void open close link unlink symlink rename fork );
+#use autodie; # does NOT include system
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(handler signal_handler normal-signals);
 
