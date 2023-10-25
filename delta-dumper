@@ -28,6 +28,7 @@ use JSON;
 use GDBM_File;
 use Storable qw( freeze thaw );
 use IO::Interactive;
+use File::Copy;
 
 # added from CPAN or system packages
 use Log::Dispatch;
@@ -521,7 +522,7 @@ sub init_config {
         'rsync_options' => {
             ARGS     => '=s',
             ARGCOUNT => ARGCOUNT_ONE,
-            DEFAULT  => '-a --inplace --no-whole-file',
+            DEFAULT  => '-a',
         },
         'prerun' => {
             ARGS     => '=s',
@@ -983,8 +984,7 @@ sub perform_backup {
                  {$p => $period_path,'errno' => $errno},
                  \%logparams);
 
-            my $rsync_result = rsync($link_target, $period_path);
-            if ($rsync_result == 1) {
+            if (copy($link_target, $period_path)) {
                 # success!
                 $link_target = $period_path;
             } else {
