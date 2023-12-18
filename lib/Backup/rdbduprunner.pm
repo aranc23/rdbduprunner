@@ -1378,8 +1378,21 @@ sub perform_backup {
           set_env($bh);
           # execute snapshot command
           system(@com);
-          unless($? == 0) {
-            error("zfs snapshot command exited with an error, this is not fatal: $?");
+          my $exit_status = exit_status(${^CHILD_ERROR_NATIVE});
+          unless ( $exit_status == 0 ) {
+              my $msg = "zfs snapshot command exited with an error this is fatal: ${exit_status}";
+              error($msg);
+              update_status_db(
+                  $$bh{src},
+                  {   'phase' => 'postrun',
+                      'exit'  => $exit_status,
+                      'errno' => $msg,
+                      'time'  => time(),
+                      'btype' => $$bh{btype},
+                  }
+              );
+              log_exit_status( $bh, $exit_status );
+              next;
           }
         }
       }
