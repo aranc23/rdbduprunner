@@ -8,7 +8,7 @@ t=$(mktemp)
 $com --level critical --status-print > $t
 if (( $( cat $t | wc -l ) > 0 )); then
     # uses | as a separator
-    echo "<<<delta_dumper:sep(60)>>>"
+    echo "<<<delta_dumper:sep(124)>>>"
     cat $t
 fi
 rm -f $t
