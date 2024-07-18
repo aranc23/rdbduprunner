@@ -5,7 +5,7 @@ if [[ ! -x $com ]]; then
     exit 0;
 fi
 t=$(mktemp)
-$com --level critical --status-json > $t
+$com --level critical --status-print > $t
 if (( $( cat $t | wc -l ) > 0 )); then
     echo "<<<delta_dumper>>>"
     cat $t
