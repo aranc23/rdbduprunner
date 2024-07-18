@@ -62,6 +62,8 @@ my $CONFIG_FILE = File::Spec->catfile($CONFIG_DIR, 'config');
 my $RESTORE;
 # if true, print the database status and exit
 my $STATUS_JSON;
+# if true, print the database status line by line and exit
+my $STATUS_PRINT;
 # delete these keys from the status database
 my @STATUS_DELETE;
 # dump the checksums and exit
@@ -578,6 +580,10 @@ sub main {
       status_json();
       exit;
   }
+  if ( $STATUS_PRINT ) {
+      status_print();
+      exit;
+  }
   if ( $CHECKSUM_DUMP ) {
       checksum_dump();
       exit;
@@ -742,6 +748,7 @@ sub parse_config {
   # parse --config command line options, removing it from @ARGV
   GetOptions('config_file|config|config-file=s'         => \$CONFIG_FILE,
              'status_json|status-json!'                 => \$STATUS_JSON,
+             'status_print|status-print!'               => \$STATUS_PRINT,
              'status_delete|status-delete=s@'           => \@STATUS_DELETE,
              'checksum_dump|checksum-dump!'             => \$CHECKSUM_DUMP,
              'checksum_fsck|checksum-fsck!'             => \$CHECKSUM_FSCK,
@@ -2326,6 +2333,38 @@ sub status_json {
     untie %status;
     unlock_and_close($h);
     print $json->encode(\%data);
+}
+
+sub status_print {
+    my $h = lock_db($DB_FILE,LOCK_SH);
+
+    my %status;
+    unless(tie %status, 'GDBM_File', $DB_FILE, O_RDONLY, oct(666)) {
+        dlog('error', "unable to open database file ${DB_FILE} for reading", {db_file => $DB_FILE});
+        return;
+    }
+    #my %data;
+    my $json = JSON->new->pretty();
+ STATUS:
+    while(my ($k,$v)=each(%status)) {
+        my $s;
+        eval {
+            $s = $json->decode($v);
+        }
+        or do {
+            eval {
+                $s = thaw($v);
+            }
+            or do {
+                dlog('error', "unable to decode string in status database for ${k}", {db_file => $DB_FILE});
+                next STATUS;
+            };
+        };
+        my ($dbtype,$dbname) = split(/[*]/, $k);
+        print join('|', $dbtype, $dbname, str2time($$s{start_time}), $$s{exit})."\n";
+    }
+    untie %status;
+    unlock_and_close($h);
 }
 
 sub build_dump_hash_from_path {
