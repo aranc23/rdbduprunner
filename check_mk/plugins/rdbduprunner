@@ -3,5 +3,8 @@
 use strict;
 use Backup::rdbduprunner;
 
-print '<<<rdbduprunner:sep(60)>>>'."\n";
-Backup::rdbduprunner::status_print();
+if( -f '/var/lib/rdbduprunner/rdbduprunner.db' ) {
+    print '<<<rdbduprunner:sep(60)>>>'."\n";
+    Backup::rdbduprunner::create_dispatcher('rdbduprunner','daemon','error','/dev/null');
+    Backup::rdbduprunner::status_print();
+}
