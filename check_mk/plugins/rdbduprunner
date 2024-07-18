@@ -3,5 +3,5 @@
 use strict;
 use Backup::rdbduprunner;
 
-print '<<<rdbduprunner>>>'."\n";
+print '<<<rdbduprunner:sep(60)>>>'."\n";
 Backup::rdbduprunner::status_print();
