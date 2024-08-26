@@ -365,7 +365,7 @@ our %DEFAULT_CONFIG = (
         sections => [qw(global backupdestination)],
         },
     lc "ZfsSnapshot" => {
-        type     => ['boolean',"valid(truefalse)"],
+        type     => "valid(truefalse)",
         optional => "true",
         sections => [qw(global backupdestination)],
     },
