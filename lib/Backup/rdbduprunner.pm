@@ -1092,7 +1092,7 @@ sub build_backup_command {
           '--delete',
           '--delete-excluded',
          );
-    # here is the where the rubbger meets the robe:
+    # here is the where the rubber meets the road:
     if( defined $$bh{wholefile}) {
       push(@com, dtruefalse($bh,'wholefile') ? '--whole-file' : '--no-whole-file');
     }
