@@ -62,7 +62,10 @@ sub pparams {
             next FIELD;
         }
         my $pt = xlate($config_definition{$section}{fields}{$field}{'type'});
-        if($field =~ m{binary}) {
+        if($field eq 'path') {
+            $pt = 'Variant[Stdlib::Absolutepath,Array[Stdlib::Absolutepath]]';
+        }
+        elsif($field =~ m{.+(binary|path)$}) {
             $pt = 'Stdlib::UnixPath';
         }
         my $default = ',';
@@ -86,7 +89,10 @@ sub sparams {
  FIELD:
     for my $field (sort(keys(%{$config_definition{$section}{fields}}))) {
         my $pt = xlate($config_definition{$section}{fields}{$field}{'type'});
-        if($field =~ m{binary}) {
+        if($field eq 'path') {
+            $pt = 'Variant[Stdlib::Absolutepath,Array[Stdlib::Absolutepath]]';
+        }
+        elsif($field =~ m{.+(binary|path)$}) {
             $pt = 'Stdlib::UnixPath';
         }
         if ( defined $config_definition{$section}{fields}{$field}{'optional'}
@@ -118,5 +124,3 @@ sub xlate {
         : $type;
     return $puppet_type;
 }
-
-      
