@@ -246,7 +246,7 @@ not run the prerun, postrun or zfs create and zfs snapshot commands
 Configuration files for rdbduprunner have 3 sections: global options,
 backupsets and backupdestinations.  Many configuration parameters are
 valid at the top level and inside backups and backupdestination
-defintions.
+definitions.
 
 For an overview of the configuration file format see the L</FILES> section.
 
