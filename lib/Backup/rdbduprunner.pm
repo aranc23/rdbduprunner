@@ -1124,7 +1124,7 @@ sub build_backup_command {
       push(@com,'--stats');
     }
     if(defined $$bh{rsyncpath}) {
-        push(@com, "--rsync-path=${$$bh{rsyncpath}}");
+        push(@com, "--rsync-path=".$$bh{rsyncpath});
     }
     # use logging
     push(@com,'--log-file='.catfile($LOG_DIR,$$bh{tag}).'.log')
