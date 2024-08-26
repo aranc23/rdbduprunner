@@ -112,9 +112,10 @@ use Data::Dumper;
     $$bh{wholefile} = 'false';
     $$bh{exclude} = [qw(nope not this)];
     $$bh{dryrun} = 'false';
+    $$bh{rsyncpath} = '/usr/local/bin/rsync';
 
     is([build_backup_command($bh)],
-       [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --sparse --bwlimit=4 --compress --stats), "--log-file=${HOME}/.local/state/build_backup_command.t/server-tmp.log",qw(--temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
+       [qw(rsync --progress --verbose --archive --one-file-system --hard-links --delete --delete-excluded --no-whole-file --checksum --inplace --partial --sparse --bwlimit=4 --compress --stats --rsync-path=/usr/local/bin/rsync), "--log-file=${HOME}/.local/state/build_backup_command.t/server-tmp.log",qw(--temp-dir=/var/tmp --exclude-from=/etc/some/file --exclude nope --exclude not --exclude this server:/tmp /some/where/server-tmp)],
        "rsync");
 }
 
