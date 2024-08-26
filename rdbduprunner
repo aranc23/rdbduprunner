@@ -370,11 +370,11 @@ Passes the --checksum (-c) option to rsync.
 
 Validity: CLI, Global, BackupDestination, BackupSet
 
-=item C<SSHCompress> I<yes|no|on|off|0|1|true|false> {B<--sshcompress|--no-sshcompress>} (rdiff-backup only)
+=item C<SSHCompress> I<yes|no|on|off|0|1|true|false> {B<--sshcompress|--no-sshcompress>} (rdiff-backup/rsync only)
 
 Passes --ssh-no-compression if set to a false value.
 
-This also mistakenly I believe passes -z to rsync to disable compression.
+This passes --compress to rsync to enable compression.
 
 Validity: CLI, Global, BackupDestination, BackupSet
 
