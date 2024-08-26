@@ -1112,7 +1112,7 @@ sub build_backup_command {
       push(@com,"--bwlimit=$$bh{trickle}");
     }
     if(dtruefalse($bh,'sshcompress')) {
-      push(@com,'-z');
+      push(@com,'--compress');
     }
     if(dtruefalse($bh,'stats')) {
       push(@com,'--stats');
