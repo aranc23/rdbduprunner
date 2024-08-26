@@ -546,6 +546,12 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli global backupdestination backupset)],
     },
+    'remoteuser' => {
+        getopt => 'remoteuser|remote-user=s',
+        type     => "string",
+        optional => "true",
+        sections => [qw(cli global backupset)],
+    },
     # 'maxwait=i'              => \$MAXWAIT,
     maxwait => {
         getopt => 'maxwait=i',
@@ -1154,7 +1160,10 @@ sub build_backup_command {
   foreach my $x (@{$$bh{exclude}}) {
     push(@com,'--exclude',$x);
   }
-  push(@com,$$bh{src},$$bh{dest});
+
+  push(@com, (defined $$bh{remoteuser} ?
+              join('@',$$bh{remoteuser},$$bh{src}) :
+              $$bh{src}), $$bh{dest});
 
   # if Trickle is set for a destination, use the trickle binary to slow upload rates to the value given
   if(defined $$bh{trickle} and $$bh{trickle} =~ /^\d+$/ and $$bh{btype} ne 'rsync') {

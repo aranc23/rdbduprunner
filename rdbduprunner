@@ -334,6 +334,12 @@ bandwidth.
 
 Validity: CLI, Global, BackupDestination, BackupSet
 
+=item C<RemoteUser> I<string> {B<--remote-user> I<string>} (rsync only)
+
+For rsync backups this value is prepended to the source portion of the command:
+
+Validity: CLI, Global, BackupSet
+
 =item C<ZfsCreate> I<yes|no|on|off|0|1|true|false>
 
 Create a zfs for the path, if the directory doesn't already exist.
