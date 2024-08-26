@@ -390,6 +390,13 @@ Default: rsync
 
 Validity: CLI, Global, BackupDestination, BackupSet
 
+=item C<RsyncPath> I<executable> {B<--rsync-path> I<executable>}
+
+For rsync backups, adds the --rsync-path= option to the invocation of
+rsync.
+
+Validity: CLI, Global, BackupSet
+
 =item C<RdiffBackupBinary> I<executable> {B<--rdiff-backup-binary> I<executable>}
 
 Default: rdiff-backup
