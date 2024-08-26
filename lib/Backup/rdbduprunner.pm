@@ -517,6 +517,12 @@ our %DEFAULT_CONFIG = (
         optional => "true",
         sections => [qw(cli global backupdestination backupset)],
     },
+    'rsyncpath' => {
+        getopt   => 'rsyncpath|rsync-path=s',
+        type     => 'string',
+        optional => 'true',
+        sections => [qw(cli global backupset)],
+    },
     # 'rsync-binary=s'         => \$RSYNC_BINARY,
     'rsyncbinary' => {
         getopt => 'rsyncbinary|rsync-binary=s',
@@ -1116,6 +1122,9 @@ sub build_backup_command {
     }
     if(dtruefalse($bh,'stats')) {
       push(@com,'--stats');
+    }
+    if(defined $$bh{rsyncpath}) {
+        push(@com, "--rsync-path=${$$bh{rsyncpath}}");
     }
     # use logging
     push(@com,'--log-file='.catfile($LOG_DIR,$$bh{tag}).'.log')
