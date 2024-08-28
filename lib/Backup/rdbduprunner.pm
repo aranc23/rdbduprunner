@@ -117,7 +117,7 @@ our @EXPORT_OK = ( @{ $EXPORT_TAGS{'all'} } );
 our @EXPORT = qw(
 );
 
-our $VERSION = '2.0.10';
+our $VERSION = '2.0.11';
 
 # constant name of the application
 our $APP_NAME = basename($0);
@@ -2176,13 +2176,15 @@ sub inventory_host {
     debug("performing inventory on ".(defined $$bs{host} ? $$bs{host} : 'localhost'));
     my $inventory_command='cat /proc/mounts';
     if (defined $$bs{host}) {
-        $inventory_command="ssh -x -o BatchMode=yes $$bs{host} ${inventory_command} < /dev/null";
+        my $target = defined $$bs{remoteuser} ? join('@',$$bs{remoteuser},$$bs{host}) : $$bs{host};
+        $inventory_command="ssh -x -o BatchMode=yes ${target} ${inventory_command} < /dev/null";
     }
     if (-x '/usr/bin/waitmax') {
         $inventory_command="/usr/bin/waitmax 30 ${inventory_command}";
     } elsif ( -x '/bin/waitmax') {
         $inventory_command="/bin/waitmax 30 ${inventory_command}";
     }
+    info($inventory_command);
     my @a=`${inventory_command}`;
     print STDERR Dumper \@a if $DEBUG;
     if ($? == 0) {
