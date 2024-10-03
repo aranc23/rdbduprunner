@@ -7,11 +7,12 @@ build_dir=$(mktemp -d)
 mkdir -p $build_dir/{usr/bin,usr/lib/{$pkg,tmpfiles.d},etc/$pkg,run/$pkg} 
 mkdir -p "${build_dir}"/{"usr/lib/${pkg}","usr/lib/${pkg}/check_mk/checks","usr/lib/${pkg}/check_mk/plugins","usr/lib/tmpfiles.d","run/${pkg}","var/log/${pkg}"} 
 
-cp delta-dumper "${build_dir}/usr/bin/"
-cp config.sample "${build_dir}/etc/delta-dumper/"
-cp check_mk/checks/delta_dumper "${build_dir}/usr/lib/${pkg}/check_mk/checks/"
-cp check_mk/plugins/delta_dumper "${build_dir}/usr/lib/${pkg}/check_mk/plugins/"
-cp contrib/tmpfiles.d/delta-dumper.conf "${build_dir}/usr/lib/tmpfiles.d/"
+install delta-dumper "${build_dir}/usr/bin/"
+install -m 0644 config.sample "${build_dir}/etc/delta-dumper/"
+install check_mk/checks/delta_dumper "${build_dir}/usr/lib/${pkg}/check_mk/checks/"
+install check_mk/plugins/delta_dumper "${build_dir}/usr/lib/${pkg}/check_mk/plugins/"
+install -m 0644 contrib/tmpfiles.d/delta-dumper.conf "${build_dir}/usr/lib/tmpfiles.d/"
+#ls -lR $build_dir
 
 tmp=$(mktemp)
 grep -E 'our \$VERSION' lib/Backup/rdbduprunner.pm > $tmp
