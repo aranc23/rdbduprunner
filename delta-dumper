@@ -2199,6 +2199,12 @@ sub sanity_check_config {
     dlog('error',$msg,{});
     die $msg;
   }
+    # technically if you only ran it weekly this wouldn't be strictly true
+    if(!$config->rsyncable and ($config->get('daily') ? $config->get('daily') : 0) == 0) {
+        $msg = 'daily must be greater than zero, unless rsyncable is set otherwise no backups will be kept';
+        dlog('error',$msg,{'rsyncable' => $config->rsyncable, 'weekly' => 0});
+        die $msg;
+    }
 }
 
 # this is invoked after a successful backup
