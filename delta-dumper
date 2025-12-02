@@ -988,11 +988,25 @@ sub perform_backup {
             unlink $period_path if -f $period_path;
             dlog('debug',
                  "unable to hard link ${period_path} -> ${link_target} with errno: ${errno}",
-                 {$p => $period_path,'errno' => $errno},
+                 {
+                     'period_path' => $period_path,
+                     'period'      => $p,
+                     'link_target' => $link_target,
+                     'errno'       => $errno,
+                 },
                  \%logparams);
 
             if (copy($link_target, $period_path)) {
                 # success!
+                dlog('debug',
+                     "copied ${link_target} -> ${period_path}",
+                     {
+                         'period_path' => $period_path,
+                         'period'      => $p,
+                         'link_target' => $link_target,
+                         'errno'       => $errno,
+                     },
+                     \%logparams);
                 $link_target = $period_path;
             } else {
                 unlink $period_path if -f $period_path;
