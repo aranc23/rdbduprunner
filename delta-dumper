@@ -963,6 +963,15 @@ sub perform_backup {
     my $link_target = $output_path;
  PERIOD:
     foreach my $p (qw(daily weekly monthly)) {
+        my $n = $config->get($p) ? $config->get($p) : 0;
+        if($n == 0) {
+            dlog('debug', "skipping ${p} because we don't intend to keep them",
+            {
+                'keep' => $n,
+                'period' => $p,
+            });
+            next PERIOD;
+        }
         # do the weekly if needed:
         if ( $p eq 'weekly' and strftime( "%a", localtime($start_time) ) ne $config->week_start ) {
             next PERIOD;
