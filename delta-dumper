@@ -999,7 +999,7 @@ sub perform_backup {
             if (copy($link_target, $period_path)) {
                 # success!
                 dlog('debug',
-                     "copied ${link_target} -> ${period_path}",
+                     "copied ${link_target} -> ${period_path} and using as future link target",
                      {
                          'period_path' => $period_path,
                          'period'      => $p,
