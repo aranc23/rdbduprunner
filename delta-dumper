@@ -1187,7 +1187,7 @@ sub clean_old_dumps {
             'period'         => $$fhash{period},
             'file'           => $$fhash{path},
             'file_timestamp' => $$fhash{timestamp},
-            'file_datetime'  => localtime( $$fhash{timestamp} ),
+            'file_datetime'  => strftime($timestamp_format, localtime( $$fhash{timestamp} )),
         );
         if( (time() - $$fhash{timestamp}) > $period_times{$$fhash{period}} ) {
             if( unlink $$fhash{path} ) {

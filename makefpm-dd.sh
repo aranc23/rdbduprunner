@@ -19,7 +19,7 @@ grep -E 'our \$VERSION' lib/Backup/rdbduprunner.pm > $tmp
 echo 'print $VERSION."\n"' >> $tmp
 
 version=$(perl $tmp)
-iteration=2
+iteration=3
 rm -f $tmp
 
 summary="script for managing compact mysql, postgres, and mongodb dumps"
