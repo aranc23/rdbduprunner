@@ -19,7 +19,7 @@ grep -E 'our \$VERSION' lib/Backup/rdbduprunner.pm > $tmp
 echo 'print $VERSION."\n"' >> $tmp
 
 version=$(perl $tmp)
-iteration=0
+iteration=1
 rm -f $tmp
 
 summary="script for managing compact mysql, postgres, and mongodb dumps"
@@ -27,7 +27,7 @@ description="dumps databases and optionally compresses or diffs them using xdelt
 rpm_deps="-d perl-JSON -d perl-AppConfig -d xdelta -d xz"
 deb_deps="-d libjson-perl -d libappconfig-perl -d xdelta3 -d xz-utils"
 common_deps="-d perl -d mbuffer -d gzip -d bzip2 -d zstd -d rsync"
-common_opts="-n ${pkg} --version $version --architecture noarch -C ${build_dir} -s dir"
+common_opts="-n ${pkg} --version $version --iteration ${iteration} --architecture noarch -C ${build_dir} -s dir"
 url="https://github.com/aranc23/rdbduprunner"
 
 fpm  -d "perl-Backup-rdbduprunner = ${version}-${iteration}" $common_opts $common_deps $rpm_deps -t rpm --rpm-summary "${summary}" --description "${description}" --url "${url}" .

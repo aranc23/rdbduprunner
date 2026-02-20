@@ -17,7 +17,7 @@ grep -E 'our \$VERSION' lib/Backup/rdbduprunner.pm > $tmp
 echo 'print $VERSION."\n"' >> $tmp
 
 version=$(perl $tmp)
-iteration=0
+iteration=1
 rm -f $tmp
 
 #rpm_deps="-d perl-JSON -d perl-Log-Dispatch -d perl-Config-General -d perl-Readonly"
