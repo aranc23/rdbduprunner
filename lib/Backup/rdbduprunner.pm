@@ -27,7 +27,7 @@ use Storable qw( freeze thaw dclone );
 use Scalar::Util qw/reftype looks_like_number/;
 use GDBM_File;
 eval { use Time::HiRes qw( time ); };
-use autodie qw( open close link unlink symlink rename fork );
+use Fatal qw( :void open close link unlink symlink rename fork );
 # added from CPAN or system packages
 use Config::General;
 use Config::Validator;
