@@ -29,7 +29,6 @@ use GDBM_File;
 eval { use Time::HiRes qw( time ); };
 use Fatal qw( :void open close link unlink symlink rename fork );
 # added from CPAN or system packages
-use Config::General;
 use Config::Validator;
 use YAML::Syck;
 use Cpanel::JSON::XS;
@@ -176,7 +175,7 @@ Readonly our %tag_priorities => (
 );
 
 # supported config file extensions
-Readonly our @extensions => qw( conf yaml json rc );
+Readonly our @extensions => qw( yaml json );
 
 # we could use a list but regexp works in Validator
 our $VALID_BACKUP_TYPE_REGEX = qr{^ ( rdiff [-] backup | rsync | duplicity ) $}xms;
@@ -861,8 +860,6 @@ our %config_definition = (
 );
 
 our %config_load_dispatch = (
-    'conf' => \&load_config_conf,
-    'rc'   => \&load_config_conf,
     'yaml' => \&load_config_yaml,
     'json' => \&load_config_json,
 );
@@ -2298,16 +2295,9 @@ sub find_configs {
     return @files;
 }
 
-sub load_config_conf {
-    my $file = shift;
-    die "file ${file} does not exist, cannot be loaded" unless -f $file;
-    my $conf =
-        new Config::General(-ConfigFile     => $file,
-                            -IncludeGlob    => 1,
-                            -AutoTrue       => 1,
-                            -LowerCaseNames => 1);
-    return {$conf->getall()};
-}
+
+
+
 
 sub load_config_yaml {
     return YAML::Syck::LoadFile($_[0]);
@@ -2441,11 +2431,6 @@ sub rdbduprunner {
     if ( defined $CLI_CONFIG{config} or defined $CLI_CONFIG{confd} ) {
         push(@config_files, $CLI_CONFIG{config}) if defined $CLI_CONFIG{config};
         push(@config_files, find_configs([$CLI_CONFIG{confd}],[])) if defined $CLI_CONFIG{confd};
-    }
-    elsif( ($USER eq 'root' and -f "/etc/rdbduprunner.rc") or -f catfile($HOME,'.rdbduprunner.rc') ) {
-        my $legacy_config = ($USER eq 'root' and -f "/etc/rdbduprunner.rc") ? "/etc/rdbduprunner.rc" : catfile($HOME,'.rdbduprunner.rc');
-        _warning("found legacy config file at ${legacy_config}");
-        push(@config_files, $legacy_config);
     }
     else {
         push(@config_files,

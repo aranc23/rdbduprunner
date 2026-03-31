@@ -9,7 +9,6 @@ WriteMakefile(
         'AnyDBM_File' => 0,
         'Carp' => 0,
         'Clone' => 0,
-        'Config::General' => 0,
         'Config::Validator' => 0,
         'Cpanel::JSON::XS' => 0,
         'Data::Dumper' => 0,

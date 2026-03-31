@@ -629,9 +629,10 @@ rdbduprunner's legacy config file is an Apache style config file parsed by
 the Config::General perl module.
 
 Configuration files specified via the command line option or those
-loaded by default are loaded by Config::Any and therefore can be in
-any format recogized by the module, provided the extension matches the
-contents.  (ie: .yaml for yaml files)
+loaded by default are loaded by Config::General, or YAML or JSON
+loaders.  Configuration items from all files are merged and then
+validated by Config::Validator using %DEFAULT_CONFIG and
+%config_definition.
 
 Regardless of the parser the configuration files consist of global options,
 BackupDestinations and BackupSets.  The options names are case
