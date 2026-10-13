@@ -144,7 +144,8 @@ sub create_dispatcher {
 
 sub build_mysql_exec {
   my $bin = shift;
-  my @mysql_options = ($config->mysql_bindir ? File::Spec->catfile($config->mysql_bindir,$bin) : $bin);
+  my @mysql_prepend = $config->mysql_prepend ? split(/\s+/,$config->mysql_prepend) : ();
+  my @mysql_options = (@mysql_prepend, $config->mysql_bindir ? File::Spec->catfile($config->mysql_bindir,$bin) : $bin);
   if ($config->mysql_defaults_file) {
     push(@mysql_options, '--defaults-file='.$config->mysql_defaults_file);
   }
@@ -446,6 +447,11 @@ sub init_config {
         'mysql_defaults_file' => {
             ALIAS    => 'mysql_defaults-file|defaults-file',
             ARGS     => '=s',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mysql_prepend' => {
+            ARGS     => '=s',
+            ALIAS    => 'mysql-prepend',
             ARGCOUNT => ARGCOUNT_ONE,
         },
         'mysql_single_transaction' => {
@@ -2771,6 +2777,12 @@ mysqldump executables.  Otherwise, assume they are in the path.
 
 When invoking mysql and mysqldump, call them with --defaults-file and
 the value of this parameter.
+
+=item B<--mysql_prepend|--mysql-prepend>=I<string> C<mysql_prepend>
+
+If specified, this string is prepended to each mysql and mysqldump
+command invoked, before the executable.  May contain multiple
+whitespace-separated words, such as "nice -n 19".
 
 =item B<--mysql_single_transaction|--no-mysql_single_transaction|--single-transaction|--no-single-transaction> (Boolean)
 
