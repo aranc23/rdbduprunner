@@ -119,4 +119,33 @@ use Data::Dumper;
        "rsync");
 }
 
+{ # remoteuser is prepended to the host in the source portion of the command
+    local *Backup::rdbduprunner::dlog = sub {};
+    %CONFIG = ();
+    our $bh = {
+        host              => 'server',
+        btype             => 'rsync',
+        backupdestination => 'default',
+        path              => '/tmp',
+        tag               => 'server-tmp',
+        exclude           => [],
+        excludes          => [],
+        src               => 'server:/tmp',
+        dest              => '/some/where/server-tmp',
+        rsyncbinary       => 'rsync',
+        rdiffbackupbinary => 'rdiff-backup',
+        duplicitybinary   => 'duplicity',
+        remoteuser        => 'backup',
+    };
+    is([build_backup_command($bh)],
+       [qw(rsync --archive --one-file-system --hard-links --delete --delete-excluded), "--log-file=${LOG_DIR}/server-tmp.log", qw(backup@server:/tmp /some/where/server-tmp)],
+       "rsync with remoteuser");
+    $$bh{btype} = 'rdiff-backup';
+    $$bh{src}  = 'server::/tmp';
+    $$bh{dest} = '/some/where/rd-server-tmp';
+    is([build_backup_command($bh)],
+       [qw(rdiff-backup --exclude-device-files --exclude-other-filesystems --no-eas --ssh-no-compression backup@server::/tmp /some/where/rd-server-tmp)],
+       "rdiff-backup with remoteuser");
+}
+
 done_testing;

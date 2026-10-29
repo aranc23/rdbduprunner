@@ -26,7 +26,7 @@ is([sort(find_configs(['./tests/modern/conf.d'],['./tests/modern/rdbduprunner'])
               'tests/modern/conf.d/backupdestination.json')],
         "find dirs and stems");
 
-$configs = Backup::rdbduprunner::load_configs(find_configs(['./tests/modern/conf.d'],['./tests/modern/rdbduprunner']));
+my $configs = Backup::rdbduprunner::load_configs(find_configs(['./tests/modern/conf.d'],['./tests/modern/rdbduprunner']));
     is($configs,
                    {
                      'tests/modern/conf.d/backupset.yaml' => {
