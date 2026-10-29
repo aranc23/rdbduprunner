@@ -165,6 +165,88 @@ use Data::Dumper;
         "cli override inplace and checksum",
     );
 
+    my $remote_bh = {
+        'backupdestination' => 'scratch',
+        'btype'             => 'rsync',
+        'checksum'          => 0,
+        'dest'              => '/scratch/backups/tock-home',
+        'duplicitybinary'   => 'duplicity',
+        'exclude'           => [],
+        'excludes'          => [],
+        'gtag'              => 'generic-home',
+        'host'              => 'tock',
+        'inplace'           => 0,
+        'local'             => 0,
+        'path'              => '/home/',
+        'progress'          => 0,
+        'rdiffbackupbinary' => 'rdiff-backup',
+        'rsyncbinary'       => 'rsync',
+        'sparse'            => 1,
+        'src'               => 'tock:/home/',
+        'stats'             => 1,
+        'tag'               => 'tock-home',
+        'tricklebinary'     => 'trickle',
+        'verbose'           => 0,
+        'zfsbinary'         => 'zfs',
+    };
+    my $remote_cli = { localhost => 'a-lnx005', excludepath => '/etc/rdbduprunner/xxx' };
+
+    is( [   parse_config_backups(
+                \%DEFAULT_CONFIG,
+                {   'backupset' => {
+                        'remote' => {
+                            'host'       => 'tock',
+                            'remoteuser' => 'backup',
+                            'path'       => '/home',
+                        }
+                    },
+                    'backupdestination' =>
+                        { 'scratch' => { 'path' => '/scratch/backups' } },
+                    'defaultbackupdestination' => 'scratch'
+                },
+                $remote_cli,
+            )
+        ],
+        [ { %$remote_bh, 'remoteuser' => 'backup' } ],
+        "remoteuser from backupset",
+    );
+    is( [   parse_config_backups(
+                \%DEFAULT_CONFIG,
+                {   'backupset' => {
+                        'remote' => { 'host' => 'tock', 'path' => '/home' }
+                    },
+                    'backupdestination' =>
+                        { 'scratch' => { 'path' => '/scratch/backups' } },
+                    'defaultbackupdestination' => 'scratch',
+                    'remoteuser' => 'backup',
+                },
+                $remote_cli,
+            )
+        ],
+        [ { %$remote_bh, 'remoteuser' => 'backup' } ],
+        "remoteuser from global config",
+    );
+    is( [   parse_config_backups(
+                \%DEFAULT_CONFIG,
+                {   'backupset' => {
+                        'remote' => {
+                            'host'       => 'tock',
+                            'remoteuser' => 'bsuser',
+                            'path'       => '/home',
+                        }
+                    },
+                    'backupdestination' =>
+                        { 'scratch' => { 'path' => '/scratch/backups' } },
+                    'defaultbackupdestination' => 'scratch',
+                    'remoteuser' => 'backup',
+                },
+                { %$remote_cli, 'remoteuser' => 'clipper' },
+            )
+        ],
+        [ { %$remote_bh, 'remoteuser' => 'clipper' } ],
+        "remoteuser from cli wins",
+    );
+
     # start of tick-tock
     ${CLI_CONFIG}{excludepath} = './tests';
     is( [   sort { $$a{dest} cmp $$b{dest} } parse_config_backups(

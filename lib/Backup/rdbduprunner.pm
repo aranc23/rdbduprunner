@@ -2173,7 +2173,11 @@ sub inventory_host {
     debug("performing inventory on ".(defined $$bs{host} ? $$bs{host} : 'localhost'));
     my $inventory_command='cat /proc/mounts';
     if (defined $$bs{host}) {
-        my $target = defined $$bs{remoteuser} ? join('@',$$bs{remoteuser},$$bs{host}) : $$bs{host};
+        # resolve remoteuser from all valid layers (global, backupset, cli)
+        # the same way the backup command does, so inventory uses the
+        # same remote user as the backup itself
+        my $remoteuser = key_selector('remoteuser',{ backupdestination => $backupdest, %$bs });
+        my $target = defined $remoteuser ? join('@',$remoteuser,$$bs{host}) : $$bs{host};
         $inventory_command="ssh -x -o BatchMode=yes ${target} ${inventory_command} < /dev/null";
     }
     if (-x '/usr/bin/waitmax') {

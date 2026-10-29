@@ -334,9 +334,11 @@ bandwidth.
 
 Validity: CLI, Global, BackupDestination, BackupSet
 
-=item C<RemoteUser> I<string> {B<--remote-user> I<string>} (rsync only)
+=item C<RemoteUser> I<string> {B<--remote-user> I<string>} (remote backups only)
 
-For rsync backups this value is prepended to the source portion of the command:
+For remote backups this value is prepended to the host in the source portion
+of the backup command (as I<RemoteUser>@I<Host>). It is also used as the ssh
+user when performing inventory on the remote host.
 
 Validity: CLI, Global, BackupSet
 
@@ -822,7 +824,9 @@ specified.
 
 =item C<Host> I<hostname or ip address>
 
-Host to be backed up; if not specified assumes localhost
+Host to be backed up; if not specified assumes localhost. This value may not
+contain a username; use C<RemoteUser> to connect to the remote host as a
+different user.
 
 =item C<Inventory> I<true|false|yes|no|on|off|0|1>
 
