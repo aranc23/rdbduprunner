@@ -81,6 +81,8 @@
 
 # [mysql]
 # bindir = /opt/mysql-alternate/bin
+# binary = mysql
+# dump_binary = mysqldump
 # defaults_file = /etc/other/my.cnf
 # single_transaction = On
 # ignore_table = some_table
@@ -95,6 +97,8 @@
 
 # [postgresql]
 # bindir = /opt/postg-alternate/bin
+# binary = psql
+# dump_binary = pg_dump
 # dump_database = all
 # # extra options were implmented as an array not a string:
 # extra_option = --clean
@@ -107,7 +111,8 @@
 # options = '-a --inplace --no-whole-file'
 
 # [mongodb]
-# mongodb_bindir = /opt/mongodb/bin
+# bindir = /opt/mongodb/bin
+# dump_binary = mongodump
 # username = flarb
 # password = flurb
 # port = 4444

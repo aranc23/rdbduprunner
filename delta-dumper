@@ -143,13 +143,20 @@ sub create_dispatcher {
 }
 
 sub build_mysql_exec {
-  my $bin = shift;
+  my $arg = shift;
+  my $is_dump = ($arg eq 'mysqldump' or $arg eq 'dump' or (defined $config->mysql_dump_binary and $arg eq $config->mysql_dump_binary));
+  my $bin = ($arg eq 'mysqldump' or $arg eq 'dump') ? $config->mysql_dump_binary
+          : ($arg eq 'mysql'     or $arg eq 'list') ? $config->mysql_binary
+          : $arg;
+  my $exec = ($config->mysql_bindir and not File::Spec->file_name_is_absolute($bin))
+      ? File::Spec->catfile($config->mysql_bindir, $bin)
+      : $bin;
   my @mysql_prepend = $config->mysql_prepend ? split(/\s+/,$config->mysql_prepend) : ();
-  my @mysql_options = (@mysql_prepend, $config->mysql_bindir ? File::Spec->catfile($config->mysql_bindir,$bin) : $bin);
+  my @mysql_options = (@mysql_prepend, $exec);
   if ($config->mysql_defaults_file) {
     push(@mysql_options, '--defaults-file='.$config->mysql_defaults_file);
   }
-  if($bin eq 'mysqldump') {
+  if($is_dump) {
     if ($config->mysql_ignore_table and @{$config->mysql_ignore_table} > 0) {
       foreach my $t (@{$config->mysql_ignore_table}) {
         push(@mysql_options,"--ignore-table=${t}");
@@ -176,10 +183,11 @@ sub build_mysql_exec {
 }
 
 sub build_mongodb_exec {
+    my $bin = $config->mongodb_dump_binary;
     my @options
-        = ( $config->mysql_bindir
-        ? File::Spec->catfile( $config->mysql_bindir, 'mongodump' )
-        : 'mongodump' );
+        = ( ($config->mongodb_bindir and not File::Spec->file_name_is_absolute($bin))
+        ? File::Spec->catfile( $config->mongodb_bindir, $bin )
+        : $bin );
     push @options, '--archive';
     foreach my $p (qw( username hostname password port )) {
         if ( $config->get('mongodb_'.$p) ) {
@@ -199,7 +207,7 @@ sub build_mongodb_exec {
 }
 
 sub mysql_database_list {
-  my $mysql_com = join(' ',build_mysql_exec('mysql'));
+  my $mysql_com = join(' ',build_mysql_exec($config->mysql_binary));
   my $mysql_handle;
   my @dl;
   if (open $mysql_handle, '-|', "${mysql_com} -e \"SHOW DATABASES;\"") {
@@ -217,7 +225,7 @@ sub mysql_database_list {
 }
 
 sub pgsql_database_list {
-    my $psql_com = join(' ',build_postgresql_exec('psql'));
+    my $psql_com = join(' ',build_postgresql_exec($config->postgresql_binary));
     my @dl;
     my $psql_handle;
     if (open $psql_handle, '-|', "su -c \"${psql_com} -q -t -c \\\"SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;\\\"\" " . $config->postgresql_username) {
@@ -385,11 +393,35 @@ sub init_config {
             ARGCOUNT => ARGCOUNT_ONE,
             VALIDATE => '^\/.+',        # require an absolute path?
         },
+        'mysql_binary' => {
+            DEFAULT  => 'mysql',
+            ARGS     => '=s',
+            ALIAS    => 'mysql-binary',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mysql_dump_binary' => {
+            DEFAULT  => 'mysqldump',
+            ARGS     => '=s',
+            ALIAS    => 'mysql-dump-binary|mysqldump_binary|mysqldump-binary',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
         'postgresql_bindir' => {
             DEFAULT  => '/usr/bin',
             ARGS     => '=s',
             ARGCOUNT => ARGCOUNT_ONE,
             VALIDATE => '^\/.+',        # require an absolute path?
+        },
+        'postgresql_binary' => {
+            DEFAULT  => 'psql',
+            ARGS     => '=s',
+            ALIAS    => 'postgresql-binary|psql_binary|psql-binary',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'postgresql_dump_binary' => {
+            DEFAULT  => 'pg_dump',
+            ARGS     => '=s',
+            ALIAS    => 'postgresql-dump-binary|pg_dump_binary|pg-dump-binary',
+            ARGCOUNT => ARGCOUNT_ONE,
         },
         'postgresql_extra_option' => {
             DEFAULT  => ['--clean','--if-exists'],
@@ -544,6 +576,12 @@ sub init_config {
             ARGS     => '=s',
             ARGCOUNT => ARGCOUNT_ONE,
             VALIDATE => '^\/.+',        # require an absolute path?
+        },
+        'mongodb_dump_binary' => {
+            DEFAULT  => 'mongodump',
+            ARGS     => '=s',
+            ALIAS    => 'mongodb-dump-binary|mongodump_binary|mongodump-binary|mongodb_binary|mongodb-binary',
+            ARGCOUNT => ARGCOUNT_ONE,
         },
         'mongodb_username' => {
             ARGS     => '=s',
@@ -1468,10 +1506,10 @@ sub generic_dump {
     }
     my @pipes = ({'stage' => 'dump'});
     if ($dbtype eq 'mysql') {
-        $pipes[0]{'exec'} = [(build_mysql_exec('mysqldump'),$database)];
+        $pipes[0]{'exec'} = [(build_mysql_exec($config->mysql_dump_binary),$database)];
     }
     elsif ($dbtype eq 'postgresql') {
-        $pipes[0]{'exec'} = [(build_postgresql_exec('pg_dump'),$database)];
+        $pipes[0]{'exec'} = [(build_postgresql_exec($config->postgresql_dump_binary),$database)];
         $pipes[0]{'user'} = 'postgres';
     }
     elsif ($dbtype eq 'mongodb') {
@@ -1762,10 +1800,17 @@ sub dry_run_pipeline {
 }
 
 sub build_postgresql_exec {
-    my $bin = shift;
-    my @com = ($config->postgresql_bindir ? File::Spec->catfile($config->postgresql_bindir,$bin) : $bin);
+    my $arg = shift;
+    my $is_list = ($arg eq 'psql' or $arg eq 'list' or (defined $config->postgresql_binary and $arg eq $config->postgresql_binary));
+    my $bin = ($arg eq 'pg_dump' or $arg eq 'dump') ? $config->postgresql_dump_binary
+            : ($arg eq 'psql'    or $arg eq 'list') ? $config->postgresql_binary
+            : $arg;
+    my $exec = ($config->postgresql_bindir and not File::Spec->file_name_is_absolute($bin))
+        ? File::Spec->catfile($config->postgresql_bindir, $bin)
+        : $bin;
+    my @com = ($exec);
 
-    if($bin eq 'psql') {
+    if($is_list) {
         # no special options here
     }
     else {
@@ -2773,6 +2818,22 @@ checksum_binaries sha512 = sha512sum
 If specified, use this directory to create the path to the mysql and
 mysqldump executables.  Otherwise, assume they are in the path.
 
+=item B<--mysql_binary|--mysql-binary>=I<executable> C<mysql_binary>
+
+Default: mysql
+
+Executable used for listing mysql databases.  If a bare filename is
+specified and C<mysql_bindir> is set, it will be combined with
+C<mysql_bindir>.
+
+=item B<--mysql_dump_binary|--mysql-dump-binary|--mysqldump_binary|--mysqldump-binary>=I<executable> C<mysql_dump_binary>
+
+Default: mysqldump
+
+Executable used for dumping mysql databases.  If a bare filename is
+specified and C<mysql_bindir> is set, it will be combined with
+C<mysql_bindir>.
+
 =item B<--mysql_defaults_file|--mysql_defaults-file|--defaults-file>=I<file>
 
 When invoking mysql and mysqldump, call them with --defaults-file and
@@ -2838,6 +2899,22 @@ command line and in the config file.
 If specified, use this directory to create the path to the postgresql
 dump executables.  Otherwise, assume they are in the path.
 
+=item B<--postgresql_binary|--postgresql-binary|--psql_binary|--psql-binary>=I<executable> C<postgresql_binary>
+
+Default: psql
+
+Executable used for listing postgresql databases.  If a bare filename
+is specified and C<postgresql_bindir> is set, it will be combined with
+C<postgresql_bindir>.
+
+=item B<--postgresql_dump_binary|--postgresql-dump-binary|--pg_dump_binary|--pg-dump-binary>=I<executable> C<postgresql_dump_binary>
+
+Default: pg_dump
+
+Executable used for dumping postgresql databases.  If a bare filename
+is specified and C<postgresql_bindir> is set, it will be combined with
+C<postgresql_bindir>.
+
 =item B<--postgresql_skip_database>=I<db> C<postgresql_skip_database>
 
 List of databases to dump, can be specified multiple timees on the
@@ -2870,6 +2947,14 @@ pass --host at all.
 
 If specified, use this directory to create the path to the mongodb
 dump executable.  Otherwise, assume they are in the path.
+
+=item B<--mongodb_dump_binary|--mongodb-dump-binary|--mongodump_binary|--mongodump-binary|--mongodb_binary|--mongodb-binary>=I<executable> C<mongodb_dump_binary>
+
+Default: mongodump
+
+Executable used for dumping mongodb databases.  If a bare filename is
+specified and C<mongodb_bindir> is set, it will be combined with
+C<mongodb_bindir>.
 
 =item B<--mongodb_username>=I<username> C<mongodb_username>
 
