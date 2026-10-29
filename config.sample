@@ -90,6 +90,7 @@
 # user = dump_user
 # password = dump_password
 # hostname = example.com
+# port = 3306
 # # extra options are specified on their own line:
 # extra_option = --flarb
 # extra_option = --floot

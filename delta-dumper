@@ -173,6 +173,7 @@ sub build_mysql_exec {
       '-u' => 'user',
       '-h' => 'hostname',
       '-p' => 'password',
+      '-P' => 'port',
   );
   while(my ($p,$c) = each(%mopts)) {
       if ( $config->get('mysql_'.$c) ) {
@@ -511,6 +512,11 @@ sub init_config {
         'mysql_hostname' => {
             ARGS     => '=s',
             ALIAS    => 'mysql-hostname',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'mysql_port' => {
+            ARGS     => '=s',
+            ALIAS    => 'mysql-port',
             ARGCOUNT => ARGCOUNT_ONE,
         },
         'mysql_extra_option' => {
@@ -2869,6 +2875,10 @@ Passed to -p on mysql and mysqldump commands.
 =item B<--mysql_hostname>=I<hostname>
 
 Passed to -h on mysql and mysqldump commands.
+
+=item B<--mysql_port|--mysql-port>=I<port> C<mysql_port>
+
+Passed to -P on mysql and mysqldump commands.
 
 =item B<--mysql_extra_option>=I<option> C<mysql_extra_option>
 
