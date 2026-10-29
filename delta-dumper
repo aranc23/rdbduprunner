@@ -211,7 +211,12 @@ sub mysql_database_list {
   my $mysql_com = join(' ',build_mysql_exec($config->mysql_binary));
   my $mysql_handle;
   my @dl;
-  if (open $mysql_handle, '-|', "${mysql_com} -e \"SHOW DATABASES;\"") {
+  my $cmd = "${mysql_com} -e \"SHOW DATABASES;\"";
+  my $log_cmd = $cmd;
+  my $mysql_password = $config->get('mysql_password');
+  $log_cmd =~ s/\Q$mysql_password\E/****/g if defined $mysql_password and length($mysql_password);
+  dlog('debug', "listing databases: ${log_cmd}", { cmd => $log_cmd });
+  if (open $mysql_handle, '-|', $cmd) {
     my $c=0;
     foreach (<$mysql_handle>) {
       chomp $_;
@@ -229,7 +234,9 @@ sub pgsql_database_list {
     my $psql_com = join(' ',build_postgresql_exec($config->postgresql_binary));
     my @dl;
     my $psql_handle;
-    if (open $psql_handle, '-|', "su -c \"${psql_com} -q -t -c \\\"SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;\\\"\" " . $config->postgresql_username) {
+    my $cmd = "su -c \"${psql_com} -q -t -c \\\"SELECT datname FROM pg_catalog.pg_database WHERE datistemplate = false;\\\"\" " . $config->postgresql_username;
+    dlog('debug', "listing databases: ${cmd}", { cmd => $cmd });
+    if (open $psql_handle, '-|', $cmd) {
         foreach (<$psql_handle>) {
             chomp $_;
             if(/\s+(.+)$/) {
