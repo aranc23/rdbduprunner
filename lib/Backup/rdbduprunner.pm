@@ -41,6 +41,19 @@ use Sys::Hostname;
 use Data::UUID;
 use IO::Interactive;
 
+# monotonic clock for measuring elapsed time; unlike time() it is
+# unaffected by daylight saving time transitions or NTP adjustments
+my $HAVE_MONOTONIC = eval {
+    require Time::HiRes;
+    Time::HiRes->can('clock_gettime') and Time::HiRes->can('CLOCK_MONOTONIC');
+} ? 1 : 0;
+
+sub stopwatch {
+    $HAVE_MONOTONIC
+        ? Time::HiRes::clock_gettime(Time::HiRes::CLOCK_MONOTONIC())
+        : time();
+}
+
 our @ISA = qw(Exporter);
 
 # Items to export into callers namespace by default. Note: do not export
@@ -107,6 +120,7 @@ $uuid
 &uuid_gen
 &callback_format
 &callback_format_terminal
+&stopwatch
 &backup_file_name_builder
 &unlink_alternates
 ) ] );
@@ -1215,9 +1229,9 @@ sub perform_backups {
     }
     if (scalar(keys(%children)) > 0) {
       debug('waiting on '.(scalar(keys(%children))).' sub-processes to exit, '.scalar(keys(%BACKUPS)).' more children to spawn, pausing');
-      my $pause_start=time();
+      my $pause_start=stopwatch();
       pause;
-      debug("paused for: ".sprintf('%.2f seconds',time()-$pause_start));
+      debug("paused for: ".sprintf('%.2f seconds',stopwatch()-$pause_start));
     }
   } until scalar(keys(%children)) == 0 and scalar(keys(%BACKUPS)) == 0
 }
@@ -1340,10 +1354,10 @@ sub perform_backup {
     my $mainret=0;
     unless($CLI_CONFIG{test}) {
       set_env($bh);
-      $$bh{runtime}=time();
+      $$bh{runtime}=stopwatch();
       system(@{$$bh{com}});
       $mainret = exit_status(${^CHILD_ERROR_NATIVE});
-      $$bh{runtime}=time()-$$bh{runtime};
+      $$bh{runtime}=stopwatch()-$$bh{runtime};
       if (defined $$EXIT_CODE{$$bh{btype}}{$mainret}) {
         $$bh{'exit_code'}=$$EXIT_CODE{$$bh{btype}}{$mainret};
       }
@@ -1628,7 +1642,7 @@ sub lock_pid_file {
   my $maxwait = shift;
   my $LOCK_FILE=lock_file_compose(@_);
   my $LOCK;
-  my $waittime=time();
+  my $waittime=stopwatch();
   my $locked=0;
   unless(open($LOCK,'+<'.$LOCK_FILE) or open($LOCK,'>'.$LOCK_FILE)) {
     error("unable to open pid file: $LOCK_FILE for writing");
@@ -1645,11 +1659,11 @@ sub lock_pid_file {
   };
   if ($@) {
     die unless $@ eq "alarm\n";   # propagate unexpected errors
-    notice("receieved ALRM waiting to lock ${LOCK_FILE}: alarm: ${maxwait} elapsed time:".(time()-$waittime) );
+    notice("receieved ALRM waiting to lock ${LOCK_FILE}: alarm: ${maxwait} elapsed time:".(stopwatch()-$waittime) );
   }
   else {
     if($locked) {
-      debug("lock wait time for $LOCK_FILE: ".(time()-$waittime));
+      debug("lock wait time for $LOCK_FILE: ".(stopwatch()-$waittime));
       truncate($LOCK,0); # this shouldn't fail if we have the file opened and locked!
       print $LOCK $$."\n"; # who really cares if this fails?
       return $LOCK; # happiness is a locked file
@@ -2424,7 +2438,7 @@ sub rdbduprunner {
                        key_selector('facility'),
                        key_selector('level'),
                        $LOG_FILE );
-    $RUNTIME=time();
+    $RUNTIME=stopwatch();
     dlog('info','starting',{});
 
     my @config_files;
@@ -2479,7 +2493,7 @@ sub rdbduprunner {
 
     dlog('info',
          'exiting',
-         {'total_run_time_seconds' => time()-$RUNTIME});
+          {'total_run_time_seconds' => stopwatch()-$RUNTIME});
 }
 
 sub dump_mode {
