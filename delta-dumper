@@ -8,7 +8,7 @@ use v5.16;
 # this should cause dd to die when sent kill, ctrl-c etc.
 use sigtrap qw(handler signal_handler normal-signals);
 
-use Backup::rdbduprunner qw($APP_NAME $USER $STATE_DIR $LOCK_DIR $LOG_DIR $CONFIG_DIR $DISPATCHER &stringy %databasetype_case &unlock_and_close $timestamp_format $iso8601_regex &dlog &lock_db &lock_pid_file &lock_file_compose $uuid &uuid_gen &callback_format &callback_format_terminal &backup_file_name_builder &unlink_alternates);
+use Backup::rdbduprunner qw($APP_NAME $USER $STATE_DIR $LOCK_DIR $LOG_DIR $CONFIG_DIR $DISPATCHER &stringy %databasetype_case &unlock_and_close $timestamp_format $iso8601_regex &dlog &lock_db &lock_pid_file &lock_file_compose $uuid &uuid_gen &callback_format &callback_format_terminal &stopwatch &backup_file_name_builder &unlink_alternates);
 
 # might be assumed to be installed on any perl system by default?
 use Data::Dumper;
@@ -664,7 +664,7 @@ sub main {
   }
 
   ## Starting up:
-  my $RUNTIME=time();
+  my $RUNTIME=stopwatch();
   dlog('info','starting',{});
 
   ## Dump the config if request, and exit:
@@ -704,7 +704,7 @@ sub main {
           unlock_and_close($GLOBAL_LOCK);
           dlog('error',
                'exiting because prerun command failed',
-               {'total_run_time_seconds' => time()-$RUNTIME});
+               {'total_run_time_seconds' => stopwatch()-$RUNTIME});
           exit;
       }
   }
@@ -750,7 +750,7 @@ sub main {
   unlock_and_close($GLOBAL_LOCK) unless $config->dry_run;
   dlog('info',
        'exiting',
-       {'total_run_time_seconds' => time()-$RUNTIME});
+       {'total_run_time_seconds' => stopwatch()-$RUNTIME});
 }
 
 # returns 1 for success or null for failure?
@@ -842,7 +842,7 @@ sub perform_backup {
         databasename    => $database,
     );
     # record the time for logging:
-    my $start_time = time();
+    my $start_time = stopwatch();
     # suffix or not:
     my @suffix = ( 'sql' ) ;
     # this is a hash from the dump_db with keys, timestamp, path, full, and period
@@ -1404,12 +1404,12 @@ sub pipeline {
             dlog('debug',
                  'waiting on '.(scalar(keys(%child_map))).' sub-processes to exit, pausing',
                  \%logparams);
-            my $pause_start=time();
+            my $pause_start=stopwatch();
             alarm $MAXWAIT;
             pause;
             alarm 0;
             dlog('debug',
-                 "paused for: ".sprintf('%.5f seconds',time()-$pause_start),
+                 "paused for: ".sprintf('%.5f seconds',stopwatch()-$pause_start),
                  \%logparams);
         };
     } until( scalar(keys(%child_map)) == 0 );
@@ -1748,7 +1748,7 @@ sub generic_dump {
         unlink $f if -p $f;
     }
 
-    $logparams{runtime} = time() - $start_time;
+    $logparams{runtime} = stopwatch() - $start_time;
     $logparams{exit} = 0;
  PIPELINE:
     foreach my $line (@pipelines) {
