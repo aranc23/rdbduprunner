@@ -100,7 +100,11 @@
 # bindir = /opt/postg-alternate/bin
 # binary = psql
 # dump_binary = pg_dump
+# dumpall_binary = pg_dumpall
 # dump_database = all
+# dump the cluster-wide globals with pg_dumpall alongside each
+# database, naming the dump "globals":
+# globals = On
 # # extra options were implmented as an array not a string:
 # extra_option = --clean
 # extra_option = --if-exists
