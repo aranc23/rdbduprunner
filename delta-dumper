@@ -431,6 +431,18 @@ sub init_config {
             ALIAS    => 'postgresql-dump-binary|pg_dump_binary|pg-dump-binary',
             ARGCOUNT => ARGCOUNT_ONE,
         },
+        'postgresql_dumpall_binary' => {
+            DEFAULT  => 'pg_dumpall',
+            ARGS     => '=s',
+            ALIAS    => 'postgresql-dumpall-binary|pg_dumpall_binary|pg-dumpall-binary',
+            ARGCOUNT => ARGCOUNT_ONE,
+        },
+        'postgresql_globals' => {
+            DEFAULT  => 1,
+            ARGS     => '!',
+            ALIAS    => 'postgresql-globals',
+            ARGCOUNT => ARGCOUNT_NONE,
+        },
         'postgresql_extra_option' => {
             DEFAULT  => ['--clean','--if-exists'],
             ARGS     => '=s@',
@@ -711,11 +723,16 @@ sub main {
  DBTYPE:
   foreach my $dbtype (qw(mysql postgresql mongodb)) {
       next unless $config->get($dbtype);
-  DB:
-      foreach my $db ( $dbtype eq 'mysql' ? mysql_database_list()
+      my @databases = $dbtype eq 'mysql' ? mysql_database_list()
                        : ( $dbtype eq 'postgresql' ? pgsql_database_list()
                        : ( $dbtype eq 'mongodb' ? qw(all)
-                       : ())) ) {
+                       : ()) );
+      # dump postgresql globals (roles, tablespaces, etc.) using
+      # pg_dumpall along side dumping each database individually:
+      push @databases, 'globals'
+          if $dbtype eq 'postgresql' and $config->postgresql_globals;
+  DB:
+      foreach my $db (@databases) {
           $uuid = uuid_gen();
           if (( $dbtype eq 'mysql'
                and $config->mysql_skip_database
@@ -1522,7 +1539,16 @@ sub generic_dump {
         $pipes[0]{'exec'} = [(build_mysql_exec($config->mysql_dump_binary),$database)];
     }
     elsif ($dbtype eq 'postgresql') {
-        $pipes[0]{'exec'} = [(build_postgresql_exec($config->postgresql_dump_binary),$database)];
+        if ( $database eq 'globals' ) {
+            # "globals" is a pseudo-database: pg_dumpall dumps
+            # cluster-wide objects (roles, tablespaces, database
+            # definitions, etc.) rather than a single database, so no
+            # database name is passed:
+            $pipes[0]{'exec'} = [build_postgresql_exec($config->postgresql_dumpall_binary)];
+        }
+        else {
+            $pipes[0]{'exec'} = [(build_postgresql_exec($config->postgresql_dump_binary),$database)];
+        }
         $pipes[0]{'user'} = 'postgres';
     }
     elsif ($dbtype eq 'mongodb') {
@@ -1816,6 +1842,7 @@ sub build_postgresql_exec {
     my $arg = shift;
     my $is_list = ($arg eq 'psql' or $arg eq 'list' or (defined $config->postgresql_binary and $arg eq $config->postgresql_binary));
     my $bin = ($arg eq 'pg_dump' or $arg eq 'dump') ? $config->postgresql_dump_binary
+            : ($arg eq 'pg_dumpall' or $arg eq 'dumpall') ? $config->postgresql_dumpall_binary
             : ($arg eq 'psql'    or $arg eq 'list') ? $config->postgresql_binary
             : $arg;
     my $exec = ($config->postgresql_bindir and not File::Spec->file_name_is_absolute($bin))
@@ -2553,7 +2580,7 @@ sub build_dump_hash_from_path {
 
 =head1 NAME
 
-delta-dumper - wrapper for mysqldump, pg_dump, and xdelta
+delta-dumper - wrapper for mysqldump, pg_dump, pg_dumpall, and xdelta
 
 =head1 SYNOPSIS
 
@@ -2636,7 +2663,9 @@ Perform (or don't) mysql database dumps.
 
 Default: false
 
-Perform (or don't) postgresql database dumps.
+Perform (or don't) postgresql database dumps.  Alongside dumping each
+database individually, pg_dumpall is used to dump the cluster-wide
+"globals" (see B<--postgresql_globals>).
 
 =item B<--mongodb|--no-mongodb> C<mongodb>
 
@@ -2931,6 +2960,25 @@ Default: pg_dump
 Executable used for dumping postgresql databases.  If a bare filename
 is specified and C<postgresql_bindir> is set, it will be combined with
 C<postgresql_bindir>.
+
+=item B<--postgresql_dumpall_binary|--postgresql-dumpall-binary|--pg_dumpall_binary|--pg-dumpall-binary>=I<executable> C<postgresql_dumpall_binary>
+
+Default: pg_dumpall
+
+Executable used for dumping postgresql globals, i.e. the cluster-wide
+objects that pg_dumpall dumps (roles, tablespaces, and database
+definitions).  If a bare filename is specified and
+C<postgresql_bindir> is set, it will be combined with
+C<postgresql_bindir>.
+
+=item B<--postgresql_globals|--no-postgresql_globals> C<postgresql_globals>
+
+Default: on
+
+Perform a pg_dumpall dump of the postgresql globals alongside the
+per-database dumps.  The dump is named "globals", producing files
+like F<postgresql-globals-2026-01-01T00:00:00.sql.gz> in the
+per-period directories.
 
 =item B<--postgresql_skip_database>=I<db> C<postgresql_skip_database>
 
